@@ -1,0 +1,107 @@
+{
+  "_about": "Pinned, locally-vendored libraries for the slides skill. Populate the actual files with: python3 scripts/libfetch.py --all  (run once, in an environment with network). 'integrity' is the Subresource-Integrity hash (sha384). If null, libfetch records it on first fetch (trust-on-first-use) and prints it for you to review/commit; on later runs it is verified. You can also paste the official SRI published by jsdelivr/cdnjs to pin BEFORE the first download.",
+  "core": {
+    "chartjs": {
+      "version": "4.4.1",
+      "base": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/",
+      "files": ["chart.umd.min.js"],
+      "integrity": { "chart.umd.min.js": null },
+      "license": "MIT",
+      "license_url": "https://github.com/chartjs/Chart.js/blob/master/LICENSE.md",
+      "kind": "umd",
+      "global": "Chart",
+      "use_when": "Multi-axis, mixed-type, time-series, or densely interactive charts beyond slidegen's inline SVG.",
+      "offline_notes": "Single UMD JS file, exposes global `Chart`. Inlines cleanly. Set options.animation=false under data-static."
+    },
+    "mermaid": {
+      "version": "10.9.1",
+      "base": "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/",
+      "files": ["mermaid.min.js"],
+      "integrity": { "mermaid.min.js": null },
+      "license": "MIT",
+      "license_url": "https://github.com/mermaid-js/mermaid/blob/develop/LICENSE",
+      "kind": "umd",
+      "global": "mermaid",
+      "use_when": "Flowcharts, sequence, class, state, gantt, or ER diagrams declared as text. Don't hand-draw these.",
+      "offline_notes": "Large UMD file. Renders SVG at runtime; with data-static call mermaid.run() synchronously and wait for SVG before capture."
+    },
+    "katex": {
+      "version": "0.16.9",
+      "base": "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/",
+      "files": ["katex.min.js", "katex.min.css"],
+      "css": ["katex.min.css"],
+      "parse_css_fonts": true,
+      "integrity": { "katex.min.js": null, "katex.min.css": null },
+      "license": "MIT",
+      "license_url": "https://github.com/KaTeX/KaTeX/blob/main/LICENSE",
+      "kind": "umd",
+      "global": "katex",
+      "use_when": "LaTeX math typesetting (inline or display equations).",
+      "offline_notes": "katex.min.css references woff2/woff/ttf fonts via @font-face; libfetch parses and downloads them into fonts/. For single-file export, bundle.py base64-embeds those fonts into the CSS."
+    },
+    "three": {
+      "version": "0.160.0",
+      "base": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/",
+      "files": ["three.module.min.js"],
+      "integrity": { "three.module.min.js": null },
+      "license": "MIT",
+      "license_url": "https://github.com/mrdoob/three.js/blob/dev/LICENSE",
+      "kind": "esm",
+      "import_name": "three",
+      "use_when": "True 3D / parametric geometry / product or spatial visuals.",
+      "offline_notes": "ES module (post-r150 dropped UMD). Load via an import map pointing at the local file, or lazy-import inside loadLib('three'). Heavy — prefer per-slide lazy load. Render one fixed frame at a pinned camera under data-static."
+    },
+    "gsap": {
+      "version": "3.12.5",
+      "base": "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/",
+      "files": ["gsap.min.js"],
+      "integrity": { "gsap.min.js": null },
+      "license": "GSAP-Standard (free, no-charge use; see license_url)",
+      "license_url": "https://gsap.com/community/standard-license/",
+      "kind": "umd",
+      "global": "gsap",
+      "use_when": "Choreographed multi-element timelines beyond what CSS keyframes can express cleanly. Otherwise prefer CSS.",
+      "offline_notes": "UMD global `gsap`. Under data-static, set timelines to their end with tl.progress(1) (or .seek(tl.duration())) so capture is the finished state."
+    },
+    "highlight": {
+      "version": "11.9.0",
+      "base": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/",
+      "files": ["highlight.min.js", "styles/github-dark.min.css"],
+      "css": ["styles/github-dark.min.css"],
+      "integrity": { "highlight.min.js": null, "styles/github-dark.min.css": null },
+      "license": "BSD-3-Clause",
+      "license_url": "https://github.com/highlightjs/highlight.js/blob/main/LICENSE",
+      "kind": "umd",
+      "global": "hljs",
+      "use_when": "Real multi-language syntax highlighting when the hand-spanned .k/.fn/.s approach is too tedious or the snippet is long.",
+      "offline_notes": "UMD global `hljs`. The theme CSS uses hard colors; override with :root vars in references/code-media.md so it matches the deck. No runtime animation — fully deterministic."
+    }
+  },
+  "lazy": {
+    "_about": "Heavier or rarely-needed libraries. Not committed by default; fetch on demand with: python3 scripts/libfetch.py d3 echarts",
+    "d3": {
+      "version": "7.9.0",
+      "base": "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/",
+      "files": ["d3.min.js"],
+      "integrity": { "d3.min.js": null },
+      "license": "ISC",
+      "license_url": "https://github.com/d3/d3/blob/main/LICENSE",
+      "kind": "umd",
+      "global": "d3",
+      "use_when": "Bespoke data-driven visuals Chart.js can't express (force graphs, custom layouts, geo).",
+      "offline_notes": "UMD global `d3`. You write the rendering; make any randomness use the deck's seeded RNG and freeze transitions under data-static."
+    },
+    "echarts": {
+      "version": "5.5.0",
+      "base": "https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/",
+      "files": ["echarts.min.js"],
+      "integrity": { "echarts.min.js": null },
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/apache/echarts/blob/master/LICENSE",
+      "kind": "umd",
+      "global": "echarts",
+      "use_when": "Very rich interactive charts (heatmaps, candlesticks, large datasets).",
+      "offline_notes": "UMD global `echarts`. Set animation:false in option under data-static."
+    }
+  }
+}
