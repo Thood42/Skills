@@ -1400,6 +1400,25 @@ body.forge-edit .forge-block:hover{ outline:1.5px dashed rgba(120,170,255,.55); 
 #forge-fmt button:hover{ background:#26303f; }
 #forge-fmt button.on{ background:#2a6df4; border-color:#2a6df4; color:#fff; }
 
+/* right-click context menu (Edit text / element actions) shown over a block on canvas */
+#forge-ctx{ position:fixed; z-index:9300; display:none; min-width:152px; padding:5px;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:9px;
+  box-shadow:0 12px 34px rgba(0,0,0,.55); }
+#forge-ctx.on{ display:block; }
+#forge-ctx button{ display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+  padding:7px 10px; border-radius:6px; cursor:pointer; background:none; color:#dbe3ef;
+  border:0; font:600 12.5px var(--font-body,system-ui,sans-serif); }
+#forge-ctx button:hover{ background:#1d2330; }
+#forge-ctx button.warn:hover{ background:#7a1f22; }
+#forge-ctx .forge-ctx-sep{ height:1px; margin:4px 6px; background:rgba(255,255,255,.10); }
+
+/* live-edit pulse — flashes the selected element whenever an inspector field changes it,
+   so it's obvious WHICH element the sidebar is driving. Uses box-shadow (not outline) so it
+   never fights .forge-sel's !important selection outline. */
+@keyframes forgePulse{ 0%{ box-shadow:0 0 0 0 rgba(46,230,166,0); }
+  28%{ box-shadow:0 0 0 4px rgba(46,230,166,.6); } 100%{ box-shadow:0 0 0 0 rgba(46,230,166,0); } }
+.forge-live{ animation:forgePulse .45s ease-out; }
+
 .forge-handles{ position:absolute; inset:0; pointer-events:none; z-index:50; }
 .forge-h{
   position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px;
@@ -1424,7 +1443,7 @@ body.forge-edit .forge-block:hover{ outline:1.5px dashed rgba(120,170,255,.55); 
   box-shadow:0 10px 40px rgba(0,0,0,.5);
 }
 body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-right:auto; padding-left:4px; }
-/* ---- content editor widgets (nested fields, arrays, emphasis) ---- */
+/* ---- content editor widgets (nested fields, arrays) ---- */
 .forge-subh{ display:flex; align-items:center; gap:7px; margin:0 0 11px; font-size:10.5px;
   letter-spacing:.16em; text-transform:uppercase; color:#aeb9cd; font-weight:700; }
 .forge-subh::before{ content:""; width:3px; height:12px; border-radius:2px; background:#2a6df4; flex:none; }
@@ -1435,13 +1454,9 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
 .forge-card-tools{ display:flex; gap:3px; }
 .forge-arr{ margin:8px 0; }
 .forge-arr-h{ display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#cdd6e6; font-weight:700; margin:8px 0 2px; }
-.forge-emph{ display:flex; gap:3px; margin:-1px 0 2px; }
 .forge-chip{ display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:24px; padding:0 7px;
   border-radius:6px; background:#1a212d; color:#cdd6e6; border:1px solid rgba(255,255,255,.12); font-size:12px; font-weight:700; cursor:pointer; }
 .forge-chip:hover{ background:#222b3a; }
-.forge-emph .forge-chip{ min-width:22px; height:20px; padding:0 6px; font:600 11px var(--font-mono,monospace); opacity:.6; }
-.forge-emph .forge-chip:hover{ opacity:1; background:#222b3a; }
-.forge-emph .forge-chip.on{ opacity:1; background:#2a6df4; border-color:#2a6df4; color:#fff; }
 .forge-chip.add{ background:#173a2a; border-color:#1f6d4a; color:#9af0c4; }
 .forge-chip.warn{ background:#3a1717; border-color:#6d1f1f; color:#f0a0a0; }
 .forge-chip[disabled]{ opacity:.35; cursor:default; }
@@ -1912,12 +1927,15 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
   /* full re-render + rebuild panels (structural changes) */
   F.commit=function(){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); reselect(); F.save(); F.buildNav(); F.syncToolbar(); F.buildInspect(); };
   /* light re-render that preserves sidebar focus (live typing) */
-  F.renderLive=function(){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); reselect(); F.save(); };
+  F.renderLive=function(){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); reselect(); F.saveDebounced(); };
   F.undoOp=function(){ if(!F.undo.length) return; F.redo.push(JSON.stringify(SG.data)); SG.data=JSON.parse(F.undo.pop()); F.sel=null; F.commit(); };
   F.redoOp=function(){ if(!F.redo.length) return; F.undo.push(JSON.stringify(SG.data)); SG.data=JSON.parse(F.redo.pop()); F.sel=null; F.commit(); };
 
   F.key=function(){ var m=SG.data.meta||{}; if(!m.id){ m.id='forge-'+Math.random().toString(36).slice(2,9); SG.data.meta=m; } return 'forge:'+m.id; };
   F.save=function(){ try{ localStorage.setItem(F.key(), JSON.stringify(SG.data)); }catch(e){} };
+  /* coalesce the rapid autosaves fired during slider/color drags + arrow-key nudges into a single
+     write (~150ms after the last change). Structural edits still save immediately via F.commit. */
+  F.saveDebounced=function(){ clearTimeout(F._saveT); F._saveT=setTimeout(F.save,150); };
 
   /* =====================================================================
      DECORATE  —  after every render: tag editable blocks, apply geometry/style
@@ -2080,22 +2098,51 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
     F.do('edit text',function(data){ var s=data.slides[i]; s.overrides=s.overrides||{}; (s.overrides[key]=s.overrides[key]||{}).html=markers; }); }
   F.endEdit=endEdit;
 
+  /* =====================================================================
+     RIGHT-CLICK CONTEXT MENU  —  right-click a block on the canvas to edit its
+     text (leaf text only), select it, or reset/delete it. Replaces double-click
+     as the way into on-canvas text editing, so the action is explicit + discoverable.
+     ===================================================================== */
+  var ctxMenu=null;
+  function buildCtxMenu(){ ctxMenu=el('div','forge-chrome'); ctxMenu.id='forge-ctx'; D.body.appendChild(ctxMenu); }
+  function hideCtxMenu(){ if(ctxMenu) ctxMenu.classList.remove('on'); }
+  F.hideCtxMenu=hideCtxMenu;
+  function ctxItem(label,cls,fn){ var b=el('button',cls||null,label); b.onclick=function(){ hideCtxMenu(); fn(); }; return b; }
+  function showCtxMenu(x,y,node){ if(!ctxMenu) buildCtxMenu(); ctxMenu.innerHTML='';
+    var isFree=node.hasAttribute('data-free'), isLeafText=!isFree && !keyableChildren(node).length;
+    if(isLeafText) ctxMenu.appendChild(ctxItem('✎ Edit text',null,function(){ startEdit(node); }));
+    ctxMenu.appendChild(ctxItem('☐ Select element',null,function(){ selectNode(node); }));
+    ctxMenu.appendChild(el('div','forge-ctx-sep'));
+    ctxMenu.appendChild(ctxItem(isFree?'🗑 Delete object':'↺ Reset element','warn',function(){
+      var sl=slideIdxOf(node), k=node.getAttribute('data-el'), id=node.getAttribute('data-free');
+      F.do(isFree?'delete object':'reset element',function(data){ var s=data.slides[sl];
+        if(isFree) s.freeObjects=(s.freeObjects||[]).filter(function(f){return f.id!==id;}); else if(s.overrides) delete s.overrides[k]; });
+      clearSel(); F.buildInspect(); }));
+    ctxMenu.classList.add('on');
+    var mw=ctxMenu.offsetWidth||156, mh=ctxMenu.offsetHeight||100;
+    ctxMenu.style.left=Math.min(x, W.innerWidth-mw-8)+'px';
+    ctxMenu.style.top=Math.min(y, W.innerHeight-mh-8)+'px'; }
+
   function wireDeck(){ var deck=deckEl();
     deck.addEventListener('pointerdown',function(e){ if(!D.body.classList.contains('forge-edit')) return;
+      if(e.button!==0) return;                          /* right/middle button: handled by contextmenu, no select/drag */
       if(F.editing){ if(F.editing.contains(e.target)) return; endEdit(); return; }   /* click outside commits the edit */
       var hnd=e.target.closest('.forge-h'); if(hnd){ startDrag(e, hnd.dataset.h==='rot'?'rot':'resize'); return; }
       /* Alt-click drills into the deepest nested element (item / child field) under the cursor */
       if(e.altKey){ var deep=e.target.closest('[data-el]'); if(deep){ e.preventDefault(); selectNode(deep); return; } }
       var blk=e.target.closest('.forge-block'); if(blk){ if(!F.sel||F.sel.node!==blk) selectNode(blk); startDrag(e,'move'); return; }
       clearSel(); F.buildInspect(); },true);
-    /* double-click a leaf text element to edit it in place */
-    deck.addEventListener('dblclick',function(e){ if(!D.body.classList.contains('forge-edit')) return;
-      var node=e.target.closest('[data-el]'); if(!node||node.hasAttribute('data-free')) return;
-      if(keyableChildren(node).length) return;                                      /* only leaf text nodes */
-      e.preventDefault(); startEdit(node); },true);
+    /* right-click a block → context menu: Edit text (leaf text only), Select, Reset/Delete */
+    deck.addEventListener('contextmenu',function(e){ if(!D.body.classList.contains('forge-edit')) return;
+      if(F.editing && F.editing.contains(e.target)) return;                          /* editing: keep native menu (spellcheck/paste) */
+      var node=e.target.closest('[data-el],[data-free]'); if(!node) return;          /* not on a block → native menu */
+      e.preventDefault(); if(F.editing) endEdit();                                   /* right-click elsewhere commits the edit */
+      showCtxMenu(e.clientX, e.clientY, node); },true);
     /* block present-mode click-to-advance while editing */
     deck.addEventListener('click',function(e){ if(D.body.classList.contains('forge-edit')){ e.stopImmediatePropagation(); e.stopPropagation(); } },true);
-    W.addEventListener('scroll',function(){ if(F.editing) positionFmtBar(); },true);
+    /* dismiss the context menu on any outside press, and on scroll (its anchor goes stale) */
+    D.addEventListener('pointerdown',function(e){ if(ctxMenu && ctxMenu.classList.contains('on') && !ctxMenu.contains(e.target)) hideCtxMenu(); },true);
+    W.addEventListener('scroll',function(){ hideCtxMenu(); if(F.editing) positionFmtBar(); },true);
   }
 
   /* =====================================================================
@@ -2133,31 +2180,9 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
     n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ obj[key]=n.value; F.renderLive(); }; return n; }
   function boundNum(obj,key){ var n=el('input'); n.type='number'; n.value=obj[key]==null?0:obj[key];
     n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); obj[key]=isNaN(v)?0:v; F.renderLive(); }; return n; }
-  /* emphasis buttons that TOGGLE a marker around the selection: wrapping if
-     absent, stripping if the selection (or the text just outside it) is already
-     wrapped — so clicking twice doesn't nest (****x****). */
-  function wrapState(v,s,e2,open,close){ var sel=v.slice(s,e2);
-    if(sel.length>=open.length+close.length && sel.slice(0,open.length)===open && sel.slice(-close.length)===close) return 'inner';
-    if(v.slice(s-open.length,s)===open && v.slice(e2,e2+close.length)===close) return 'outer';
-    return 'none'; }
-  function emphasisRow(input){ var r=el('div','forge-emph'); var chips=[];
-    [['B','**','**','bold'],['✦','[[',']]','glow (accent color)'],['&lt;&gt;','`','`','mono']].forEach(function(b){
-      var open=b[1],close=b[2];
-      var x=el('button','forge-chip',b[0]); x.title='Toggle '+b[3]; x._open=open; x._close=close;
-      x.onmousedown=function(e){ e.preventDefault();
-        var s=input.selectionStart||0,e2=input.selectionEnd||0,v=input.value,sel=v.slice(s,e2);
-        var st=wrapState(v,s,e2,open,close),ns,nss,nse;
-        if(st==='inner'){ var inner=sel.slice(open.length,sel.length-close.length);
-          ns=v.slice(0,s)+inner+v.slice(e2); nss=s; nse=s+inner.length; }
-        else if(st==='outer'){ ns=v.slice(0,s-open.length)+sel+v.slice(e2+close.length); nss=s-open.length; nse=nss+sel.length; }
-        else { ns=v.slice(0,s)+open+sel+close+v.slice(e2); nss=s+open.length; nse=e2+open.length; }
-        input.value=ns; input.focus(); input.selectionStart=nss; input.selectionEnd=nse;
-        input.dispatchEvent(new Event('input')); updateActive(); };
-      chips.push(x); r.appendChild(x); });
-    function updateActive(){ var s=input.selectionStart||0,e2=input.selectionEnd||0,v=input.value;
-      chips.forEach(function(x){ x.classList.toggle('on', wrapState(v,s,e2,x._open,x._close)!=='none'); }); }
-    input.addEventListener('keyup',updateActive); input.addEventListener('mouseup',updateActive); input.addEventListener('focus',updateActive);
-    return r; }
+  /* Inline emphasis (bold / glow / mono) is applied ON-CANVAS now — select text while
+     editing an element and use the floating toolbar (see the WYSIWYG section below).
+     The sidebar no longer carries emphasis chips, so there's one place to format. */
 
   /* =====================================================================
      CONTENT EDITOR — introspects the slide's content; nested arrays editable
@@ -2168,7 +2193,7 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
     var val=parent[key];
     if(typeof val==='string'){ var ml=val.length>40||/\n/.test(val)||key==='code'||key==='body'||key==='html';
       var inp=boundText(parent,key,ml); host.appendChild(field(pretty(key),inp));
-      if(typeof val==='string' && key!=='code' && key!=='html' && key!=='body' && key!=='image') host.appendChild(emphasisRow(inp)); return; }
+      return; }
     if(typeof val==='number'){ host.appendChild(field(pretty(key),boundNum(parent,key))); return; }
     if(typeof val==='boolean'){ var cb=el('input'); cb.type='checkbox'; cb.checked=val; cb.onchange=function(){ F.do('toggle',function(){ parent[key]=cb.checked; }); }; host.appendChild(fieldRow(pretty(key),cb)); return; }
     if(Array.isArray(val)){ renderArray(parent,key,host); return; }
@@ -2187,7 +2212,7 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
       var dn=el('button','forge-chip','↓'); dn.disabled=idx===arr.length-1; dn.onclick=function(){ F.do('reorder',function(){ var t=arr[idx+1]; arr[idx+1]=arr[idx]; arr[idx]=t; }); };
       var tools=el('div','forge-card-tools'); tools.appendChild(up); tools.appendChild(dn); tools.appendChild(del); ch.appendChild(tools); card.appendChild(ch);
       if(item&&typeof item==='object'){ Object.keys(item).forEach(function(k){ renderValue(item,k,card); }); }
-      else { var box={v:item}; var inp=boundText(box,'v',false); inp.onfocus=function(){ F.pushUndo(); }; inp.oninput=function(){ arr[idx]=inp.value; F.renderLive(); }; card.appendChild(field('Text',inp)); card.appendChild(emphasisRow(inp)); }
+      else { var box={v:item}; var inp=boundText(box,'v',false); inp.onfocus=function(){ F.pushUndo(); }; inp.oninput=function(){ arr[idx]=inp.value; F.renderLive(); }; card.appendChild(field('Text',inp)); }
       wrap.appendChild(card); });
     host.appendChild(wrap); }
 
@@ -2255,7 +2280,9 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
   function resolved(node,prop){ try{ var v=getComputedStyle(node)[prop]; return /^rgb/.test(v)?rgbHex(v):(/^#/.test(v)?v:''); }catch(e){ return ''; } }
   function resolvedVar(node,tok){ try{ var v=getComputedStyle(node).getPropertyValue(tok).trim(); return /^#/.test(v)?v:''; }catch(e){ return ''; } }
   function rgbHex(v){ var m=v.match(/\d+/g); if(!m) return ''; return '#'+m.slice(0,3).map(function(x){return ('0'+(+x).toString(16)).slice(-2);}).join(''); }
-  function reflow(){ if(!F.sel) return; var d=selData(); F.sel.kind==='free'?applyFree(F.sel.node,d):applyOverride(F.sel.node,d); refreshHandles(); F.save(); }
+  /* brief box-shadow flash on the selected node so an inspector change is visibly tied to it */
+  function pulse(node){ if(!node) return; node.classList.remove('forge-live'); void node.offsetWidth; node.classList.add('forge-live'); }
+  function reflow(){ if(!F.sel) return; var d=selData(); F.sel.kind==='free'?applyFree(F.sel.node,d):applyOverride(F.sel.node,d); refreshHandles(); pulse(F.sel.node); F.saveDebounced(); }
 
   /* =====================================================================
      SLIDE + DECK SETTINGS
@@ -2350,7 +2377,7 @@ body.forge-edit #forge-bar .forge-title{ color:#7e8aa0; font-size:12px; margin-r
         e.preventDefault(); e.stopImmediatePropagation(); return; }
       if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?F.redoOp():F.undoOp(); }
       else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); F.download(); }
-      else if(e.key==='Escape'){ clearSel(); F.buildInspect(); }
+      else if(e.key==='Escape'){ hideCtxMenu(); clearSel(); F.buildInspect(); }
       else if((e.key==='Delete'||e.key==='Backspace')&&F.sel){ e.preventDefault();
         var sl=F.sel.slideIdx,k=F.sel.key,id=F.sel.id,kind=F.sel.kind;
         F.do('delete',function(data){ var s=data.slides[sl]; if(kind==='free') s.freeObjects=(s.freeObjects||[]).filter(function(f){return f.id!==id;}); else if(s.overrides) delete s.overrides[k]; });

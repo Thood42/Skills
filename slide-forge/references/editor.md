@@ -13,12 +13,12 @@ fields are text/number inputs; **nested arrays** (a stat-grid's `stats`, an agen
 timeline's `items`, comparison `items`, etc.) render as **separate cards** — each item editable on
 its own, with **＋ Add**, **✕ remove**, and **↑/↓ reorder**. Editing here changes
 `slides[i].content` directly and re-renders from data, so text never goes stale and **survives a
-layout switch**. Text fields offer inline-emphasis chips — **B** (`**bold**`), **✦** (`[[glow]]`,
-the accent color), **`<>`** (`` `mono` ``). The chips **toggle**: select already-wrapped text and the
-chip strips the markers instead of nesting, and it lights up to show the selection's current state.
+layout switch**. The sidebar holds **no text-formatting controls** — emphasis is applied visually on
+the canvas (next paragraph). You can still type the light inline markers by hand if you prefer —
+`**bold**`, `[[glow]]` (the accent color), `` `mono` `` — and they render the same way.
 
-**On-canvas WYSIWYG (the primary way to format).** In Edit mode, **double-click any text element on
-the slide** to edit it in place. Selecting text raises a small floating toolbar (**B / ✦ / `<>`**)
+**On-canvas WYSIWYG (the primary way to format).** In Edit mode, **right-click any text element on
+the slide and choose ✎ Edit text** to edit it in place. Selecting text raises a small floating toolbar (**B / ✦ / `<>`**)
 that toggles the same bold / glow / mono formatting directly on what you see — no markers visible.
 Press **Enter** (or click away) to commit, **Esc** to cancel. The edit is serialized back to marker
 text and stored as that element's `html` override (see below), so it round-trips and exports clean.
@@ -92,6 +92,7 @@ nudge a selected object.
   `content` is unaffected.
 - An on-canvas `html` edit and the sidebar **Content** field for the same element can diverge (the
   override wins on the slide). To go back to the content-driven text, use "Reset element".
-- Keyboard-text editing intentionally targets **leaf** text elements only; double-clicking a
-  container (a grid/list wrapper) does nothing — drill to the item/field first.
+- On-canvas text editing intentionally targets **leaf** text elements only; the right-click menu
+  shows **✎ Edit text** only on a leaf — right-clicking a container (a grid/list wrapper) offers
+  **Select** / **Reset** but no Edit text, so drill to the item/field first.
 - The editor is vanilla JS with zero dependencies, so the single-file/offline guarantee holds.

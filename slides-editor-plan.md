@@ -391,3 +391,29 @@ alignment guides, accessibility pass) is deferred.
 Run the skill-creator eval loop (generate sample decks with/without the skill, review), then a
 real-browser QA of the edit interactions, then optional Phase-6 polish. Description-trigger
 optimization after the content is settled.
+
+---
+
+## 9. Addendum (2026-06-20) — inspector/interaction refactor
+
+A focused refactor to make edits feel clearly tied to the selected element and to give text editing
+one obvious entry point. Implemented on branch `editor-refactor` in `editor-template.html`; docs in
+§8 / `references/editor.md` / `SKILL.md` updated to match.
+
+1. **One formatting surface.** The sidebar's inline-emphasis chips (and the dead `wrapState()` /
+   `emphasisRow()` helpers + their `.forge-emph` CSS) were removed. Bold / glow / mono is now applied
+   **only** on-canvas via the floating toolbar over a text selection. Typed markers
+   (`**`/`[[ ]]`/`` ` ``) still render — `rich()` is untouched — so authored content is unaffected.
+2. **Right-click to edit, not double-click.** The `dblclick` → `startEdit` path was replaced by a
+   `contextmenu` handler + a small `#forge-ctx` menu (**✎ Edit text** on leaf text, **Select**,
+   **Reset/Delete**). `pointerdown` now ignores non-left buttons so right-click never starts a
+   drag/select. Editing still commits to `overrides[key].html` exactly as before (§8.2.2 unchanged).
+3. **Live feedback.** Inspector field changes now flash the selected node (`.forge-live` box-shadow
+   pulse, fired from `reflow()`), so it's visually obvious which element the sidebar drives. Uses
+   box-shadow, not outline, to avoid fighting `.forge-sel`'s `!important` selection outline.
+4. **Autosave coalesced.** `reflow()` / `renderLive()` now call a debounced `F.saveDebounced()`
+   (~150ms) instead of writing `localStorage` on every slider/color/nudge event; structural edits
+   still save immediately through `F.commit`.
+
+Closes part of the §8.3 "real-browser verification owed" item: these interactions were QA'd in a
+browser (right-click menu, on-canvas edit, inspector pulse, no console errors).

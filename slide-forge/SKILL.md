@@ -148,7 +148,7 @@ The delivered file does double duty, so close by telling them how to use both ha
 - **Present:** open the file, click to advance, press `F` for fullscreen.
 - **Edit (no install):** click **Edit** (bottom-right) — or add `?edit` to the file URL. Then they can
   **click any element to select it and drag to move, drag a corner to resize, the green handle to
-  rotate, double-click to edit text inline**, add slides or free **Text/Box** objects from the top
+  rotate, right-click an element to edit its text inline**, add slides or free **Text/Box** objects from the top
   bar, reorder/delete slides from the left panel, and recolor the whole deck (Theme) or just the
   selected element (per-object colors in the right panel). **Undo/redo** is `Cmd/Ctrl+Z`.
 - **Saving:** edits autosave in the browser, but the portable save is **Save .html** (top bar /
