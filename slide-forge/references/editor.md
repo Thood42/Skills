@@ -14,23 +14,49 @@ timeline's `items`, comparison `items`, etc.) render as **separate cards** — e
 its own, with **＋ Add**, **✕ remove**, and **↑/↓ reorder**. Editing here changes
 `slides[i].content` directly and re-renders from data, so text never goes stale and **survives a
 layout switch**. Text fields offer inline-emphasis chips — **B** (`**bold**`), **✦** (`[[glow]]`,
-the accent color), **‹›** (`` `mono` ``) — that wrap the selection.
+the accent color), **`<>`** (`` `mono` ``). The chips **toggle**: select already-wrapped text and the
+chip strips the markers instead of nesting, and it lights up to show the selection's current state.
 
-**2. Object (geometry & style) — overrides layered on a template element or free object.**
+**On-canvas WYSIWYG (the primary way to format).** In Edit mode, **double-click any text element on
+the slide** to edit it in place. Selecting text raises a small floating toolbar (**B / ✦ / `<>`**)
+that toggles the same bold / glow / mono formatting directly on what you see — no markers visible.
+Press **Enter** (or click away) to commit, **Esc** to cancel. The edit is serialized back to marker
+text and stored as that element's `html` override (see below), so it round-trips and exports clean.
+
+**2. Object (geometry, style & animation) — overrides layered on a template element or free object.**
 Click an element on the slide to select it; the **Object** panel exposes position (X/Y), scale,
-rotation, **text color**, **accent**, **font** (from the theme fonts), and a **surface** color.
-These write to a per-slide `overrides` map (for template elements, keyed by `data-el` like `b0`)
-or to a free object. Arrow keys nudge a selected object (Shift = 10px). "Reset element" drops the
-override; "Delete object" removes a free object.
+rotation, **text color**, **accent**, **font** (from the theme fonts), a **surface** color, and an
+**Animation** effect (+ delay). These write to a per-slide `overrides` map (for template elements,
+keyed by `data-el` like `b0`) or to a free object. Arrow keys nudge a selected object (Shift = 10px).
+"Reset element" drops the override; "Delete object" removes a free object.
+
+**Animation binding.** The Object panel's **Animation** section assigns one effect to the selected
+element from a curated catalog (entrance: *fade-rise, reveal-wipe, typewriter, kinetic*; continuous:
+*glow-pulse, shimmer, gradient-text, neon-flicker, float*) plus a **delay** in seconds. Entrance
+effects replay when the slide opens (and a **▶ Replay** button previews them while editing);
+continuous effects loop. Stored as `overrides[key].anim` / `.animDelay`.
+
+**Nested elements (array items & their fields).** Beyond the top-level blocks (`b0`, `b1`…), the
+editor also keys **array items and their child fields** with positional dotted keys (`b6.0`,
+`b6.0.1`). Select them via the **Nested** list in the Object panel (a child picker with a ↑ parent
+button), or **Alt-click** the element on the canvas to drill straight in. Once selected, all of the
+above — style, geometry, and **animation** — apply to that individual item or field.
 
 ```jsonc
 { "layout": "stat-grid",
   "content": { "title": "By the numbers", "stats": [ {"count":94,"unit":"%","label":"…"} ] },
   "overrides": { "b0": { "x":120, "y":60, "rot":-2, "scale":1.1,
                          "color":"#ffd166", "font":"var(--font-mono)",
-                         "theme": { "--cyan":"#ff5", "--bg":"#101" } } },
+                         "anim":"reveal-wipe", "animDelay":0.2,
+                         "html":"**By** the [[numbers]]",          // on-canvas WYSIWYG edit
+                         "theme": { "--cyan":"#ff5", "--bg":"#101" } },
+                 "b1.0": { "anim":"glow-pulse" } },               // a nested array item
   "freeObjects": [ { "id":"f1", "type":"txt", "x":900, "y":120, "text":"Draft", "size":40 } ] }
 ```
+
+`html` (set by on-canvas editing) replaces that element's template text with `rich()`-formatted
+markers, layered over `content` the same way geometry/style overrides are — so if both exist, the
+override wins on the slide while `content` stays as the authored source. "Reset element" clears it.
 
 A deck with no `overrides`/`freeObjects` renders byte-for-byte like a plain static deck — which is
 why everything you generate stays clean and portable.
@@ -60,7 +86,12 @@ nudge a selected object.
 
 ## Notes & limits (be honest with the user)
 
-- `data-el` keys for geometry overrides are positional; if a slide's content shape changes a lot,
-  a geometry override may detach — recoverable via Undo or "Reset element". Text edits live in
-  `content` and are unaffected.
+- `data-el` keys (including nested `b6.0` ones) are positional; if a slide's content shape changes a
+  lot — reordering array items, switching layouts — an override (geometry, animation, or `html`) may
+  detach or land on a different element. Recoverable via Undo or "Reset element". Plain text in
+  `content` is unaffected.
+- An on-canvas `html` edit and the sidebar **Content** field for the same element can diverge (the
+  override wins on the slide). To go back to the content-driven text, use "Reset element".
+- Keyboard-text editing intentionally targets **leaf** text elements only; double-clicking a
+  container (a grid/list wrapper) does nothing — drill to the item/field first.
 - The editor is vanilla JS with zero dependencies, so the single-file/offline guarantee holds.
