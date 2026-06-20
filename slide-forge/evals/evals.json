@@ -1,0 +1,53 @@
+{
+  "skill_name": "slide-forge",
+  "evals": [
+    {
+      "id": 0,
+      "name": "editable-onboarding-deck",
+      "prompt": "Turn these notes into a slide deck I can tweak myself before our team meeting \u2014 I'll want to move things around and fix wording. NOTES: Q3 onboarding revamp. Problem: new hires took ~6 weeks to first meaningful PR, too long. What we changed: a 2-week structured ramp, a buddy system, a checklist in Notion, weekly 1:1s. Results: time-to-first-PR down to 18 days, new-hire NPS up from 41 to 72, 0 regretted attrition in cohort. Next: roll out to the data team, add a mentorship track.",
+      "expected_output": "A single self-contained .html file: a data-driven deck (cover, problem, what-changed, results stats, next steps) using slide-forge layouts, with the in-file editor present (Edit button, overrides/freeObjects machinery), valid deck-data JSON, and present-mode byte-compatible structure.",
+      "files": [],
+      "assertions": [
+        "Delivered a single self-contained .html deck",
+        "deck-data JSON parses",
+        "In-file editor is present (Edit + forge runtime)",
+        "All slide layouts are valid registry names",
+        "Present-mode engine intact (deck-engine + boot)",
+        "Self-contained: no external CDN <script> at runtime",
+        "Reasonable slide count (4\u201312)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "draggable-4day-pitch",
+      "prompt": "make me a ~6 slide pitch on why our startup should adopt a 4-day work week, something I can drag things around in and recolor to match our brand later. punchy, not a wall of text.",
+      "expected_output": "A single self-contained editable .html deck (~6 slides) with varied structured layouts, short copy, the editor enabled so the user can drag/recolor afterward, valid deck-data JSON, a chosen theme applied.",
+      "files": [],
+      "assertions": [
+        "Delivered a single self-contained .html deck",
+        "deck-data JSON parses",
+        "In-file editor is present (Edit + forge runtime)",
+        "All slide layouts are valid registry names",
+        "Present-mode engine intact (deck-engine + boot)",
+        "Self-contained: no external CDN <script> at runtime",
+        "Reasonable slide count (4\u201312)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "investor-update-rearrange",
+      "prompt": "turn this into slides I can edit and rearrange before sending \u2014 founder update for investors. we hit 12k MRR, churn down to 3%, hired 2 engineers, runway 14 months. keep it short.",
+      "expected_output": "A single self-contained editable .html deck, short, with the metrics as stat/bignum layouts, editor enabled, valid deck-data JSON.",
+      "files": [],
+      "assertions": [
+        "Delivered a single self-contained .html deck",
+        "deck-data JSON parses",
+        "In-file editor is present (Edit + forge runtime)",
+        "All slide layouts are valid registry names",
+        "Present-mode engine intact (deck-engine + boot)",
+        "Self-contained: no external CDN <script> at runtime",
+        "Reasonable slide count (4\u201312)"
+      ]
+    }
+  ]
+}
