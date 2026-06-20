@@ -36,6 +36,31 @@
 
 set -euo pipefail
 
+# ---- PDF export: one slide per page, 16:9, frozen motion --------------------
+#   ./render.sh --pdf <deck.html> [out.pdf]
+# Uses Chrome's print-to-pdf against the deck's @media print stylesheet, which
+# lays every .slide on its own 1280x720 page. Same headless engine as the PNG
+# path, so the PDF matches what the golden-frame check verifies.
+if [[ "${1:-}" == "--pdf" ]]; then
+  shift
+  PDF_DECK="${1:?Usage: render.sh --pdf <deck.html> [out.pdf]}"
+  PDF_OUT="${2:-${PDF_DECK%.html}.pdf}"
+  PCHROME=""
+  for c in /opt/google/chrome/chrome /usr/bin/google-chrome-stable /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+    [[ -x "$c" ]] && PCHROME="$c" && break
+  done
+  [[ -z "$PCHROME" ]] && { echo "ERROR: Chrome not found for --pdf." >&2; exit 1; }
+  PDF_ABS="$(realpath "$PDF_DECK")"
+  echo "Printing $PDF_ABS -> $PDF_OUT (one slide per page, 16:9)"
+  "$PCHROME" --headless --disable-gpu --no-sandbox \
+    --force-prefers-reduced-motion --allow-file-access-from-files \
+    --run-all-compositor-stages-before-draw --virtual-time-budget=8000 \
+    --no-pdf-header-footer --print-to-pdf="$PDF_OUT" \
+    "file://$PDF_ABS?static=1" 2>/dev/null || true
+  echo "Done -> $PDF_OUT"
+  exit 0
+fi
+
 DECK="${1:?Usage: render.sh <deck.html> <num_slides> <output_dir>}"
 N="${2:?}"
 OUTDIR="${3:?}"

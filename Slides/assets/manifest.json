@@ -1,0 +1,17 @@
+{
+  "icons": [
+    "bolt",
+    "chart",
+    "check",
+    "database",
+    "gear",
+    "layers",
+    "rocket",
+    "spark",
+    "target"
+  ],
+  "images": [
+    "architecture"
+  ],
+  "styles": false
+}

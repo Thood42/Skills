@@ -1,0 +1,341 @@
+{
+  "meta": {
+    "title": "Slides — theme gallery",
+    "seed": 7,
+    "libs": []
+  },
+  "theme": "midnight-neon",
+  "defaults": {
+    "ambient": "auto"
+  },
+  "slides": [
+    {
+      "layout": "divider",
+      "content": {
+        "index": "00",
+        "title": "Theme Gallery",
+        "subtitle": "One slide per theme. Each slide just sets a per-slide \"theme\" override — the same trick you can use on any single slide in a real deck."
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#05080f",
+        "--bg-2": "#0a1122",
+        "--ink": "#eaf1fb",
+        "--muted": "#93a2bd",
+        "--faint": "#5a6a86",
+        "--cyan": "#3ce8ff",
+        "--indigo": "#7c8cff",
+        "--mint": "#44f3c4",
+        "--glow-cyan": "0 0 34px rgba(60,232,255,.40)",
+        "--stage": "#05080f",
+        "--font-display": "'Sora','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'IBM Plex Sans','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 01 · dark",
+        "title": "Midnight",
+        "accent": "Neon",
+        "subtitle": "Cool, techy, high-contrast cyan/indigo/mint on near-black.",
+        "meta": [
+          {
+            "text": "Neon",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#140b05",
+        "--bg-2": "#1d1006",
+        "--ink": "#fff3e6",
+        "--muted": "#d6b59a",
+        "--faint": "#8a6f5a",
+        "--cyan": "#ffb020",
+        "--indigo": "#ff6a3d",
+        "--mint": "#ffd166",
+        "--glow-cyan": "0 0 34px rgba(255,160,40,.40)",
+        "--stage": "#140b05",
+        "--font-display": "'Unbounded','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 02 · dark",
+        "title": "Solar",
+        "accent": "Flare",
+        "subtitle": "Energetic amber→orange→gold on warm charcoal. Launches, momentum.",
+        "meta": [
+          {
+            "text": "Heat",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#04110d",
+        "--bg-2": "#07191a",
+        "--ink": "#e8f6ee",
+        "--muted": "#97b6a8",
+        "--faint": "#5d7a6e",
+        "--cyan": "#3ddc97",
+        "--indigo": "#1fb6a6",
+        "--mint": "#b6e84a",
+        "--glow-cyan": "0 0 34px rgba(52,224,161,.38)",
+        "--stage": "#04110d",
+        "--font-display": "'Fraunces','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Spectral','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 03 · dark",
+        "title": "Evergreen",
+        "accent": "Growth",
+        "subtitle": "Emerald/teal/lime with a serif display. Calm, natural, sustainability.",
+        "meta": [
+          {
+            "text": "Growth",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#0c0d10",
+        "--bg-2": "#15171c",
+        "--ink": "#f2f4f8",
+        "--muted": "#9aa0ac",
+        "--faint": "#5e6470",
+        "--cyan": "#5b8cff",
+        "--indigo": "#c8cdd8",
+        "--mint": "#9aa3b2",
+        "--glow-cyan": "0 0 34px rgba(91,140,255,.35)",
+        "--stage": "#0c0d10",
+        "--font-display": "'Archivo','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 04 · dark",
+        "title": "Monolith",
+        "accent": "Mono",
+        "subtitle": "Slate greys with a single electric-blue accent. Minimal, modern.",
+        "meta": [
+          {
+            "text": "Mono",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#0e0718",
+        "--bg-2": "#160a26",
+        "--ink": "#f3ecff",
+        "--muted": "#b6a6cf",
+        "--faint": "#7c6b9a",
+        "--cyan": "#b98cff",
+        "--indigo": "#8a5cff",
+        "--mint": "#ffcf6b",
+        "--glow-cyan": "0 0 34px rgba(160,110,255,.40)",
+        "--stage": "#0e0718",
+        "--font-display": "'Playfair Display','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Lora','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 05 · dark",
+        "title": "Royal",
+        "accent": "Velvet",
+        "subtitle": "Violet/purple with gold. Premium, editorial, luxury.",
+        "meta": [
+          {
+            "text": "Luxe",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#160a10",
+        "--bg-2": "#21101a",
+        "--ink": "#ffeef2",
+        "--muted": "#d6a9b8",
+        "--faint": "#93697a",
+        "--cyan": "#ff6f91",
+        "--indigo": "#ff9671",
+        "--mint": "#ffc75f",
+        "--glow-cyan": "0 0 34px rgba(255,111,145,.38)",
+        "--stage": "#160a10",
+        "--font-display": "'Syne','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Manrope','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 06 · dark",
+        "title": "Coral",
+        "accent": "Sunset",
+        "subtitle": "Coral, peach, warm yellow. Approachable, consumer, social.",
+        "meta": [
+          {
+            "text": "Warmth",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#021018",
+        "--bg-2": "#04212e",
+        "--ink": "#e6f6ff",
+        "--muted": "#93b8c9",
+        "--faint": "#587886",
+        "--cyan": "#38d6ff",
+        "--indigo": "#3b82f6",
+        "--mint": "#2ee6c6",
+        "--glow-cyan": "0 0 34px rgba(56,214,255,.38)",
+        "--stage": "#021018",
+        "--font-display": "'Epilogue','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Fira Code','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 07 · dark",
+        "title": "Deep",
+        "accent": "Ocean",
+        "subtitle": "Azure/blue/teal. Trustworthy, enterprise, data, SaaS.",
+        "meta": [
+          {
+            "text": "Trust",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#f6f1e7",
+        "--bg-2": "#efe7d6",
+        "--ink": "#1c1a17",
+        "--muted": "#4f4a42",
+        "--faint": "#8a8377",
+        "--cyan": "#c0392b",
+        "--indigo": "#1c1a17",
+        "--mint": "#b8860b",
+        "--glow-cyan": "0 0 18px rgba(192,57,43,.18)",
+        "--stage": "#f6f1e7",
+        "--font-display": "'Newsreader','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Source Serif 4','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 08 · light",
+        "title": "Editorial",
+        "accent": "Paper",
+        "subtitle": "Cream paper, ink text, crimson + goldenrod. Serif. Reports, essays.",
+        "meta": [
+          {
+            "text": "Print",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#ffffff",
+        "--bg-2": "#eef4fb",
+        "--ink": "#0d1b2a",
+        "--muted": "#43566b",
+        "--faint": "#8496a8",
+        "--cyan": "#0091d5",
+        "--indigo": "#3a5bd9",
+        "--mint": "#16b8a6",
+        "--glow-cyan": "0 0 18px rgba(0,145,213,.20)",
+        "--stage": "#ffffff",
+        "--font-display": "'Bricolage Grotesque','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Manrope','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 09 · light",
+        "title": "Arctic",
+        "accent": "Crisp",
+        "subtitle": "White/ice, azure + teal. Airy, product, healthcare, corporate.",
+        "meta": [
+          {
+            "text": "Crisp",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#f4ece0",
+        "--bg-2": "#ece0cf",
+        "--ink": "#2a2118",
+        "--muted": "#5b4f40",
+        "--faint": "#91836f",
+        "--cyan": "#c1632d",
+        "--indigo": "#7a7a2e",
+        "--mint": "#b8902f",
+        "--glow-cyan": "0 0 18px rgba(193,99,45,.18)",
+        "--stage": "#f4ece0",
+        "--font-display": "'Fraunces','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 10 · light",
+        "title": "Sandstone",
+        "accent": "Earth",
+        "subtitle": "Warm beige, terracotta + olive + ochre. Serif. Craft, food, travel.",
+        "meta": [
+          {
+            "text": "Earth",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    }
+  ]
+}

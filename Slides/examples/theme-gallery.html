@@ -615,6 +615,17 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
 })();
 </script>
 
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Spectral:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Lora:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
 <!-- engine additions: new layouts, deck UI, print/PDF stylesheet -->
 <style>
 /* =====================================================================
@@ -1269,12 +1280,12 @@ body.hide-docs .doc-panel{display:none}
 
 <!-- ===== DECK CONTENT (edit this; it is the single source of truth) ===== -->
 <script type="application/json" id="deck-assets">
-{"icons": {"bolt": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><path d=\"M13 2L4 14h7l-1 8 9-12h-7l1-8z\"/></svg>", "chart": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><path d=\"M4 4v16h16\"/><path d=\"M7 14l3-4 3 3 4-6\"/></svg>", "check": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l2.5 2.5L16 9\"/></svg>", "database": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><ellipse cx=\"12\" cy=\"5.5\" rx=\"7\" ry=\"2.6\"/><path d=\"M5 5.5v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6\"/><path d=\"M5 11.5v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6\"/></svg>", "gear": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"12\" r=\"3.2\"/><path d=\"M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8\"/></svg>", "layers": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><path d=\"M12 3l9 5-9 5-9-5 9-5z\"/><path d=\"M3 13l9 5 9-5\"/></svg>", "rocket": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><path d=\"M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2\"/><path d=\"M9 13c-2 0-5 1-6 4 3-1 4-1 4-1\"/><path d=\"M14.5 4.5C18 3 21 6 19.5 9.5L13 16l-5-5 6.5-6.5z\"/><circle cx=\"14.5\" cy=\"9.5\" r=\"1.6\"/></svg>", "spark": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><path d=\"M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3\"/></svg>", "target": "<svg viewBox=\"0 0 24 24\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/></svg>"}, "images": {"architecture": "data:image/svg+xml;utf8,%3Csvg viewBox='0 0 1280 720' xmlns='http://www.w3.org/2000/svg'%3E %3Cdefs%3E  %3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E   %3Cstop offset='0' stop-color='%230a1430'/%3E%3Cstop offset='1' stop-color='%2305080f'/%3E%3C/linearGradient%3E  %3CradialGradient id='r' cx='0.7' cy='0.3' r='0.8'%3E   %3Cstop offset='0' stop-color='%233ce8ff' stop-opacity='0.5'/%3E%3Cstop offset='1' stop-color='%233ce8ff' stop-opacity='0'/%3E%3C/radialGradient%3E %3C/defs%3E %3Crect width='1280' height='720' fill='url(%23g)'/%3E %3Crect width='1280' height='720' fill='url(%23r)'/%3E %3Cg stroke='%237c8cff' stroke-opacity='0.5' fill='none' stroke-width='1.2'%3E  %3Ccircle cx='900' cy='240' r='120'/%3E%3Ccircle cx='900' cy='240' r='200'/%3E%3Ccircle cx='900' cy='240' r='290'/%3E %3C/g%3E %3Cg stroke='%233ce8ff' stroke-opacity='0.85' fill='none' stroke-width='2'%3E  %3Cpath d='M120 600 L360 460 L560 520 L780 320 L1040 380 L1200 180'/%3E %3C/g%3E %3Cg fill='%2344f3c4'%3E%3Ccircle cx='360' cy='460' r='6'/%3E%3Ccircle cx='780' cy='320' r='6'/%3E%3Ccircle cx='1200' cy='180' r='6'/%3E%3C/g%3E %3C/svg%3E"}, "styles": ""}
+{"icons":{},"images":{},"styles":""}
 </script>
 <script type="application/json" id="deck-data">
 {
   "meta": {
-    "title": "Slides — layout reference",
+    "title": "Slides — theme gallery",
     "seed": 7,
     "libs": []
   },
@@ -1284,672 +1295,331 @@ body.hide-docs .doc-panel{display:none}
   },
   "slides": [
     {
-      "layout": "cover",
-      "content": {
-        "kicker": "A Visual Primer",
-        "title": "How Machines",
-        "accent": "Learn",
-        "subtitle": "From raw data to working intelligence — the core ideas behind modern AI, one concept at a time.",
-        "meta": [
-          {
-            "text": "Data & AI Foundations",
-            "strong": true
-          },
-          "Module 01",
-          "2026"
-        ]
-      },
-      "doc": "{\n  \"layout\": \"cover\",\n  \"content\": {\n    \"kicker\": \"…\",\n    \"title\": \"How Machines\",\n    \"accent\": \"Learn\",\n    \"subtitle\": \"…\",\n    \"meta\": [\n      {\n        \"text\": \"…\",\n        \"strong\": true\n      },\n      \"…\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "agenda",
-      "content": {
-        "kicker": "Roadmap",
-        "title": "What we'll cover",
-        "items": [
-          {
-            "title": "The learning problem",
-            "desc": "What it means for a machine to \"learn\"."
-          },
-          {
-            "title": "Data → features",
-            "desc": "Turning messy reality into numbers."
-          },
-          {
-            "title": "Training vs inference",
-            "desc": "The two modes every model lives in."
-          },
-          {
-            "title": "Families of models",
-            "desc": "Supervised, unsupervised, between."
-          },
-          {
-            "title": "Why scale matters",
-            "desc": "How more data changed everything."
-          },
-          {
-            "title": "Where it's heading",
-            "desc": "The frontier, still unsolved."
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"agenda\",\n  \"content\": {\n    \"kicker\": \"…\",\n    \"title\": \"…\",\n    \"items\": [\n      {\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      \"…(numbered automatically)\"\n    ]\n  }\n}"
-    },
-    {
       "layout": "divider",
       "content": {
-        "index": "01",
-        "title": "The Learning Problem",
-        "subtitle": "Before the math: what are we actually asking a machine to do?"
-      },
-      "doc": "{\n  \"layout\": \"divider\",\n  \"content\": {\n    \"index\": \"01\",\n    \"title\": \"The Learning Problem\",\n    \"subtitle\": \"…  (title animates letter-by-letter)\"\n  }\n}"
-    },
-    {
-      "layout": "stat-grid",
-      "content": {
-        "kicker": "By the numbers",
-        "title": "The shape of a modern model",
-        "stats": [
-          {
-            "count": 60,
-            "unit": "+ yrs",
-            "label": "since the first trainable perceptron — 1958."
-          },
-          {
-            "value": "10",
-            "unit": "¹¹",
-            "label": "tunable parameters in a frontier model."
-          },
-          {
-            "value": "2",
-            "unit": " modes",
-            "label": "training (learning) and inference (answering)."
-          },
-          {
-            "value": "1",
-            "unit": " goal",
-            "label": "a single loss the system tries to minimize."
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"stat-grid\",\n  \"content\": {\n    \"title\": \"…\",\n    \"stats\": [\n      {\n        \"count\": 60,\n        \"unit\": \"+ yrs\",\n        \"label\": \"…  (count-up)\"\n      },\n      {\n        \"value\": \"10\",\n        \"unit\": \"¹¹\",\n        \"label\": \"…  (static)\"\n      }\n    ]\n  }\n}"
-    },
-    {
-      "layout": "bignum",
-      "content": {
-        "kicker": "Put it in perspective",
-        "count": 100000000000,
-        "fmt": "compact",
-        "subtitle": "numerical weights inside a large model — each nudged a tiny amount until predictions stop improving. The structure is [[learned]], not written by hand."
-      },
-      "doc": "{\n  \"layout\": \"bignum\",\n  \"content\": {\n    \"kicker\": \"…\",\n    \"count\": 100000000000,\n    \"fmt\": \"compact\",\n    \"subtitle\": \"…  use [[word]] to glow, **word** to bold\"\n  }\n}"
-    },
-    {
-      "layout": "chart",
-      "content": {
-        "kicker": "The scaling story",
-        "title": "Model size over time",
-        "note": "trainable parameters · log scale",
-        "body": "<svg viewBox=\"0 0 1010 360\" preserveAspectRatio=\"none\"><defs>\n<linearGradient id=\"lg\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"var(--cyan)\" stop-opacity=\".35\"/><stop offset=\"100%\" stop-color=\"var(--cyan)\" stop-opacity=\"0\"/></linearGradient>\n<linearGradient id=\"ls\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0%\" stop-color=\"var(--indigo)\"/><stop offset=\"100%\" stop-color=\"var(--cyan)\"/></linearGradient></defs>\n<g class=\"chart-grid\" font-family=\"var(--font-mono)\" font-size=\"13\" fill=\"var(--faint)\">\n<line x1=\"70\" y1=\"310\" x2=\"985\" y2=\"310\" stroke=\"var(--grid)\"/><text x=\"58\" y=\"314\" text-anchor=\"end\">10⁷</text>\n<line x1=\"70\" y1=\"210\" x2=\"985\" y2=\"210\" stroke=\"var(--grid)\"/><text x=\"58\" y=\"214\" text-anchor=\"end\">10⁹</text>\n<line x1=\"70\" y1=\"110\" x2=\"985\" y2=\"110\" stroke=\"var(--grid)\"/><text x=\"58\" y=\"114\" text-anchor=\"end\">10¹¹</text></g>\n<path d=\"M70,286 234,260 479,245 643,190 725,99 888,74 970,52 L970,310 L70,310 Z\" fill=\"url(#lg)\"/>\n<polyline class=\"chart-line\" points=\"70,286 234,260 479,245 643,190 725,99 888,74 970,52\" fill=\"none\" stroke=\"url(#ls)\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n<g fill=\"var(--cyan)\"><circle cx=\"70\" cy=\"286\" r=\"4.5\"/><circle cx=\"479\" cy=\"245\" r=\"4.5\"/><circle cx=\"725\" cy=\"99\" r=\"5.5\"/><circle cx=\"970\" cy=\"52\" r=\"5.5\"/></g>\n<text x=\"725\" y=\"84\" text-anchor=\"middle\" font-family=\"var(--font-mono)\" font-size=\"13\" fill=\"var(--ink)\">175B</text>\n<g font-family=\"var(--font-mono)\" font-size=\"13\" fill=\"var(--faint)\" text-anchor=\"middle\"><text x=\"70\" y=\"336\">2012</text><text x=\"479\" y=\"336\">2017</text><text x=\"725\" y=\"336\">2020</text><text x=\"970\" y=\"336\">2023</text></g></svg>"
-      },
-      "doc": "{\n  \"layout\": \"chart\",\n  \"content\": {\n    \"kicker\": \"…\",\n    \"title\": \"…\",\n    \"note\": \"…\",\n    \"body\": \"<svg>…</svg>  (raw SVG, or paste a slidegen chart fragment)\"\n  }\n}"
-    },
-    {
-      "layout": "comparison",
-      "content": {
-        "kicker": "Families of models",
-        "title": "Two ways to learn",
-        "left": {
-          "tag": "Supervised",
-          "title": "Learn from answers",
-          "items": [
-            "Trained on labeled examples",
-            "Predict labels for unseen inputs",
-            "Spam filters, image tagging"
-          ]
-        },
-        "right": {
-          "tag": "Unsupervised",
-          "title": "Learn from structure",
-          "items": [
-            "No labels — finds patterns itself",
-            "Reveals groupings & similarity",
-            "Segments, anomalies, embeddings"
-          ]
-        }
-      },
-      "doc": "{\n  \"layout\": \"comparison\",\n  \"content\": {\n    \"title\": \"…\",\n    \"left\": {\n      \"tag\": \"…\",\n      \"title\": \"…\",\n      \"items\": [\n        \"…\"\n      ]\n    },\n    \"right\": {\n      \"tag\": \"…\",\n      \"title\": \"…\",\n      \"items\": [\n        \"…\"\n      ]\n    },\n    \"badge\": \"VS\"\n  }\n}"
-    },
-    {
-      "layout": "quote",
-      "content": {
-        "quote": "All models are wrong, but some are useful.",
-        "by": "George E. P. Box · Statistician",
-        "subtitle": "A model is a simplification, never the territory. The craft is choosing approximations that are wrong in ways that don't matter."
-      },
-      "doc": "{\n  \"layout\": \"quote\",\n  \"content\": {\n    \"quote\": \"…\",\n    \"by\": \"…\",\n    \"subtitle\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "code",
-      "content": {
-        "kicker": "Under the hood",
-        "title": "Learning, in five lines",
-        "filename": "train.py — scikit-learn",
-        "code": "<span class=\"k\">from</span> sklearn.linear_model <span class=\"k\">import</span> <span class=\"fn\">LogisticRegression</span>\n\nmodel <span class=\"k\">=</span> <span class=\"fn\">LogisticRegression</span>()\nmodel.<span class=\"fn\">fit</span>(X_train, y_train)      <span class=\"c\"># nudge weights to fit the data</span>\npreds <span class=\"k\">=</span> model.<span class=\"fn\">predict</span>(X_test)    <span class=\"c\"># generalize to unseen inputs</span>\n<span class=\"fn\">print</span>(<span class=\"fn\">accuracy</span>(y_test, preds))   <span class=\"c\"># did it actually learn?</span>",
-        "caption": "Every framework hides the same loop: **fit** on what you know, **predict** on what you don't, then **measure** the gap."
-      },
-      "doc": "{\n  \"layout\": \"code\",\n  \"content\": {\n    \"title\": \"…\",\n    \"filename\": \"…\",\n    \"code\": \"<span class='k'>from</span> …  (hand-highlight: .k .fn .s .c .n)\",\n    \"caption\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "timeline",
-      "content": {
-        "kicker": "A short history",
-        "title": "Six decades of breakthroughs",
-        "items": [
-          {
-            "year": "1958",
-            "title": "Perceptron",
-            "desc": "first trainable neuron"
-          },
-          {
-            "year": "1986",
-            "title": "Backprop",
-            "desc": "deep nets become practical"
-          },
-          {
-            "year": "1997",
-            "title": "LSTM",
-            "desc": "networks that remember"
-          },
-          {
-            "year": "2012",
-            "title": "AlexNet",
-            "desc": "deep learning breaks vision"
-          },
-          {
-            "year": "2017",
-            "title": "Transformers",
-            "desc": "attention reshapes the field"
-          },
-          {
-            "year": "2022",
-            "title": "Generative AI",
-            "desc": "reaches everyday users",
-            "now": true
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"timeline\",\n  \"content\": {\n    \"title\": \"…\",\n    \"items\": [\n      {\n        \"year\": \"1958\",\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      {\n        \"year\": \"2022\",\n        \"title\": \"…\",\n        \"desc\": \"…\",\n        \"now\": true\n      }\n    ]\n  }\n}"
-    },
-    {
-      "layout": "pipeline",
-      "content": {
-        "kicker": "How it fits together",
-        "title": "The ML pipeline",
-        "nodes": [
-          {
-            "icon": "▦",
-            "title": "Data",
-            "desc": "collect & clean"
-          },
-          {
-            "icon": "❖",
-            "title": "Features",
-            "desc": "encode signal"
-          },
-          {
-            "icon": "◉",
-            "title": "Model",
-            "desc": "train weights"
-          },
-          {
-            "icon": "✓",
-            "title": "Evaluate",
-            "desc": "test & tune"
-          },
-          {
-            "icon": "⤴",
-            "title": "Deploy",
-            "desc": "serve & monitor"
-          }
-        ],
-        "loop": "↺ monitor → retrain → the loop repeats"
-      },
-      "doc": "{\n  \"layout\": \"pipeline\",\n  \"content\": {\n    \"title\": \"…\",\n    \"nodes\": [\n      {\n        \"icon\": \"◉\",\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      \"…  or use \\\"iconAsset\\\":\\\"rocket\\\"\"\n    ],\n    \"loop\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "closing",
-      "content": {
-        "kicker": "The big picture",
-        "title": "Three things to",
-        "accent": "remember",
-        "takeaways": [
-          {
-            "title": "Learning is optimization",
-            "desc": "Shrink error by adjusting parameters. The whole game."
-          },
-          {
-            "title": "Data beats cleverness",
-            "desc": "Cleaner data usually beats a fancier model."
-          },
-          {
-            "title": "Scale unlocked capability",
-            "desc": "More data + parameters drove the leap."
-          }
-        ],
-        "note": "Thanks for watching · questions welcome"
-      },
-      "doc": "{\n  \"layout\": \"closing\",\n  \"content\": {\n    \"title\": \"…\",\n    \"accent\": \"…\",\n    \"takeaways\": [\n      {\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      \"…(numbered)\"\n    ],\n    \"note\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "divider",
-      "content": {
-        "index": "02",
-        "title": "New Layouts",
-        "subtitle": "Twelve additional archetypes — the same theming, one ambient touch each."
+        "index": "00",
+        "title": "Theme Gallery",
+        "subtitle": "One slide per theme. Each slide just sets a per-slide \"theme\" override — the same trick you can use on any single slide in a real deck."
       }
     },
     {
-      "layout": "manifesto",
-      "content": {
-        "statement": "We don't add slides. We compose [[arguments]].",
-        "lead": "Manifesto puts one oversized statement in command of the frame. Wrap a phrase in [[ ]] to accent it."
-      },
-      "doc": "{\n  \"layout\": \"manifesto\",\n  \"content\": {\n    \"statement\": \"… [[accent]] …\",\n    \"lead\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "editorial",
-      "content": {
-        "kicker": "Editorial",
-        "lead": "A lead line, then ruled columns — for text-forward slides that still feel designed.",
-        "columns": [
-          {
-            "head": "Structure",
-            "body": "A bold lead sets the thesis; columns carry the supporting detail."
-          },
-          {
-            "head": "Rhythm",
-            "body": "Rule lines and a mono column head give it print-like cadence."
-          },
-          {
-            "head": "Use",
-            "body": "Great for findings, principles, or a dense idea broken into three."
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"editorial\",\n  \"content\": {\n    \"kicker\": \"…\",\n    \"lead\": \"…\",\n    \"columns\": [\n      {\n        \"head\": \"…\",\n        \"body\": \"…\"\n      },\n      \"… up to 3\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "hero-asym",
-      "content": {
-        "title": "Asymmetric by [[design]].",
-        "sub": "A commanding title on the left, a metadata rail on the right.",
-        "rows": [
-          {
-            "k": "Throughput",
-            "v": "1.2M",
-            "unit": "req/s"
-          },
-          {
-            "k": "Latency",
-            "v": "42",
-            "unit": "ms p99"
-          },
-          {
-            "k": "Uptime",
-            "v": "99.98",
-            "unit": "%"
-          }
-        ]
-      },
-      "ambient": "rays",
-      "doc": "{\n  \"layout\": \"hero-asym\",\n  \"content\": {\n    \"_note\": \"ambient:\\\"rays\\\" injects a rotating-light background — works on any layout\",\n    \"title\": \"… [[accent]] …\",\n    \"sub\": \"…\",\n    \"rows\": [\n      {\n        \"k\": \"label\",\n        \"v\": \"value\",\n        \"unit\": \"unit\"\n      }\n    ]\n  }\n}"
-    },
-    {
-      "layout": "figure",
-      "content": {
-        "kicker": "Full-bleed",
-        "image": "architecture",
-        "title": "Let an image carry the idea.",
-        "caption": "Figure overlays a caption on an edge-to-edge image. Reference any file in assets/images by name."
-      },
-      "doc": "{\n  \"layout\": \"figure\",\n  \"content\": {\n    \"image\": \"architecture\",\n    \"title\": \"…\",\n    \"caption\": \"…\",\n    \"kicker\": \"…\"\n  }\n}"
-    },
-    {
-      "layout": "metric-dash",
-      "content": {
-        "kicker": "Dashboard",
-        "title": "Status at a glance",
-        "ring": {
-          "value": 86,
-          "label": "Health",
-          "suffix": "%"
-        },
-        "tiles": [
-          {
-            "value": "1.2",
-            "unit": "M",
-            "label": "Monthly active"
-          },
-          {
-            "value": "42",
-            "unit": "ms",
-            "label": "p99 latency"
-          },
-          {
-            "value": "99.98",
-            "unit": "%",
-            "label": "Uptime"
-          },
-          {
-            "value": "3",
-            "unit": "",
-            "label": "Open incidents"
-          },
-          {
-            "value": "$0.7",
-            "unit": "M",
-            "label": "Run-rate / mo"
-          },
-          {
-            "value": "12",
-            "unit": "",
-            "label": "Deploys / wk"
-          }
-        ]
-      },
-      "ambient": "glow",
-      "doc": "{\n  \"layout\": \"metric-dash\",\n  \"content\": {\n    \"title\": \"…\",\n    \"ring\": {\n      \"value\": 86,\n      \"label\": \"…\",\n      \"suffix\": \"%\"\n    },\n    \"tiles\": [\n      {\n        \"value\": \"…\",\n        \"unit\": \"…\",\n        \"label\": \"…\"\n      }\n    ]\n  }\n}"
-    },
-    {
-      "layout": "leaderboard",
-      "content": {
-        "kicker": "Ranked",
-        "title": "Where the time goes",
-        "rows": [
-          {
-            "name": "Training",
-            "value": "45%",
-            "pct": 45
-          },
-          {
-            "name": "Data prep",
-            "value": "35%",
-            "pct": 35
-          },
-          {
-            "name": "Evaluation",
-            "value": "12%",
-            "pct": 12
-          },
-          {
-            "name": "Tuning",
-            "value": "8%",
-            "pct": 8
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"leaderboard\",\n  \"content\": {\n    \"title\": \"…\",\n    \"rows\": [\n      {\n        \"name\": \"…\",\n        \"value\": \"45%\",\n        \"pct\": 45\n      },\n      \"… bars scale to the max pct\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "diptych",
-      "content": {
-        "left": {
-          "tag": "Before",
-          "title": "Hand-written rules",
-          "body": "Brittle, capped by what a human can enumerate."
-        },
-        "right": {
-          "tag": "After",
-          "title": "Learned behavior",
-          "body": "Adapts from data; improves as the data grows."
-        }
-      },
-      "doc": "{\n  \"layout\": \"diptych\",\n  \"content\": {\n    \"left\": {\n      \"tag\": \"…\",\n      \"title\": \"…\",\n      \"body\": \"…\"\n    },\n    \"right\": {\n      \"tag\": \"…\",\n      \"title\": \"…\",\n      \"body\": \"…\"\n    }\n  }\n}"
-    },
-    {
-      "layout": "matrix",
-      "content": {
-        "kicker": "Trade-offs",
-        "title": "Effort vs. impact",
-        "xlabel": "Effort →",
-        "ylabel": "Impact →",
-        "cells": [
-          {
-            "title": "Quick wins",
-            "desc": "Low effort, high impact — do first.",
-            "hot": true
-          },
-          {
-            "title": "Big bets",
-            "desc": "High effort, high impact — plan for."
-          },
-          {
-            "title": "Fill-ins",
-            "desc": "Low effort, low impact — maybe."
-          },
-          {
-            "title": "Money pits",
-            "desc": "High effort, low impact — avoid."
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"matrix\",\n  \"content\": {\n    \"title\": \"…\",\n    \"xlabel\": \"…\",\n    \"ylabel\": \"…\",\n    \"cells\": [\n      \"4 cells {title,desc,hot?}\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "stack",
-      "content": {
-        "kicker": "Architecture",
-        "title": "The serving stack",
-        "bands": [
-          {
-            "iconAsset": "database",
-            "title": "Storage",
-            "desc": "feature store + object store"
-          },
-          {
-            "iconAsset": "layers",
-            "title": "Model layer",
-            "desc": "batched inference, autoscaled"
-          },
-          {
-            "iconAsset": "bolt",
-            "title": "API gateway",
-            "desc": "auth, rate-limit, routing"
-          },
-          {
-            "iconAsset": "target",
-            "title": "Clients",
-            "desc": "web, mobile, partners"
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"stack\",\n  \"content\": {\n    \"title\": \"…\",\n    \"bands\": [\n      {\n        \"iconAsset\": \"database\",\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      \"… icon: glyph or iconAsset name\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "quote-mosaic",
-      "content": {
-        "kicker": "Voices",
-        "title": "What teams told us",
-        "quotes": [
-          {
-            "quote": "It cut our triage time in half.",
-            "by": "Eng lead"
-          },
-          {
-            "quote": "Onboarding went from days to hours.",
-            "by": "PM"
-          },
-          {
-            "quote": "Finally, one source of truth.",
-            "by": "Data"
-          },
-          {
-            "quote": "We shipped the backlog in a week.",
-            "by": "Design"
-          }
-        ]
-      },
-      "doc": "{\n  \"layout\": \"quote-mosaic\",\n  \"content\": {\n    \"title\": \"…\",\n    \"quotes\": [\n      {\n        \"quote\": \"…\",\n        \"by\": \"…\"\n      }\n    ]\n  }\n}"
-    },
-    {
-      "layout": "index-mosaic",
-      "content": {
-        "kicker": "Contents",
-        "title": "In this section",
-        "items": [
-          {
-            "title": "Foundations",
-            "desc": "the core mental model"
-          },
-          {
-            "title": "Methods",
-            "desc": "how it's actually built"
-          },
-          {
-            "title": "Evidence",
-            "desc": "what the data shows"
-          },
-          {
-            "title": "Trade-offs",
-            "desc": "costs and limits"
-          },
-          {
-            "title": "Roadmap",
-            "desc": "what's next"
-          },
-          {
-            "title": "Appendix",
-            "desc": "details & sources"
-          }
-        ]
-      },
-      "ambient": "constellation",
-      "doc": "{\n  \"layout\": \"index-mosaic\",\n  \"content\": {\n    \"title\": \"…\",\n    \"items\": [\n      {\n        \"title\": \"…\",\n        \"desc\": \"…\"\n      },\n      \"…(large numbers added automatically)\"\n    ]\n  }\n}"
-    },
-    {
-      "layout": "before-after",
-      "content": {
-        "kicker": "Impact",
-        "title": "What changed",
-        "before": {
-          "tag": "Before",
-          "title": "Manual pipeline",
-          "items": [
-            "3 days per release",
-            "Numbering by hand",
-            "No single source"
-          ]
-        },
-        "after": {
-          "tag": "After",
-          "title": "Data-driven deck",
-          "items": [
-            "Minutes per release",
-            "Auto-numbered",
-            "JSON is the source"
-          ]
-        }
-      },
-      "doc": "{\n  \"layout\": \"before-after\",\n  \"content\": {\n    \"title\": \"…\",\n    \"before\": {\n      \"title\": \"…\",\n      \"items\": [\n        \"…\"\n      ]\n    },\n    \"after\": {\n      \"title\": \"…\",\n      \"items\": [\n        \"…\"\n      ]\n    }\n  }\n}"
-    },
-    {
-      "layout": "divider",
-      "content": {
-        "index": "03",
-        "title": "Ambient Animation",
-        "subtitle": "Every slide carries one subtle background motion. Pick it per slide in the JSON with \"ambient\":\"<name>\" — or \"auto\" (layout default) / \"none\" (silence)."
-      },
-      "ambient": "aurora"
-    },
-    {
-      "layout": "index-mosaic",
-      "content": {
-        "kicker": "Ambient catalog",
-        "title": "Pick one per slide",
-        "items": [
-          {
-            "title": "orbs",
-            "desc": "drifting color fields"
-          },
-          {
-            "title": "aurora",
-            "desc": "gradient wash (this slide is rays)"
-          },
-          {
-            "title": "grid",
-            "desc": "drifting dot lattice"
-          },
-          {
-            "title": "rays",
-            "desc": "rotating light"
-          },
-          {
-            "title": "grain",
-            "desc": "film-grain texture"
-          },
-          {
-            "title": "contours",
-            "desc": "topographic rings"
-          },
-          {
-            "title": "scan",
-            "desc": "sweeping light bar"
-          },
-          {
-            "title": "waves",
-            "desc": "diagonal striations"
-          },
-          {
-            "title": "glow",
-            "desc": "breathing vignette"
-          },
-          {
-            "title": "constellation",
-            "desc": "twinkling points"
-          }
-        ]
-      },
-      "ambient": "rays",
-      "doc": "{\n  \"layout\": \"index-mosaic\",\n  \"content\": {\n    \"_note\": \"set ambient on the slide; this one uses rays\",\n    \"ambient\": \"rays\",\n    \"content\": {\n      \"…\": \"…\"\n    }\n  }\n}"
-    },
-    {
-      "layout": "bignum",
-      "content": {
-        "kicker": "Per-slide theme",
-        "count": 1,
-        "subtitle": "This slide overrides the global palette with its own warm theme — set \"theme\" on the slide to patch any CSS variable, just for this slide."
-      },
+      "layout": "cover",
       "theme": {
-        "--cyan": "#ffd166",
-        "--indigo": "#ff8e3c",
-        "--bg": "#0c0a06",
-        "--bg-2": "#1b1206",
-        "--glow-cyan": "0 0 34px rgba(255,209,102,.45)"
+        "--bg": "#05080f",
+        "--bg-2": "#0a1122",
+        "--ink": "#eaf1fb",
+        "--muted": "#93a2bd",
+        "--faint": "#5a6a86",
+        "--cyan": "#3ce8ff",
+        "--indigo": "#7c8cff",
+        "--mint": "#44f3c4",
+        "--glow-cyan": "0 0 34px rgba(60,232,255,.40)",
+        "--stage": "#05080f",
+        "--font-display": "'Sora','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'IBM Plex Sans','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
       },
-      "doc": "{\n  \"layout\": \"bignum\",\n  \"content\": {\n    \"_note\": \"add a theme object to ANY slide to override the global :root\",\n    \"theme\": {\n      \"--cyan\": \"#ffd166\",\n      \"--bg\": \"#0c0a06\"\n    },\n    \"content\": {\n      \"…\": \"…\"\n    }\n  }\n}"
+      "content": {
+        "kicker": "Theme 01 · dark",
+        "title": "Midnight",
+        "accent": "Neon",
+        "subtitle": "Cool, techy, high-contrast cyan/indigo/mint on near-black.",
+        "meta": [
+          {
+            "text": "Neon",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
     },
     {
-      "layout": "closing",
+      "layout": "cover",
+      "theme": {
+        "--bg": "#140b05",
+        "--bg-2": "#1d1006",
+        "--ink": "#fff3e6",
+        "--muted": "#d6b59a",
+        "--faint": "#8a6f5a",
+        "--cyan": "#ffb020",
+        "--indigo": "#ff6a3d",
+        "--mint": "#ffd166",
+        "--glow-cyan": "0 0 34px rgba(255,160,40,.40)",
+        "--stage": "#140b05",
+        "--font-display": "'Unbounded','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
       "content": {
-        "kicker": "That's the system",
-        "title": "One source,",
-        "accent": "three formats",
-        "takeaways": [
+        "kicker": "Theme 02 · dark",
+        "title": "Solar",
+        "accent": "Flare",
+        "subtitle": "Energetic amber→orange→gold on warm charcoal. Launches, momentum.",
+        "meta": [
           {
-            "title": "Live HTML",
-            "desc": "Open in any browser; present full-screen."
+            "text": "Heat",
+            "strong": true
           },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#04110d",
+        "--bg-2": "#07191a",
+        "--ink": "#e8f6ee",
+        "--muted": "#97b6a8",
+        "--faint": "#5d7a6e",
+        "--cyan": "#3ddc97",
+        "--indigo": "#1fb6a6",
+        "--mint": "#b6e84a",
+        "--glow-cyan": "0 0 34px rgba(52,224,161,.38)",
+        "--stage": "#04110d",
+        "--font-display": "'Fraunces','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Spectral','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 03 · dark",
+        "title": "Evergreen",
+        "accent": "Growth",
+        "subtitle": "Emerald/teal/lime with a serif display. Calm, natural, sustainability.",
+        "meta": [
           {
-            "title": "Content JSON",
-            "desc": "Press E to export, I to import & re-render."
+            "text": "Growth",
+            "strong": true
           },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#0c0d10",
+        "--bg-2": "#15171c",
+        "--ink": "#f2f4f8",
+        "--muted": "#9aa0ac",
+        "--faint": "#5e6470",
+        "--cyan": "#5b8cff",
+        "--indigo": "#c8cdd8",
+        "--mint": "#9aa3b2",
+        "--glow-cyan": "0 0 34px rgba(91,140,255,.35)",
+        "--stage": "#0c0d10",
+        "--font-display": "'Archivo','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 04 · dark",
+        "title": "Monolith",
+        "accent": "Mono",
+        "subtitle": "Slate greys with a single electric-blue accent. Minimal, modern.",
+        "meta": [
           {
-            "title": "Flat PDF",
-            "desc": "Press P (or render.sh --pdf) to share."
-          }
-        ],
-        "note": "Edit the JSON, reload, done."
+            "text": "Mono",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#0e0718",
+        "--bg-2": "#160a26",
+        "--ink": "#f3ecff",
+        "--muted": "#b6a6cf",
+        "--faint": "#7c6b9a",
+        "--cyan": "#b98cff",
+        "--indigo": "#8a5cff",
+        "--mint": "#ffcf6b",
+        "--glow-cyan": "0 0 34px rgba(160,110,255,.40)",
+        "--stage": "#0e0718",
+        "--font-display": "'Playfair Display','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Lora','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 05 · dark",
+        "title": "Royal",
+        "accent": "Velvet",
+        "subtitle": "Violet/purple with gold. Premium, editorial, luxury.",
+        "meta": [
+          {
+            "text": "Luxe",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#160a10",
+        "--bg-2": "#21101a",
+        "--ink": "#ffeef2",
+        "--muted": "#d6a9b8",
+        "--faint": "#93697a",
+        "--cyan": "#ff6f91",
+        "--indigo": "#ff9671",
+        "--mint": "#ffc75f",
+        "--glow-cyan": "0 0 34px rgba(255,111,145,.38)",
+        "--stage": "#160a10",
+        "--font-display": "'Syne','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Manrope','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 06 · dark",
+        "title": "Coral",
+        "accent": "Sunset",
+        "subtitle": "Coral, peach, warm yellow. Approachable, consumer, social.",
+        "meta": [
+          {
+            "text": "Warmth",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#021018",
+        "--bg-2": "#04212e",
+        "--ink": "#e6f6ff",
+        "--muted": "#93b8c9",
+        "--faint": "#587886",
+        "--cyan": "#38d6ff",
+        "--indigo": "#3b82f6",
+        "--mint": "#2ee6c6",
+        "--glow-cyan": "0 0 34px rgba(56,214,255,.38)",
+        "--stage": "#021018",
+        "--font-display": "'Epilogue','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Fira Code','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 07 · dark",
+        "title": "Deep",
+        "accent": "Ocean",
+        "subtitle": "Azure/blue/teal. Trustworthy, enterprise, data, SaaS.",
+        "meta": [
+          {
+            "text": "Trust",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#f6f1e7",
+        "--bg-2": "#efe7d6",
+        "--ink": "#1c1a17",
+        "--muted": "#4f4a42",
+        "--faint": "#8a8377",
+        "--cyan": "#c0392b",
+        "--indigo": "#1c1a17",
+        "--mint": "#b8860b",
+        "--glow-cyan": "0 0 18px rgba(192,57,43,.18)",
+        "--stage": "#f6f1e7",
+        "--font-display": "'Newsreader','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Source Serif 4','Georgia','DejaVu Serif',serif",
+        "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 08 · light",
+        "title": "Editorial",
+        "accent": "Paper",
+        "subtitle": "Cream paper, ink text, crimson + goldenrod. Serif. Reports, essays.",
+        "meta": [
+          {
+            "text": "Print",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#ffffff",
+        "--bg-2": "#eef4fb",
+        "--ink": "#0d1b2a",
+        "--muted": "#43566b",
+        "--faint": "#8496a8",
+        "--cyan": "#0091d5",
+        "--indigo": "#3a5bd9",
+        "--mint": "#16b8a6",
+        "--glow-cyan": "0 0 18px rgba(0,145,213,.20)",
+        "--stage": "#ffffff",
+        "--font-display": "'Bricolage Grotesque','DejaVu Sans',system-ui,sans-serif",
+        "--font-body": "'Manrope','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 09 · light",
+        "title": "Arctic",
+        "accent": "Crisp",
+        "subtitle": "White/ice, azure + teal. Airy, product, healthcare, corporate.",
+        "meta": [
+          {
+            "text": "Crisp",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
+      }
+    },
+    {
+      "layout": "cover",
+      "theme": {
+        "--bg": "#f4ece0",
+        "--bg-2": "#ece0cf",
+        "--ink": "#2a2118",
+        "--muted": "#5b4f40",
+        "--faint": "#91836f",
+        "--cyan": "#c1632d",
+        "--indigo": "#7a7a2e",
+        "--mint": "#b8902f",
+        "--glow-cyan": "0 0 18px rgba(193,99,45,.18)",
+        "--stage": "#f4ece0",
+        "--font-display": "'Fraunces','Georgia','DejaVu Serif',serif",
+        "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+        "--font-mono": "'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace"
+      },
+      "content": {
+        "kicker": "Theme 10 · light",
+        "title": "Sandstone",
+        "accent": "Earth",
+        "subtitle": "Warm beige, terracotta + olive + ochre. Serif. Craft, food, travel.",
+        "meta": [
+          {
+            "text": "Earth",
+            "strong": true
+          },
+          "accent-1 / 2 / 3",
+          "aa / aA / Aa"
+        ]
       }
     }
   ]
