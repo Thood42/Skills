@@ -1,0 +1,332 @@
+/* =====================================================================
+   ENGINE ADDITIONS — new canvas-derived layouts, asset chrome, deck UI,
+   and the print stylesheet for PDF export. Everything reads CSS variables
+   so it themes globally and honours per-slide overrides.
+   ===================================================================== */
+
+/* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
+.ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
+.ico-wrap svg{width:1em; height:1em; display:block; fill:none; stroke:currentColor}
+.ico-wrap.solid svg{fill:currentColor; stroke:none}
+
+/* ---- deck UI (present / export / import / pdf) ----
+   One control cluster, bottom-RIGHT, immediately left of the editor's Edit
+   button so every control shares a corner and a pill style. Hidden in print,
+   static capture and presentation mode. ---- */
+.deck-ui{position:fixed; right:118px; bottom:16px; z-index:50; display:flex; gap:8px;
+  font-family:var(--font-mono); opacity:0; transition:opacity .25s; pointer-events:none}
+body:hover .deck-ui{opacity:.92; pointer-events:auto}
+.deck-ui button{font-size:12px; font-weight:600; letter-spacing:.02em;
+  color:#eaf1fb; background:#11141c; border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:10px 14px; cursor:pointer;
+  font-family:var(--font-body,system-ui,sans-serif);
+  box-shadow:0 8px 30px rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px)}
+.deck-ui button:hover{background:#171b25; border-color:var(--cyan); color:var(--cyan)}
+html[data-static] .deck-ui{display:none !important}
+body.presenting .deck-ui{display:none !important}
+body.presenting{cursor:none}
+
+/* =====================================================================
+   NEW LAYOUTS
+   ===================================================================== */
+
+/* MANIFESTO — one oversized statement, asymmetric, lots of air */
+.manifesto{justify-content:center}
+.manifesto .statement{font-family:var(--font-display); font-weight:800; font-size:84px;
+  line-height:1.02; letter-spacing:-.03em; max-width:24ch}
+.manifesto .statement em{font-style:normal; color:var(--cyan); text-shadow:var(--glow-cyan)}
+.manifesto .lead{margin-top:30px; font-size:20px; color:var(--muted); max-width:54ch}
+.manifesto .mark{position:absolute; right:-40px; top:-60px; width:480px; height:480px; border-radius:50%;
+  background:radial-gradient(circle,var(--indigo),transparent 62%); opacity:.18; filter:blur(20px); z-index:0}
+
+/* EDITORIAL-SPLIT — lead + body columns, rule lines (print/editorial) */
+.editorial{display:grid; grid-template-columns:1fr; gap:0; flex:1}
+.ed-lead{font-family:var(--font-display); font-weight:700; font-size:46px; line-height:1.08;
+  letter-spacing:-.02em; max-width:18ch; padding-bottom:26px; border-bottom:2px solid var(--brd-2)}
+.ed-cols{display:grid; grid-template-columns:repeat(3,1fr); gap:34px; margin-top:30px}
+.ed-col h3{font-size:18px; font-weight:600; color:var(--cyan); margin-bottom:10px;
+  font-family:var(--font-mono); letter-spacing:.06em}
+.ed-col p{font-size:16px; line-height:1.6}
+.ed-col{border-top:1px solid var(--brd); padding-top:16px}
+
+/* HERO-ASYM — huge title left, metadata rail right */
+.hero-asym{display:grid; grid-template-columns:1.5fr .9fr; gap:48px; align-items:center; flex:1}
+.hero-asym .htitle{font-family:var(--font-display); font-weight:800; font-size:78px; line-height:1.0;
+  letter-spacing:-.03em}
+.hero-asym .htitle em{font-style:normal; color:var(--cyan)}
+.hero-asym .hsub{margin-top:22px; font-size:19px; color:var(--muted); max-width:30ch}
+.hero-rail{border-left:2px solid var(--brd-2); padding-left:28px; display:flex; flex-direction:column; gap:22px}
+.hero-rail .row .k{font-family:var(--font-mono); font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint)}
+.hero-rail .row .v{font-family:var(--font-display); font-weight:700; font-size:30px; color:var(--ink); margin-top:4px}
+.hero-rail .row .v small{font-size:16px; color:var(--cyan)}
+
+/* FIGURE — full-bleed image with overlaid caption */
+.figure{padding:0}
+.figure .fig-img{position:absolute; inset:0; background-size:cover; background-position:center; z-index:0}
+.figure .fig-shade{position:absolute; inset:0; z-index:1;
+  background:linear-gradient(90deg, rgba(5,8,15,.86) 0%, rgba(5,8,15,.45) 45%, rgba(5,8,15,.12) 100%)}
+.figure .fig-body{position:relative; z-index:2; height:100%; display:flex; flex-direction:column;
+  justify-content:flex-end; padding:var(--pad)}
+.figure .fig-title{font-family:var(--font-display); font-weight:800; font-size:58px; line-height:1.04; letter-spacing:-.02em; max-width:20ch}
+.figure .fig-cap{margin-top:16px; font-size:18px; color:var(--muted); max-width:52ch}
+
+/* METRIC-DASH — mixed dashboard: kpi ring + stat tiles */
+.dash{display:grid; grid-template-columns:auto 1fr; gap:34px; align-items:center; flex:1; margin-top:30px}
+.dash-ring{display:flex; flex-direction:column; align-items:center; gap:14px}
+.dash-ring .cap{font-family:var(--font-mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+.dash-tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+.dash-tile{background:var(--panel); border:1px solid var(--brd); border-radius:14px; padding:22px 24px}
+.dash-tile .v{font-family:var(--font-display); font-weight:800; font-size:38px; color:var(--ink); letter-spacing:-.02em}
+.dash-tile .v small{font-size:18px; color:var(--cyan)}
+.dash-tile .l{margin-top:6px; font-size:14px; color:var(--muted); line-height:1.4}
+
+/* LEADERBOARD — ranked rows with proportional bars */
+.board{display:flex; flex-direction:column; gap:14px; flex:1; margin-top:36px; justify-content:center}
+.board-row{display:grid; grid-template-columns:34px 1fr auto; gap:18px; align-items:center}
+.board-row .rk{font-family:var(--font-mono); font-size:16px; color:var(--cyan)}
+.board-bar{position:relative; height:40px; border-radius:10px; background:var(--panel); overflow:hidden; border:1px solid var(--brd)}
+.board-bar .fill{position:absolute; left:0; top:0; height:100%; border-radius:10px;
+  background:linear-gradient(90deg,var(--indigo),var(--cyan)); width:var(--w,40%)}
+.board-bar .nm{position:absolute; left:16px; top:50%; transform:translateY(-50%); font-family:var(--font-display);
+  font-weight:600; font-size:17px; color:var(--ink); z-index:2}
+.board-row .val{font-family:var(--font-mono); font-size:18px; color:var(--ink); min-width:64px; text-align:right}
+
+/* DIPTYCH — two contrasting color fields */
+.diptych{padding:0; display:grid; grid-template-columns:1fr 1fr; flex:1}
+.dip-panel{display:flex; flex-direction:column; justify-content:center; padding:var(--pad); position:relative}
+.dip-panel.left{background:linear-gradient(160deg, var(--bg-2), var(--bg))}
+.dip-panel.right{background:linear-gradient(160deg, color-mix(in srgb, var(--cyan) 22%, var(--bg-2)), var(--bg))}
+.dip-panel .tag{font-family:var(--font-mono); font-size:13px; letter-spacing:.2em; text-transform:uppercase; color:var(--cyan)}
+.dip-panel .big{font-family:var(--font-display); font-weight:800; font-size:54px; line-height:1.04; margin-top:14px; letter-spacing:-.02em}
+.dip-panel p{margin-top:16px; font-size:17px; color:var(--muted); max-width:32ch}
+.dip-panel .divline{position:absolute; right:0; top:12%; height:76%; width:1px; background:var(--brd-2)}
+
+/* MATRIX-2x2 — quadrant matrix with axis labels */
+.matrix{position:relative; flex:1; margin-top:48px; display:grid; grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr; gap:14px}
+.mx-cell{background:var(--panel); border:1px solid var(--brd); border-radius:14px; padding:22px 24px; display:flex; flex-direction:column; justify-content:center}
+.mx-cell h3{font-size:20px; font-weight:600; margin-bottom:6px}
+.mx-cell p{font-size:14px; color:var(--muted); line-height:1.45}
+.mx-cell.hot{border-color:var(--brd-2); box-shadow:0 0 26px rgba(60,232,255,.12)}
+.mx-axis-x,.mx-axis-y{position:absolute; font-family:var(--font-mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint)}
+.mx-axis-x{bottom:-26px; left:50%; transform:translateX(-50%)}
+.mx-axis-y{top:50%; left:-12px; transform:translateY(-50%) rotate(-90deg)}
+
+/* STACK — layered horizontal bands (architecture/process layers) */
+.stack{display:flex; flex-direction:column; gap:12px; flex:1; margin-top:34px; justify-content:center}
+.stack-band{display:flex; align-items:center; gap:22px; padding:22px 28px; border-radius:14px;
+  background:var(--panel); border:1px solid var(--brd); position:relative; overflow:hidden}
+.stack-band::before{content:""; position:absolute; left:0; top:0; height:100%; width:5px;
+  background:linear-gradient(180deg,var(--cyan),var(--indigo))}
+.stack-band .si{font-size:30px; color:var(--cyan); min-width:40px; text-align:center}
+.stack-band .st h3{font-size:21px; font-weight:600}
+.stack-band .st p{font-size:15px; color:var(--muted); margin-top:3px}
+
+/* QUOTE-MOSAIC — several short quotes in a grid */
+.mosaic{display:grid; grid-template-columns:repeat(2,1fr); gap:18px; flex:1; margin-top:34px}
+.mq{background:var(--panel); border:1px solid var(--brd); border-radius:16px; padding:26px 28px; display:flex; flex-direction:column; justify-content:center}
+.mq blockquote{margin:0; font-family:var(--font-display); font-weight:600; font-size:24px; line-height:1.3; letter-spacing:-.01em}
+.mq .by{margin-top:16px; font-family:var(--font-mono); font-size:13px; letter-spacing:.12em; color:var(--cyan); text-transform:uppercase}
+
+/* INDEX-MOSAIC — large numbered section index */
+.indexm{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; flex:1; margin-top:38px}
+.ix{position:relative; border:1px solid var(--brd); border-radius:16px; padding:26px; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:flex-end; min-height:150px}
+.ix .ixn{position:absolute; top:8px; right:14px; font-family:var(--font-display); font-weight:800;
+  font-size:96px; line-height:1; color:transparent; -webkit-text-stroke:1.5px var(--brd-2); opacity:.7}
+.ix h3{font-size:20px; font-weight:600; position:relative}
+.ix p{font-size:14px; color:var(--muted); margin-top:6px; position:relative}
+
+/* BEFORE-AFTER — two stacked-state panels with arrow */
+.bna{display:grid; grid-template-columns:1fr 56px 1fr; align-items:stretch; flex:1; margin-top:40px}
+.bna-col{background:var(--panel); border:1px solid var(--brd); border-radius:16px; padding:30px 32px; display:flex; flex-direction:column}
+.bna-col .tag{font-family:var(--font-mono); font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint)}
+.bna-col.after .tag{color:var(--mint)}
+.bna-col h3{font-size:26px; font-weight:700; margin:8px 0 16px}
+.bna-col ul{list-style:none; margin:0; padding:0}
+.bna-col li{display:flex; gap:10px; padding:9px 0; border-top:1px solid var(--brd); font-size:15px; color:var(--muted)}
+.bna-col li::before{content:"-"; color:var(--faint)}
+.bna-col.after li::before{content:"+"; color:var(--mint)}
+.bna-arrow{display:grid; place-items:center; color:var(--cyan); font-size:26px; font-family:var(--font-mono)}
+
+/* DOC PANEL — reference deck uses this to show each layout's JSON usage */
+.doc-panel{position:absolute; left:64px; right:64px; bottom:52px; z-index:4; margin:0;
+  background:rgba(8,13,26,.82); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  border:1px solid var(--brd); border-left:3px solid var(--cyan); border-radius:10px;
+  padding:12px 16px; max-height:30%; overflow:auto}
+body.hide-docs .doc-panel{display:none}
+.doc-panel .doc-h{font-family:var(--font-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); margin-bottom:8px}
+.doc-panel pre{padding:0; background:none; font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap}
+
+/* =====================================================================
+   PRINT — one slide per page, 16:9, frozen motion (drives PDF export)
+   ===================================================================== */
+@media print{
+  @page{ size:1280px 720px; margin:0 }
+  *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important }
+  html,body{ width:1280px; height:auto; overflow:visible; background:#fff; display:block; place-items:initial }
+  .deck{ transform:none !important; width:1280px; height:auto; box-shadow:none; border-radius:0; overflow:visible }
+  .slide{ position:relative !important; inset:auto !important; display:flex !important;
+    opacity:1 !important; visibility:visible !important; width:1280px; height:720px;
+    page-break-after:always; break-after:page; page-break-inside:avoid; break-inside:avoid }
+  .slide:last-child{ page-break-after:auto; break-after:auto }
+  .slide *{ animation:none !important; transition:none !important }
+  .deck-ui, .doc-panel{ display:none !important }
+  /* resolve entrance/hidden states so animation-revealed content is visible in the PDF
+     (the JS beforeprint handler fills count-ups/rings; these cover the CSS-only ones) */
+  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span{ opacity:1 !important }
+  .sg-reveal-wipe{ clip-path:none !important }
+  .sg-typewriter{ width:auto !important; border-right:0 !important }
+  .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
+  .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
+}
+
+/* ambient override: a slide may set "ambient":"none" to silence motion */
+.slide[data-ambient="none"] *{ animation:none !important }
+
+/* =====================================================================
+   CONFIGURABLE AMBIENTS  —  pick one per slide from the JSON with
+   "ambient":"<name>". The renderer injects a <div class="amb amb-<name>">
+   behind the content, so ANY layout can take ANY ambient. "auto" keeps the
+   layout's built-in motion; "none" silences it. Each has a visible resting
+   base (outside the motion query) so reduced-motion / PDF look finished.
+   Several are canvas-design-inspired: rays, grain, contours, waves,
+   constellation. All read theme variables, so they recolor with the theme.
+   ===================================================================== */
+.amb{position:absolute; inset:0; pointer-events:none; overflow:hidden}
+.slide>.amb{z-index:0}
+
+/* orbs — drifting blurred color fields */
+.amb-orbs::before,.amb-orbs::after{content:""; position:absolute; border-radius:50%; filter:blur(70px); opacity:.40}
+.amb-orbs::before{width:420px; height:420px; background:radial-gradient(circle,var(--cyan),transparent 65%); top:-120px; right:-60px}
+.amb-orbs::after{width:520px; height:520px; background:radial-gradient(circle,var(--indigo),transparent 65%); bottom:-200px; left:-80px}
+
+/* aurora — slow diagonal gradient wash */
+.amb-aurora{background:linear-gradient(120deg,
+  color-mix(in srgb,var(--cyan) 12%,transparent), color-mix(in srgb,var(--indigo) 12%,transparent),
+  color-mix(in srgb,var(--mint) 10%,transparent), color-mix(in srgb,var(--indigo) 12%,transparent));
+  background-size:300% 300%}
+
+/* grid — drifting dot lattice */
+.amb-grid{background-image:radial-gradient(var(--dot) 1px,transparent 1.4px); background-size:34px 34px; opacity:.5;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent); mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent)}
+
+/* rays — slow rotating conic light (canvas-design: systematic radiance) */
+.amb-rays{position:absolute; width:200%; height:200%; left:-50%; top:-50%; transform-origin:50% 50%;
+  background:conic-gradient(from 0deg,
+    transparent 0 17deg, color-mix(in srgb,var(--cyan) 9%,transparent) 17deg 20deg,
+    transparent 20deg 37deg, color-mix(in srgb,var(--indigo) 8%,transparent) 37deg 40deg, transparent 40deg);
+  -webkit-mask-image:radial-gradient(circle at 70% 30%,#000,transparent 70%); mask-image:radial-gradient(circle at 70% 30%,#000,transparent 70%)}
+
+/* grain — fine film grain drift (canvas-design: paper/ink texture) */
+.amb-grain{opacity:.06; background-image:repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.6) 0 1px, transparent 1px 3px)}
+
+/* contours — topographic rings (canvas-design: map / observation) */
+.amb-contours{opacity:.5; background-image:repeating-radial-gradient(circle at 28% 120%,
+  transparent 0 38px, color-mix(in srgb,var(--cyan) 10%,transparent) 38px 40px)}
+
+/* scan — single soft light bar sweeping down */
+.amb-scan::after{content:""; position:absolute; left:0; right:0; top:-130px; height:130px;
+  background:linear-gradient(var(--cyan),transparent); opacity:.08}
+
+/* waves — drifting diagonal striations (canvas-design: contour fields) */
+.amb-waves{opacity:.5; background:repeating-linear-gradient(100deg,
+  transparent 0 38px, color-mix(in srgb,var(--cyan) 6%,transparent) 38px 40px);
+  -webkit-mask-image:linear-gradient(transparent,#000); mask-image:linear-gradient(transparent,#000)}
+
+/* glow — breathing central vignette */
+.amb-glow{opacity:.6; background:radial-gradient(60% 60% at 50% 40%, color-mix(in srgb,var(--cyan) 12%,transparent), transparent 70%)}
+
+/* constellation — faint twinkling points (canvas-design: charted sky) */
+.amb-constellation{opacity:.5; background-image:
+  radial-gradient(1.5px 1.5px at 20% 30%, var(--mint), transparent),
+  radial-gradient(1.5px 1.5px at 70% 60%, var(--cyan), transparent),
+  radial-gradient(1.5px 1.5px at 42% 82%, var(--indigo), transparent),
+  radial-gradient(1.5px 1.5px at 86% 24%, var(--cyan), transparent),
+  radial-gradient(1.5px 1.5px at 58% 16%, var(--mint), transparent)}
+
+@media (prefers-reduced-motion: no-preference){
+  .amb-orbs::before{animation:drift 16s ease-in-out infinite}
+  .amb-orbs::after{animation:drift 20s ease-in-out infinite reverse}
+  @keyframes ambAur{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .amb-aurora{animation:ambAur 20s ease infinite}
+  @keyframes ambGrid{0%{background-position:0 0}100%{background-position:0 340px}}
+  .amb-grid{animation:ambGrid 14s linear infinite}
+  @keyframes ambRot{to{transform:rotate(360deg)}}
+  .amb-rays{animation:ambRot 90s linear infinite}
+  @keyframes ambGrain{0%{transform:translate(0,0)}25%{transform:translate(-3px,2px)}50%{transform:translate(2px,-2px)}75%{transform:translate(-2px,-3px)}100%{transform:translate(0,0)}}
+  .amb-grain{animation:ambGrain .8s steps(4) infinite}
+  @keyframes ambCont{0%{background-position:0 0}100%{background-position:0 -80px}}
+  .amb-contours{animation:ambCont 18s linear infinite}
+  @keyframes ambScan{0%{top:-130px}100%{top:100%}}
+  .amb-scan::after{animation:ambScan 8s linear infinite}
+  @keyframes ambWave{0%{background-position:0 0}100%{background-position:120px 0}}
+  .amb-waves{animation:ambWave 11s linear infinite}
+  @keyframes ambGlow{0%,100%{opacity:.35}50%{opacity:.70}}
+  .amb-glow{animation:ambGlow 8s ease-in-out infinite}
+  @keyframes ambTw{0%,100%{opacity:.30}50%{opacity:.70}}
+  .amb-constellation{animation:ambTw 6s ease-in-out infinite}
+}
+
+
+/* =====================================================================
+   V2 PHASE 3 — data-driven charts + tables. All color via theme tokens:
+   --chart-1..3 are the accent slots, 4..6 derived mixes, so themes AND
+   brand kits recolor every chart automatically.
+   ===================================================================== */
+:root{
+  --chart-1: var(--cyan);
+  --chart-2: var(--indigo);
+  --chart-3: var(--mint);
+  --chart-4: color-mix(in srgb, var(--cyan) 55%, var(--indigo));
+  --chart-5: color-mix(in srgb, var(--mint) 55%, var(--indigo));
+  --chart-6: color-mix(in srgb, var(--cyan) 45%, var(--ink));
+}
+.chart-anim{ width:100%; height:100%; }
+.chart-svg{ width:100%; height:100%; display:block; }
+.chart-err{ font-family:var(--font-mono); font-size:15px; color:var(--cyan);
+  border:1px dashed var(--brd-2); border-radius:10px; padding:18px 20px; }
+
+/* enter animations — resting base is the FINISHED state (reduced-motion/print
+   safe); motion only inside the no-preference query, driven by .sg-onenter -> .run */
+@media (prefers-reduced-motion: no-preference){
+  @keyframes cbarGrow{ from{ transform:scaleY(0); } to{ transform:scaleY(1); } }
+  .chart-anim.sg-onenter:not(.run) .cbar{ transform:scaleY(0); }
+  .chart-anim.run .cbar{ transform-box:fill-box; transform-origin:center bottom;
+    animation:cbarGrow .8s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes cbarhGrow{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+  .chart-anim.sg-onenter:not(.run) .cbarh{ transform:scaleX(0); }
+  .chart-anim.run .cbarh{ transform-box:fill-box; transform-origin:left center;
+    animation:cbarhGrow .8s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes cfadeIn{ from{ opacity:0; } to{ opacity:1; } }
+  .chart-anim.sg-onenter:not(.run) .cfade{ opacity:0; }
+  .chart-anim.run .cfade{ animation:cfadeIn .6s ease both; }
+  @keyframes cpopIn{ from{ opacity:0; transform:scale(.3); } to{ opacity:1; transform:scale(1); } }
+  .chart-anim.sg-onenter:not(.run) .cpop{ opacity:0; }
+  .chart-anim.run .cpop{ transform-box:fill-box; transform-origin:center; animation:cpopIn .5s cubic-bezier(.2,.7,.2,1) both; }
+  /* .cline paths draw via the shared .sg-draw machinery on the wrapper */
+}
+@media print{
+  .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
+    transform:none !important; opacity:1 !important; animation:none !important; }
+}
+
+/* ---- table layout ---- */
+.tbl-wrap{ flex:1; margin-top:34px; min-height:0; display:flex; flex-direction:column; }
+table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19px;
+  background:var(--panel); border:1px solid var(--brd); border-radius:16px; overflow:hidden; }
+.tbl th{ font-family:var(--font-mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--cyan); text-align:left; padding:16px 22px; border-bottom:1px solid var(--brd-2);
+  background:var(--panel-2); }
+.tbl td{ padding:15px 22px; color:var(--muted); border-bottom:1px solid var(--brd); }
+.tbl tbody tr:last-child td{ border-bottom:none; }
+.tbl td:first-child{ color:var(--ink); font-weight:600; font-family:var(--font-display); }
+.tbl .hi{ background:color-mix(in srgb, var(--cyan) 9%, transparent); color:var(--ink); }
+.tbl th.hi{ color:var(--cyan); }
+.tbl.compact{ font-size:15px; } .tbl.compact td{ padding:9px 18px; } .tbl.compact th{ padding:11px 18px; }
+.tbl-note{ margin-top:12px; font-family:var(--font-mono); font-size:13px; color:var(--faint); }
+
+/* ---- brand mark (auto-placed on cover + closing) ---- */
+.brand-mark{ position:absolute; right:44px; top:38px; height:46px; max-width:220px;
+  object-fit:contain; z-index:5; }

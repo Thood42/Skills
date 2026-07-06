@@ -4,7 +4,7 @@
     {
       "id": 0,
       "name": "editable-onboarding-deck",
-      "prompt": "Turn these notes into a slide deck I can tweak myself before our team meeting \u2014 I'll want to move things around and fix wording. NOTES: Q3 onboarding revamp. Problem: new hires took ~6 weeks to first meaningful PR, too long. What we changed: a 2-week structured ramp, a buddy system, a checklist in Notion, weekly 1:1s. Results: time-to-first-PR down to 18 days, new-hire NPS up from 41 to 72, 0 regretted attrition in cohort. Next: roll out to the data team, add a mentorship track.",
+      "prompt": "Turn these notes into a slide deck I can tweak myself before our team meeting — I'll want to move things around and fix wording. NOTES: Q3 onboarding revamp. Problem: new hires took ~6 weeks to first meaningful PR, too long. What we changed: a 2-week structured ramp, a buddy system, a checklist in Notion, weekly 1:1s. Results: time-to-first-PR down to 18 days, new-hire NPS up from 41 to 72, 0 regretted attrition in cohort. Next: roll out to the data team, add a mentorship track.",
       "expected_output": "A single self-contained .html file: a data-driven deck (cover, problem, what-changed, results stats, next steps) using slide-forge layouts, with the in-file editor present (Edit button, overrides/freeObjects machinery), valid deck-data JSON, and present-mode byte-compatible structure.",
       "files": [],
       "assertions": [
@@ -14,7 +14,7 @@
         "All slide layouts are valid registry names",
         "Present-mode engine intact (deck-engine + boot)",
         "Self-contained: no external CDN <script> at runtime",
-        "Reasonable slide count (4\u201312)"
+        "Reasonable slide count (4–12)"
       ]
     },
     {
@@ -30,13 +30,13 @@
         "All slide layouts are valid registry names",
         "Present-mode engine intact (deck-engine + boot)",
         "Self-contained: no external CDN <script> at runtime",
-        "Reasonable slide count (4\u201312)"
+        "Reasonable slide count (4–12)"
       ]
     },
     {
       "id": 2,
       "name": "investor-update-rearrange",
-      "prompt": "turn this into slides I can edit and rearrange before sending \u2014 founder update for investors. we hit 12k MRR, churn down to 3%, hired 2 engineers, runway 14 months. keep it short.",
+      "prompt": "turn this into slides I can edit and rearrange before sending — founder update for investors. we hit 12k MRR, churn down to 3%, hired 2 engineers, runway 14 months. keep it short.",
       "expected_output": "A single self-contained editable .html deck, short, with the metrics as stat/bignum layouts, editor enabled, valid deck-data JSON.",
       "files": [],
       "assertions": [
@@ -46,7 +46,37 @@
         "All slide layouts are valid registry names",
         "Present-mode engine intact (deck-engine + boot)",
         "Self-contained: no external CDN <script> at runtime",
-        "Reasonable slide count (4\u201312)"
+        "Reasonable slide count (4–12)"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "quarterly-metrics-charts",
+      "prompt": "turn these into slides with real charts I can edit: Q1-Q4 revenue 4.1, 5.0, 5.8, 7.2 ($M); churn by quarter 5.1%, 4.4%, 3.6%, 3.0%; plan mix Q4: starter 220 seats, pro 340, enterprise 90. short deck for the board.",
+      "expected_output": "A single editable .html deck where every chart is authored as data (type + data.labels/series rendered by SG.charts), not hand-drawn SVG; series lengths match labels; a table or stat layout for the plan mix is acceptable.",
+      "files": [],
+      "assertions": [
+        "Delivered a single self-contained .html deck",
+        "deck-data JSON parses and validate.py exits 0",
+        "At least two chart layouts authored as data (content.data present, no hand-written <svg> in chart content)",
+        "Every chart series has exactly one value per label",
+        "Chart colors are not hard-coded in content (renderer tokens only)",
+        "In-file editor present"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "branded-deck-from-template-pack",
+      "prompt": "use my team template (templates/exec-briefing.json) and our brand - primary #E4572E, secondary #17BEBB, font Archivo - to build a briefing on our platform migration: 60% done, $1.2M saved, target date March.",
+      "expected_output": "A deck built by applying the pack (its slide skeleton order and theme), with a top-level brand block carrying the two accent colors and the Archivo display font; the migration content filled into the skeleton; validate.py green.",
+      "files": [],
+      "assertions": [
+        "Delivered a single self-contained .html deck",
+        "deck-data JSON parses and validate.py exits 0",
+        "Top-level brand block present with accent1 #E4572E and font Archivo",
+        "Slide order follows the exec-briefing pack skeleton",
+        "Deck content covers the migration facts (60%, $1.2M, March)",
+        "In-file editor present"
       ]
     }
   ]

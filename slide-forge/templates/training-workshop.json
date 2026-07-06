@@ -1,0 +1,217 @@
+{
+  "packVersion": 1,
+  "name": "Training Workshop",
+  "theme": {
+    "--bg": "#021018",
+    "--bg-2": "#04212e",
+    "--ink": "#e6f6ff",
+    "--muted": "#93b8c9",
+    "--faint": "#587886",
+    "--cyan": "#38d6ff",
+    "--indigo": "#3b82f6",
+    "--mint": "#2ee6c6",
+    "--glow-cyan": "0 0 34px rgba(56,214,255,.38)",
+    "--stage": "#01080f",
+    "--dot": "rgba(56,180,220,.10)",
+    "--font-display": "'Epilogue','DejaVu Sans',system-ui,sans-serif",
+    "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+    "--font-mono": "'Fira Code','DejaVu Sans Mono',ui-monospace,monospace"
+  },
+  "defaults": {
+    "ambient": "auto"
+  },
+  "skeleton": [
+    {
+      "layout": "cover",
+      "content": {
+        "kicker": "A Workshop",
+        "title": "Title",
+        "accent": "Accent",
+        "subtitle": "Subtitle text",
+        "meta": [
+          {
+            "text": "Series",
+            "strong": true
+          },
+          "Module 01",
+          "Date"
+        ]
+      },
+      "ambient": "constellation"
+    },
+    {
+      "layout": "agenda",
+      "content": {
+        "kicker": "What we'll cover",
+        "title": "Agenda",
+        "items": [
+          {
+            "title": "Item one",
+            "desc": "Description"
+          },
+          {
+            "title": "Item two",
+            "desc": "Description"
+          },
+          {
+            "title": "Item three",
+            "desc": "Description"
+          },
+          {
+            "title": "Item four",
+            "desc": "Description"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "divider",
+      "content": {
+        "index": "01",
+        "title": "Section",
+        "subtitle": "Subtitle text"
+      },
+      "ambient": "glow"
+    },
+    {
+      "layout": "editorial",
+      "content": {
+        "kicker": "Kicker",
+        "lead": "Lead paragraph",
+        "columns": [
+          {
+            "head": "Point one",
+            "body": "Body text"
+          },
+          {
+            "head": "Point two",
+            "body": "Body text"
+          },
+          {
+            "head": "Point three",
+            "body": "Body text"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "stat-grid",
+      "content": {
+        "kicker": "Kicker",
+        "title": "By the numbers",
+        "stats": [
+          {
+            "count": 0,
+            "unit": "%",
+            "label": "Label"
+          },
+          {
+            "count": 0,
+            "unit": "%",
+            "label": "Label"
+          },
+          {
+            "count": 0,
+            "unit": "x",
+            "label": "Label"
+          },
+          {
+            "value": "1",
+            "unit": "",
+            "label": "Label"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "comparison",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Compare",
+        "badge": "VS",
+        "left": {
+          "tag": "Before",
+          "title": "Option A",
+          "items": [
+            "Point",
+            "Point",
+            "Point"
+          ]
+        },
+        "right": {
+          "tag": "After",
+          "title": "Option B",
+          "items": [
+            "Point",
+            "Point",
+            "Point"
+          ]
+        }
+      }
+    },
+    {
+      "layout": "chart",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Title",
+        "type": "line",
+        "data": {
+          "labels": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "series": [
+            {
+              "name": "Series 1",
+              "values": [
+                3,
+                5,
+                4,
+                6
+              ]
+            }
+          ]
+        },
+        "options": {
+          "unit": "",
+          "showValues": true
+        },
+        "note": ""
+      }
+    },
+    {
+      "layout": "quote",
+      "content": {
+        "quote": "A short, memorable quote",
+        "by": "Source"
+      },
+      "ambient": "glow"
+    },
+    {
+      "layout": "closing",
+      "content": {
+        "kicker": "Take these with you",
+        "title": "Thank",
+        "accent": "you",
+        "takeaways": [
+          {
+            "title": "Takeaway",
+            "desc": "Description"
+          },
+          {
+            "title": "Takeaway",
+            "desc": "Description"
+          },
+          {
+            "title": "Takeaway",
+            "desc": "Description"
+          }
+        ],
+        "note": "Closing note"
+      },
+      "ambient": "constellation"
+    }
+  ]
+}

@@ -49,50 +49,104 @@ above — style, geometry, and **animation** — apply to that individual item o
                          "color":"#ffd166", "font":"var(--font-mono)",
                          "anim":"reveal-wipe", "animDelay":0.2,
                          "html":"**By** the [[numbers]]",          // on-canvas WYSIWYG edit
-                         "theme": { "--cyan":"#ff5", "--bg":"#101" } },
-                 "b1.0": { "anim":"glow-pulse" } },               // a nested array item
-  "freeObjects": [ { "id":"f1", "type":"txt", "x":900, "y":120, "text":"Draft", "size":40 } ] }
+                         "theme": { "--cyan":"#ff5", "--bg":"#101" } } },
+  "freeObjects": [ { "id":"f1a2b3c", "type":"txt", "x":900, "y":600,
+                     "text":"Hand-placed note", "size":28, "color":"#ffd166" } ] }
 ```
 
-`html` (set by on-canvas editing) replaces that element's template text with `rich()`-formatted
-markers, layered over `content` the same way geometry/style overrides are — so if both exist, the
-override wins on the slide while `content` stays as the authored source. "Reset element" clears it.
+Deleting a free object removes it from `freeObjects`; "Reset element" deletes that key from
+`overrides`. Undo/redo snapshots the whole deck JSON (80 deep); edits autosave to localStorage
+keyed by `meta.id`, and **Save .html** re-serializes the entire file with `deck-data` (and
+`deck-assets`) updated — so the saved file is byte-equivalent to one authored that way directly.
 
-A deck with no `overrides`/`freeObjects` renders byte-for-byte like a plain static deck — which is
-why everything you generate stays clean and portable.
+---
 
-## Layout switching is safe
+## v2 additions (editing UX)
 
-Changing a slide's layout loads that layout's default content (so the slide is never empty),
-**carries shared fields over** (title, kicker, subtitle, accent), and **clears stale geometry
-overrides** that referenced the old layout's elements. This is the fix for "text disappears after
-switching layouts": text lives in `content` and is re-rendered fresh.
+The editor now wraps every selectable thing — template blocks (`b0`), nested dotted keys
+(`b6.0.1`) and free objects — behind **one element model** (`Forge.sels[]`), so all of them share
+the same verbs. New in v2:
 
-## Persistence
+- **Double-click text to edit in place** (right-click → *Edit text* still works). The floating
+  **B / ✦ / `<>`** toolbar toggles bold / glow / mono on the selection.
+- **Smart guides + snapping.** Dragging snaps to slide center/edges/margins and to sibling
+  edges/centers, with pink guide lines; falls back to an 8px grid. Hold **Alt** to disable snapping.
+  Rotation snaps to 15° (Alt for free).
+- **Multi-select.** Shift-click to add/remove; drag a marquee on empty canvas to box-select. The
+  floating toolbar gains **align** (left/center/right/top/middle/bottom) and, at 3+, **distribute**
+  (horizontal/vertical). All geometry math is in slide-space (pre-transform), so it's correct at any
+  fit scale.
+- **Clipboard.** `Cmd/Ctrl+C · V · D` copy / paste / duplicate within and across slides. A pasted
+  template element lands as a free object carrying its text + computed style.
+- **Z-order.** Bring forward / send back (`overrides[key].z` or `freeObjects[i].z`).
+- **Keyboard.** Arrow keys nudge the selection (Shift = 10px); `Delete`/`Backspace` removes/resets;
+  `Esc` clears; `Cmd/Ctrl+S` saves the `.html`; `Cmd/Ctrl+Z` / `Shift+Z` undo/redo.
+- **Slide row tools.** The left panel's slide rows expose move-up/down, duplicate and delete on hover.
 
-- **Autosave** to `localStorage` after every change (best-effort; some browsers restrict it on
-  `file://`).
-- **Save .html** (toolbar / `Cmd-Ctrl+S`) serializes the current deck JSON into a fresh clone of the
-  file and downloads it — a full deck+editor with edits baked in, reopens clean. A browser can't
-  overwrite the opened file, so saving always produces a new download; tell the user this.
-- **Export/Import JSON** (`{ }` / `E`/`I`) remains for backup or hand-editing.
+**Schema.** `meta.schemaVersion` is stamped to `2` on load by `SG.migrate()`; v1 decks are valid v2
+decks (all new keys — `overrides[key].z`, `slides[i].notes`, top-level `brand`/`masters` — are
+optional), so old decks open and re-save with no visual diff.
 
-## Undo / redo & keys
+**Source layout.** The template is now built from `src/` by `scripts/build.py`; validate a deck with
+`scripts/validate.py <deck.html|deck.json>`. Claude's authoring workflow is unchanged — copy
+`editor-template.html`, inject the `deck-data` JSON.
 
-Snapshot-based whole-deck undo (cap ~80). `Cmd/Ctrl+Z` / `Cmd/Ctrl+Shift+Z`. In Edit mode,
-present-mode slide advancing (arrows/space/click) is suppressed so it can't interrupt editing —
-navigate via the **Slides** panel. `Esc` deselects, `Delete` removes a selected object, arrows
-nudge a selected object.
+## v2 phase 2
 
-## Notes & limits (be honest with the user)
+- **Grouping.** Select several elements, `Ctrl+G` (or the chain button on the floating toolbar) to
+  group, `Ctrl+Shift+G` to ungroup. Stored as a shared `group` id on `overrides[key]` /
+  `freeObjects[i]`; selecting any member selects the whole group, and all verbs apply to it.
+- **Detach to freeform.** Right-click a template *text* element → **Detach to free text**: recreated
+  as a free object at identical position/size/style; the original is hidden via
+  `overrides[key].hide` (reset the element to restore it).
+- **Slide sorter.** The ▦ button in the Slides panel toggles a thumbnail grid (live-rendered
+  miniatures). Drag thumbnails to reorder; hover for duplicate/delete.
+- **Presenter notes + speaker view.** Notes live in `slides[i].notes` (Slide panel textarea). Press
+  **S** while presenting: a popup shows the current slide, notes, next-up, a clock and an elapsed
+  timer; arrow keys in the popup drive the main deck.
+- **In-place save.** On Chrome/Edge, **Save .html** / `Ctrl+S` writes the file in place via the File
+  System Access API (first save picks the file, later saves are silent). Elsewhere it falls back to
+  downloading a fresh copy.
+- **Onboarding hints.** First entry into Edit mode shows a dismissable basics overlay (stored in
+  localStorage under `forge:hints-seen`).
+- **Text-edit write-back.** On-canvas text edits are written back into the matching `content` field
+  (so the sidebar and layout switches stay in sync); an `html` override is used only when the source
+  field can't be identified unambiguously.
 
-- `data-el` keys (including nested `b6.0` ones) are positional; if a slide's content shape changes a
-  lot — reordering array items, switching layouts — an override (geometry, animation, or `html`) may
-  detach or land on a different element. Recoverable via Undo or "Reset element". Plain text in
-  `content` is unaffected.
-- An on-canvas `html` edit and the sidebar **Content** field for the same element can diverge (the
-  override wins on the slide). To go back to the content-driven text, use "Reset element".
-- On-canvas text editing intentionally targets **leaf** text elements only; the right-click menu
-  shows **✎ Edit text** only on a leaf — right-clicking a container (a grid/list wrapper) offers
-  **Select** / **Reset** but no Edit text, so drill to the item/field first.
-- The editor is vanilla JS with zero dependencies, so the single-file/offline guarantee holds.
+## v2.1 refinements
+
+- **Elements tree.** The flat "Nested" picker is now a collapsible hierarchical tree (in the
+  Inspector, with or without a selection): every block, nested item and free object, indented, with
+  the selection highlighted. Click a row to select; disclosure arrows collapse branches.
+- **Item operations from the tree / right-click.** Containers that render a content array (agenda
+  items, stats, matrix cells...) map back to it, so the tree offers **＋ add item** (cloned with the
+  right field shape), and item rows offer **⧉ duplicate item** / **✕ remove item** — all edits land
+  in `content`, so they survive layout switches. Ambiguous mappings simply don't offer the buttons.
+- **Animation triggers & build steps.** Entrance effects have a **Trigger**: *On slide enter*
+  (default) or *On click (build step)* with a **step order** number. While presenting, → / Space /
+  click plays pending steps in order (same number = together) before advancing to the next slide.
+  Stored as `animTrigger`/`animStep` on the override or free object. New **"Stagger children"**
+  effect animates a container's children in sequence. The Slide panel shows an **Animations**
+  overview — every animated element with its trigger/step/delay, select / replay / clear, and Play all.
+- **Faithful duplication.** Duplicating a container (right-click, toolbar, `Ctrl+D`) now deep-copies
+  its full markup — nested items included — as a `{type:"html"}` free object (previously an empty
+  box). Nested array items additionally offer **Duplicate item (in layout)**, which clones the
+  content entry in place.
+- **`?` opens a keyboard-shortcut overlay** in Edit mode; editor chrome carries aria-labels and
+  visible focus rings.
+
+## v2.2 refinements
+
+- **One control corner.** Present / Docs / Export / Import / Save PDF now sit bottom-right beside
+  the Edit button, in the same pill style. Presentation mode hides every control.
+- **Structure editor.** The Elements panel's ⤢ button opens a large modal: the elements tree beside
+  a direct JSON editor for the slide. **Copy JSON** exports the structure; paste JSON back in and
+  **Apply** (validated: parse + known layout) to replace the slide — round-trips with Export/Import.
+- **Faithful duplicate.** Duplicating a nested layout item now clones its content entry in place —
+  a real element of the same type, not a free copy. Containers still deep-copy as `html` free
+  objects, and those now carry every override property (color, font, theme, animation, z).
+- **Delete key.** Deleting a selected nested item removes the item from `content` (not just the
+  override); containers reset; free objects are removed.
+- **Build steps are opt-in.** `defaults.buildSteps` (Deck panel toggle, **off by default**) gates
+  click-to-reveal: when off, everything is visible everywhere; when on, On-click elements wait for
+  → / Space / click while presenting. Setting a click trigger enables the toggle automatically.

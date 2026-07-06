@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%TITLE%</title>
+
+<!-- slide-forge %BUILD% — built by scripts/build.py; edit src/*, not this file -->
+<!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
+     stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
+<meta name="deck-libs" content="">
+
+<script>
+%SG_JS%
+</script>
+
+<!--
+  =====================================================================
+  /slides reference deck  —  self-contained HTML presentation
+  ---------------------------------------------------------------------
+  • One file. Open in any browser. Arrow keys / Space to navigate.
+  • Data-driven: all content lives in the deck-data JSON block.
+  • One subtle ambient animation per slide (CSS only, motion-safe).
+  • Theme via the CSS variables in :root. Fonts via CDN with sturdy
+    local fallbacks so it still renders offline.
+  • Per-slide deep links: deck.html#7 opens slide 7 (used for PNG render).
+  =====================================================================
+-->
+
+<!-- Fonts: CDN with installed fallbacks (DejaVu) so offline render still works -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+%DECK_CSS%
+</style>
+
+<!-- slidegen animation library -->
+<style>
+%ANIM_CSS%
+</style>
+<script>
+%ANIM_JS%
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Spectral:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Lora:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- engine additions: new layouts, deck UI, print/PDF stylesheet -->
+<style>
+%ENGINE_CSS%
+</style>
+<!-- chart renderer: data -> theme-token SVG (v2 phase 3) -->
+<script id="deck-charts">
+%CHARTS_JS%
+</script>
+<!-- deck engine: data-driven rendering, theming, export/import -->
+<script id="deck-engine">
+%ENGINE_JS%
+</script>
+<style id="forge-css">
+%EDITOR_CSS%
+</style>
+</head>
+<body>
+<div class="deck" id="deck"></div>
+
+<!-- ===== DECK CONTENT (edit this; it is the single source of truth) ===== -->
+<script type="application/json" id="deck-assets">
+%DECK_ASSETS%
+</script>
+<script type="application/json" id="deck-data">
+%DECK_DATA%
+</script>
+
+<div class="deck-ui"><button onclick="SG.present()" title="Presentation mode (F)">▶ Present</button><button onclick="SG.toggleDocs()" title="Toggle JSON docs (D)">Docs</button><button onclick="SG.exportJSON()" title="Export JSON (E)">Export JSON</button><button onclick="SG.importJSON()" title="Import JSON (I)">Import JSON</button><button onclick="window.print()" title="Save as PDF (P)">Save PDF</button></div>
+<input type="file" id="deck-import" accept="application/json,.json" hidden>
+
+<script id="forge-editor">
+%EDITOR_JS%
+</script>
+</body>
+</html>

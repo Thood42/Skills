@@ -1,0 +1,170 @@
+{
+  "packVersion": 1,
+  "name": "Product Launch",
+  "theme": {
+    "--bg": "#140b05",
+    "--bg-2": "#1d1006",
+    "--ink": "#fff3e6",
+    "--muted": "#d6b59a",
+    "--faint": "#8a6f5a",
+    "--cyan": "#ffb020",
+    "--indigo": "#ff6a3d",
+    "--mint": "#ffd166",
+    "--glow-cyan": "0 0 34px rgba(255,160,40,.40)",
+    "--stage": "#0b0603",
+    "--dot": "rgba(255,150,80,.10)",
+    "--font-display": "'Unbounded','DejaVu Sans',system-ui,sans-serif",
+    "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+    "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+  },
+  "defaults": {
+    "ambient": "auto"
+  },
+  "skeleton": [
+    {
+      "layout": "cover",
+      "content": {
+        "kicker": "Introducing",
+        "title": "Product",
+        "accent": "Name",
+        "subtitle": "The one-sentence pitch",
+        "meta": [
+          {
+            "text": "Launch",
+            "strong": true
+          },
+          "Date",
+          ""
+        ]
+      },
+      "ambient": "orbs"
+    },
+    {
+      "layout": "manifesto",
+      "content": {
+        "statement": "The [[bold claim]] your product makes",
+        "lead": "Supporting sentence"
+      },
+      "ambient": "rays"
+    },
+    {
+      "layout": "divider",
+      "content": {
+        "index": "01",
+        "title": "The problem",
+        "subtitle": "Subtitle text"
+      },
+      "ambient": "aurora"
+    },
+    {
+      "layout": "before-after",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Before / After",
+        "before": {
+          "tag": "Before",
+          "title": "Life today",
+          "items": [
+            "Pain",
+            "Pain",
+            "Pain"
+          ]
+        },
+        "after": {
+          "tag": "After",
+          "title": "With us",
+          "items": [
+            "Gain",
+            "Gain",
+            "Gain"
+          ]
+        }
+      }
+    },
+    {
+      "layout": "metric-dash",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Early results",
+        "ring": {
+          "value": 50,
+          "suffix": "%",
+          "label": "Label"
+        },
+        "tiles": [
+          {
+            "value": "0",
+            "unit": "",
+            "label": "Label"
+          },
+          {
+            "value": "0",
+            "unit": "",
+            "label": "Label"
+          },
+          {
+            "value": "0",
+            "unit": "",
+            "label": "Label"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "leaderboard",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Vs. the field",
+        "rows": [
+          {
+            "name": "Us",
+            "value": "100",
+            "pct": 100
+          },
+          {
+            "name": "Them",
+            "value": "64",
+            "pct": 64
+          },
+          {
+            "name": "Them",
+            "value": "41",
+            "pct": 41
+          }
+        ]
+      }
+    },
+    {
+      "layout": "quote",
+      "content": {
+        "quote": "A customer quote that sells it",
+        "by": "Customer, Company"
+      },
+      "ambient": "glow"
+    },
+    {
+      "layout": "closing",
+      "content": {
+        "kicker": "Get it",
+        "title": "Launch",
+        "accent": "day",
+        "takeaways": [
+          {
+            "title": "Where",
+            "desc": "Description"
+          },
+          {
+            "title": "When",
+            "desc": "Description"
+          },
+          {
+            "title": "How",
+            "desc": "Description"
+          }
+        ],
+        "note": "Call to action"
+      },
+      "ambient": "orbs"
+    }
+  ]
+}

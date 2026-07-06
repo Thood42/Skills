@@ -1,0 +1,221 @@
+{
+  "packVersion": 1,
+  "name": "Research Readout",
+  "theme": {
+    "--bg": "#f6f1e7",
+    "--bg-2": "#efe7d6",
+    "--ink": "#1c1a17",
+    "--muted": "#4f4a42",
+    "--faint": "#8a8377",
+    "--cyan": "#c0392b",
+    "--indigo": "#1c1a17",
+    "--mint": "#b8860b",
+    "--glow-cyan": "0 0 18px rgba(192,57,43,.18)",
+    "--stage": "#e9e1d2",
+    "--dot": "rgba(20,18,15,.10)",
+    "--font-display": "'Newsreader','Georgia','DejaVu Serif',serif",
+    "--font-body": "'Source Serif 4','Georgia','DejaVu Serif',serif",
+    "--font-mono": "'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace"
+  },
+  "defaults": {
+    "ambient": "auto"
+  },
+  "skeleton": [
+    {
+      "layout": "cover",
+      "content": {
+        "kicker": "Research readout",
+        "title": "Study",
+        "accent": "",
+        "subtitle": "What we asked, what we learned",
+        "meta": [
+          {
+            "text": "n = 00",
+            "strong": true
+          },
+          "Method",
+          "Date"
+        ]
+      },
+      "ambient": "grain"
+    },
+    {
+      "layout": "agenda",
+      "content": {
+        "kicker": "In this readout",
+        "title": "Contents",
+        "items": [
+          {
+            "title": "Method",
+            "desc": ""
+          },
+          {
+            "title": "Findings",
+            "desc": ""
+          },
+          {
+            "title": "Evidence",
+            "desc": ""
+          },
+          {
+            "title": "Recommendations",
+            "desc": ""
+          }
+        ]
+      }
+    },
+    {
+      "layout": "editorial",
+      "content": {
+        "kicker": "Method",
+        "lead": "How the study was run",
+        "columns": [
+          {
+            "head": "Who",
+            "body": "Body text"
+          },
+          {
+            "head": "What",
+            "body": "Body text"
+          },
+          {
+            "head": "How",
+            "body": "Body text"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "chart",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Key finding",
+        "type": "bar-h",
+        "data": {
+          "labels": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "series": [
+            {
+              "name": "Series 1",
+              "values": [
+                3,
+                5,
+                4,
+                6
+              ]
+            }
+          ]
+        },
+        "options": {
+          "unit": "",
+          "showValues": true
+        },
+        "note": ""
+      }
+    },
+    {
+      "layout": "table",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Findings by segment",
+        "columns": [
+          "",
+          "Column A",
+          "Column B"
+        ],
+        "rows": [
+          [
+            "Row 1",
+            "",
+            ""
+          ],
+          [
+            "Row 2",
+            "",
+            ""
+          ],
+          [
+            "Row 3",
+            "",
+            ""
+          ]
+        ],
+        "options": {}
+      }
+    },
+    {
+      "layout": "quote-mosaic",
+      "content": {
+        "kicker": "In their words",
+        "title": "Voices",
+        "quotes": [
+          {
+            "quote": "Quote",
+            "by": "P1"
+          },
+          {
+            "quote": "Quote",
+            "by": "P2"
+          },
+          {
+            "quote": "Quote",
+            "by": "P3"
+          },
+          {
+            "quote": "Quote",
+            "by": "P4"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "index-mosaic",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Recommendations",
+        "items": [
+          {
+            "title": "Recommendation",
+            "desc": "Description"
+          },
+          {
+            "title": "Recommendation",
+            "desc": "Description"
+          },
+          {
+            "title": "Recommendation",
+            "desc": "Description"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "closing",
+      "content": {
+        "kicker": "Next",
+        "title": "What happens",
+        "accent": "now",
+        "takeaways": [
+          {
+            "title": "Do",
+            "desc": "Description"
+          },
+          {
+            "title": "Decide",
+            "desc": "Description"
+          },
+          {
+            "title": "Watch",
+            "desc": "Description"
+          }
+        ],
+        "note": "Follow-up plan"
+      },
+      "ambient": "grain"
+    }
+  ]
+}

@@ -1,0 +1,240 @@
+{
+  "packVersion": 1,
+  "name": "Executive Briefing",
+  "theme": {
+    "--bg": "#0c0d10",
+    "--bg-2": "#15171c",
+    "--ink": "#f2f4f8",
+    "--muted": "#9aa0ac",
+    "--faint": "#5e6470",
+    "--cyan": "#5b8cff",
+    "--indigo": "#c8cdd8",
+    "--mint": "#9aa3b2",
+    "--glow-cyan": "0 0 34px rgba(91,140,255,.35)",
+    "--stage": "#060708",
+    "--dot": "rgba(255,255,255,.06)",
+    "--font-display": "'Archivo','DejaVu Sans',system-ui,sans-serif",
+    "--font-body": "'Hanken Grotesk','DejaVu Sans',system-ui,sans-serif",
+    "--font-mono": "'Space Mono','DejaVu Sans Mono',ui-monospace,monospace"
+  },
+  "defaults": {
+    "ambient": "auto"
+  },
+  "skeleton": [
+    {
+      "layout": "cover",
+      "content": {
+        "kicker": "Confidential",
+        "title": "Title",
+        "accent": "",
+        "subtitle": "One-line summary of the recommendation",
+        "meta": [
+          {
+            "text": "Team",
+            "strong": true
+          },
+          "Q1",
+          "Date"
+        ]
+      },
+      "ambient": "grid"
+    },
+    {
+      "layout": "hero-asym",
+      "content": {
+        "title": "The headline [[finding]]",
+        "sub": "Supporting sentence",
+        "rows": [
+          {
+            "k": "Metric",
+            "v": "0",
+            "unit": ""
+          },
+          {
+            "k": "Metric",
+            "v": "0",
+            "unit": ""
+          },
+          {
+            "k": "Metric",
+            "v": "0",
+            "unit": ""
+          }
+        ]
+      }
+    },
+    {
+      "layout": "stat-grid",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Where we stand",
+        "stats": [
+          {
+            "count": 0,
+            "unit": "%",
+            "label": "Label"
+          },
+          {
+            "count": 0,
+            "unit": "M",
+            "label": "Label"
+          },
+          {
+            "count": 0,
+            "unit": "%",
+            "label": "Label"
+          },
+          {
+            "value": "1",
+            "unit": "",
+            "label": "Label"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "chart",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Title",
+        "type": "bar",
+        "data": {
+          "labels": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "series": [
+            {
+              "name": "Series 1",
+              "values": [
+                3,
+                5,
+                4,
+                6
+              ]
+            }
+          ]
+        },
+        "options": {
+          "unit": "",
+          "showValues": true
+        },
+        "note": ""
+      }
+    },
+    {
+      "layout": "table",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Options considered",
+        "columns": [
+          "",
+          "Column A",
+          "Column B"
+        ],
+        "rows": [
+          [
+            "Row 1",
+            "",
+            ""
+          ],
+          [
+            "Row 2",
+            "",
+            ""
+          ],
+          [
+            "Row 3",
+            "",
+            ""
+          ]
+        ],
+        "options": {}
+      }
+    },
+    {
+      "layout": "matrix",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Decision matrix",
+        "xlabel": "Effort",
+        "ylabel": "Impact",
+        "cells": [
+          {
+            "title": "Do now",
+            "desc": "Description",
+            "hot": true
+          },
+          {
+            "title": "Plan",
+            "desc": "Description"
+          },
+          {
+            "title": "Delegate",
+            "desc": "Description"
+          },
+          {
+            "title": "Drop",
+            "desc": "Description"
+          }
+        ]
+      }
+    },
+    {
+      "layout": "timeline",
+      "content": {
+        "kicker": "Kicker",
+        "title": "Path to done",
+        "items": [
+          {
+            "year": "Q1",
+            "title": "Milestone",
+            "desc": ""
+          },
+          {
+            "year": "Q2",
+            "title": "Milestone",
+            "desc": "",
+            "now": true
+          },
+          {
+            "year": "Q3",
+            "title": "Milestone",
+            "desc": ""
+          },
+          {
+            "year": "Q4",
+            "title": "Milestone",
+            "desc": ""
+          }
+        ]
+      }
+    },
+    {
+      "layout": "closing",
+      "content": {
+        "kicker": "The ask",
+        "title": "Decision",
+        "accent": "needed",
+        "takeaways": [
+          {
+            "title": "Ask one",
+            "desc": "Description"
+          },
+          {
+            "title": "Ask two",
+            "desc": "Description"
+          },
+          {
+            "title": "Ask three",
+            "desc": "Description"
+          }
+        ],
+        "note": "Next step"
+      },
+      "ambient": "grid"
+    }
+  ]
+}

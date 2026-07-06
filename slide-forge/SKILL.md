@@ -22,12 +22,17 @@ slide-forge/
 ├── editor-template.html    ← the standalone deck+editor. COPY THIS, edit its deck-data JSON.
 ├── references/
 │   ├── layouts.md          ← FULL per-layout content schema (read when authoring slides)
+│   ├── charts.md           ← chart + table data schemas (v2: author charts as DATA, never SVG)
 │   ├── themes.md           ← 11 drop-in palettes (let the user pick)
 │   ├── audiences.md        ← 8 content strategies (let the user pick)
+│   ├── templates.md        ← brand kits, masters, template packs
 │   └── editor.md           ← how the in-file editor works + what to tell the user
+├── templates/              ← curated template packs (apply with deckdata.py)
+├── src/ + scripts/build.py ← the template's SOURCE; build only when developing the tool itself
 └── scripts/
     ├── assets.py           ← inline user-provided icons/images so the file stays single-file
-    └── deckdata.py         ← extract/inject the deck JSON <-> the .html (optional)
+    ├── validate.py         ← per-layout schema validation (run before delivering)
+    └── deckdata.py         ← extract/inject deck JSON; template extract/apply (packs)
 ```
 
 The editor layer is **purely additive**: a deck with no manual edits renders identically to a plain
@@ -38,10 +43,12 @@ position/scale/rotation/recolor *overrides* and free-floating objects on top lat
 
 ## Workflow (follow in order)
 
-1. **Ask the user two things first (required).** The **audience strategy** (how the content is
-   built) and the **theme** (how it looks). Present both as short pick-lists; never silently default —
-   they reshape the whole deck. Strategies live in `references/audiences.md`, themes in
-   `references/themes.md`. If the request already implies one, say which you'll use and offer the list.
+1. **Ask the user three things first.** The **audience strategy** (how the content is built), the
+   **theme** (how it looks) — both required, presented as short pick-lists, never silently defaulted —
+   and a **brand kit** (optional; skip fast if none: "logo / brand colors / fonts, or shall I use the
+   theme as-is?"). Strategies live in `references/audiences.md`, themes in `references/themes.md`,
+   brand format in `references/templates.md`. If the user has a team template pack, apply it instead:
+   `python3 scripts/deckdata.py template apply pack.json <deck>.html`.
 2. **Plan the narrative.** Using the chosen strategy's arc, turn the topic/notes into an ordered
    slide list — one idea per slide — and pick a layout for each. Aim for variety; don't repeat a
    layout back-to-back. Skim `references/layouts.md` for the palette of 24 layouts and their fields.
@@ -49,7 +56,8 @@ position/scale/rotation/recolor *overrides* and free-floating objects on top lat
 4. **Apply the theme once.** Swap the font `<link>` and the `:root` block for the chosen theme's
    (from `references/themes.md`). The user can still re-theme later from the editor; this sets the
    starting look.
-5. **Write the content as JSON.** Replace the `<script id="deck-data">` block: set `meta.title`,
+5. **Write the content as JSON.** Charts are DATA (`references/charts.md`) — labels + series, never
+   hand-drawn SVG.  Replace the `<script id="deck-data">` block: set `meta.title`,
    and build the `slides` array — one `{ "layout", "content" }` object per slide. Read
    `references/layouts.md` for each layout's `content` fields. Use the user's exact words where they
    gave them; where they gave a topic, write tight slide copy (titles ≤ 6 words, supporting lines
@@ -146,11 +154,24 @@ leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · bef
 The delivered file does double duty, so close by telling them how to use both halves:
 
 - **Present:** open the file, click to advance, press `F` for fullscreen.
-- **Edit (no install):** click **Edit** (bottom-right) — or add `?edit` to the file URL. Then they can
-  **click any element to select it and drag to move, drag a corner to resize, the green handle to
-  rotate, right-click an element to edit its text inline**, add slides or free **Text/Box** objects from the top
-  bar, reorder/delete slides from the left panel, and recolor the whole deck (Theme) or just the
-  selected element (per-object colors in the right panel). **Undo/redo** is `Cmd/Ctrl+Z`.
+- **Edit (no install):** click **Edit** (bottom-right). Then they can **click any element and drag to
+  move it** — smart guides snap it to centers, edges and neighbours (hold **Alt** to snap freely).
+  Drag a corner to resize, the green handle to rotate, and **double-click any text to edit it in
+  place** (a floating **B / ✦ / `<>`** toolbar formats the selection). **Shift-click or drag a box on
+  empty canvas to select several elements at once**, then use the floating toolbar to **align &
+  distribute** them. **Copy / paste / duplicate** with `Cmd/Ctrl+C·V·D`, nudge with arrow keys
+  (Shift = 10px), and bring elements **forward / back**. Add slides or free **Text/Box** objects from
+  the top bar; reorder, duplicate or delete slides from the row tools in the left panel; recolor the
+  whole deck (Theme) or just the selected element (right panel). **Group** elements with
+  `Cmd/Ctrl+G`; the ▦ button turns the slide list into a **drag-to-reorder thumbnail sorter**.
+  **Undo/redo** is `Cmd/Ctrl+Z` / `Shift+Z`.
+- **Present like a pro:** add per-slide **presenter notes** in the Slide panel, then press **S**
+  while presenting — a **speaker view** popup shows the current slide, your notes, what's next, and
+  a timer. Set an animation's trigger to **On click** to reveal content **step-by-step** with → /
+  Space / click, PowerPoint-style; the Slide panel's Animations list manages every effect in one
+  place. Press **?** in Edit mode for the full shortcut list.
+- **Saving:** on Chrome/Edge, **Save .html** / `Cmd/Ctrl+S` saves **in place** (first save asks
+  where; after that it's silent). Other browsers download a fresh copy.
 - **Saving:** edits autosave in the browser, but the portable save is **Save .html** (top bar /
   `Cmd/Ctrl+S`) — it downloads a fresh self-contained file with their changes baked in. (A browser
   can't overwrite the file in place, so editing produces a new download — mention this so it isn't a
@@ -165,9 +186,9 @@ specific interaction maps to the saved data.
 
 You can't see a rendered HTML file here, so verify what you *can*:
 
-1. **The JSON parses.** Extract and parse the `deck-data` block — a deck with invalid JSON shows an
-   error slide. Quick check:
-   `python3 -c "import re,json,sys; h=open('<deck>.html').read(); s=re.search(r'id=\"deck-data\">(.*?)</script>',h,re.S).group(1); json.loads(s); print('deck-data OK')"`
+1. **Run the validator:** `python3 scripts/validate.py <deck>.html` — parses the JSON and checks
+   every layout's required fields, chart series/label consistency, table shape, overrides, brand and
+   masters. Fix every ERROR; read the WARNs.
 2. **Every `layout` is a real layout name** and each slide's `content` has the fields that layout
    needs (cross-check `references/layouts.md`). Unknown layouts fall back to `raw` and look wrong.
 3. **The theme actually changed** if the user picked a non-default one — confirm the `:root` block and
@@ -185,10 +206,11 @@ user the deck is generated and ready to open.
 
 1. **Don't hand-number slides.** The engine derives the pager/progress from position.
 2. **Don't hard-code colors in content** — use theme tokens (`[[glow]]`, per-slide/per-object
-   `theme`), so the user's later re-theming works.
+   `theme`), so the user's later re-theming and brand kits keep working. Charts inherit
+   `--chart-1…6` automatically.
 3. **Keep `deck-data` valid JSON.** Escape quotes inside strings; the engine shows an error slide if
-   it can't parse.
+   it can't parse. `scripts/validate.py` catches this and every schema mistake — run it.
 4. **Don't fetch or invent imagery.** User-provided assets only.
-5. **Don't edit the engine or the editor `<script>` blocks.** You only replace `deck-data` (and the
-   `:root`/font for theming). The editor and overrides/freeObjects machinery is already wired.
-6. **One idea per slide; short copy.** Walls of text defeat the format and overflow the stage.
+5. **Don't edit the engine or the editor `<script>` blocks.** You only replace `deck-data` (and
+   `deck-assets` via `assets.py`). The template's source lives in `src/` and is rebuilt with
+   `scripts/build.py` — that's for developing the tool, never for authoring a deck.
