@@ -1,18 +1,28 @@
 /* =====================================================================
-   SLIDE-FORGE EDITOR v2  —  in-deck hybrid editor.
+   SLIDE-FORGE EDITOR v3  —  in-deck hybrid editor.
    Additive layer over the data-driven engine. Two kinds of edit:
      • CONTENT — the slide's `content` data is edited directly in the sidebar
        (fields + nested array items, add/remove). The deck re-renders from data,
        so edits never go stale and survive layout switches.
-     • OBJECT  — geometry (x/y/scale/rotate/z) + style (color/accent/font/surface)
-       overrides layered on a template element or a free object.
-   v2 unifies every selectable thing behind one Element model: template blocks,
-   nested dotted keys and free objects all get the same verbs — move, resize,
-   rotate, style, animate, copy, duplicate, delete, reorder(z). On top of that:
-   double-click text editing, smart guides + snapping, multi-select (shift/
-   marquee), a floating contextual toolbar, copy/paste, align/distribute.
+     • OBJECT  — geometry (x/y/w/h/scale/rotate/z) + style (color/accent/font/
+       surface) overrides layered on a template element or a free object.
+   v3 identity is AUTHORED by the engine's layouts (see plan §10):
+     data-el   — stable content-path key ("title", "stats.2") for selection +
+                 overrides. No positional tagging (except `raw` slides).
+     data-bind — the content path a text leaf renders; on-canvas edits write
+                 back to that path deterministically.
+     data-arr  — the content array a container renders; item add/duplicate/
+                 remove parse the item index from the element key and REMAP
+                 sibling override keys, so styling survives list edits. A GC
+                 pass in commit drops overrides whose element no longer exists.
+   Everything selectable shares one Element model and the same verbs — move,
+   resize (corner drag = width/reflow, Alt = scale), rotate, style, animate,
+   copy, duplicate, delete, reorder(z) — plus double-click text editing, smart
+   guides + snapping, multi-select, align/distribute, groups.
    Source of truth = SG.data. Edits route through Forge.do()/pushUndo so undo/
-   redo and autosave are free. "Save" = download a fresh self-contained .html.
+   redo and autosave are free; continuous inputs coalesce to one snapshot per
+   gesture. Content typing re-renders only the current slide (SG.renderSlide).
+   "Save" = download a fresh self-contained .html.
    ===================================================================== */
 (function(){
   var W=window, D=document, SG=W.SG=W.SG||{};
@@ -95,12 +105,23 @@
      COMMAND LAYER  —  snapshot-based undo/redo + autosave.
      ===================================================================== */
   F.undo=[]; F.redo=[];
-  F.pushUndo=function(){ F.undo.push(JSON.stringify(SG.data)); if(F.undo.length>80) F.undo.shift(); F.redo.length=0; F.syncToolbar(); };
+  F.pushUndo=function(){ F._coTag=null;
+    F.undo.push(JSON.stringify(SG.data)); if(F.undo.length>80) F.undo.shift(); F.redo.length=0; F.syncToolbar(); };
+  /* one snapshot per continuous GESTURE (color-picker drag, arrow-nudge run):
+     same tag within 900ms coalesces instead of flooding the undo stack. */
+  F.pushUndoCoalesced=function(tag){ var now=Date.now();
+    if(F._coTag===tag && now-(F._coAt||0)<900){ F._coAt=now; return; }
+    F.pushUndo(); F._coTag=tag; F._coAt=now; };
   F.do=function(label,mutate){ F.pushUndo(); mutate(SG.data); F.commit(); };
   /* full re-render + rebuild panels (structural changes) */
-  F.commit=function(){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); reselect(); F.save(); F.buildNav(); F.syncToolbar(); F.buildInspect(); positionFloat(); };
-  /* light re-render that preserves sidebar focus (live typing) */
+  F.commit=function(){ SG.render(deckEl(),SG.data); gcOverrides(deckEl()); SG.refresh&&SG.refresh(); reselect(); F.save(); F.buildNav(); F.syncToolbar(); F.buildInspect(); positionFloat(); };
+  /* light FULL re-render that preserves sidebar focus (global settings: theme,
+     brand — anything that isn't scoped to one slide) */
   F.renderLive=function(){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); reselect(); F.saveDebounced(); };
+  /* targeted live re-render: rebuild only the CURRENT slide's section while
+     typing in the sidebar. Falls back to a full render on structure drift. */
+  F.renderLiveSlide=function(){ SG.renderSlide(deckEl(),curSlide());
+    SG.refresh&&SG.refresh(); reselect(); F.saveDebounced(); };
   F.undoOp=function(){ if(!F.undo.length) return; F.redo.push(JSON.stringify(SG.data)); SG.data=JSON.parse(F.undo.pop()); clearSel(); F.commit(); };
   F.redoOp=function(){ if(!F.redo.length) return; F.undo.push(JSON.stringify(SG.data)); SG.data=JSON.parse(F.redo.pop()); clearSel(); F.commit(); };
   F.syncToolbar=function(){ if(F._undoBtn) F._undoBtn.disabled=!F.undo.length; if(F._redoBtn) F._redoBtn.disabled=!F.redo.length; };
@@ -110,34 +131,80 @@
   F.saveDebounced=function(){ clearTimeout(F._saveT); F._saveT=setTimeout(F.save,150); };
 
   /* =====================================================================
-     DECORATE  —  after every render: tag editable blocks, apply geometry/style
-     overrides, mount free objects. With none present, output is unchanged.
+     DECORATE  —  after every render: apply geometry/style overrides to the
+     engine's authored data-el keys, mount free objects, and (raw slides only)
+     fall back to positional b0/b0.1 tagging. With no edits present, output is
+     unchanged. Also: one-time legacy-key migration + orphan-override GC.
      ===================================================================== */
   var CHROME=/^(amb|pager|progress|doc-panel|forge-)/;
   var INLINE_SKIP=/^(STRONG|EM|CODE|B|I)$/;
+  /* top-level selectable blocks: the engine keys every meaningful child */
   function blocks(section){ return [].slice.call(section.children).filter(function(ch){
-    var c=(typeof ch.className==='string'?ch.className:'').split(' ')[0]||''; return ch.nodeType===1 && !CHROME.test(c); }); }
+    return ch.nodeType===1 && ch.hasAttribute('data-el') && !ch.classList.contains('forge-free'); }); }
+  /* ---- v2 positional walk — kept ONLY for raw slides + legacy migration ---- */
+  function rawBlocks(section){ return [].slice.call(section.children).filter(function(ch){
+    var c=(typeof ch.className==='string'?ch.className:'').split(' ')[0]||'';
+    return ch.nodeType===1 && !CHROME.test(c) && !ch.classList.contains('forge-free'); }); }
   function keyableChildren(node){ return [].slice.call(node.children).filter(function(ch){
     if(ch.nodeType!==1) return false;
     var c=(typeof ch.className==='string'?ch.className:'').split(' ')[0]||'';
     if(CHROME.test(c)) return false; if(ch.classList.contains('forge-free')||ch.classList.contains('forge-handles')) return false;
     if(INLINE_SKIP.test(ch.tagName)||ch.classList.contains('glow')) return false;
     return (ch.textContent||'').trim().length>0; }); }
-  function keyEl(node,key,ov,depth){ node.setAttribute('data-el',key); if(depth===0) node.classList.add('forge-block');
-    applyOverride(node,ov[key]);
-    if(depth<2) keyableChildren(node).forEach(function(ch,ci){ keyEl(ch,key+'.'+ci,ov,depth+1); }); }
+  function rawKeyEl(node,key,depth){ node.setAttribute('data-el',key); if(depth===0) node.classList.add('forge-block');
+    if(depth<2) keyableChildren(node).forEach(function(ch,ci){ rawKeyEl(ch,key+'.'+ci,depth+1); }); }
+
+  /* ---- one-time v2→v3 migration: remap positional b-keys to authored keys.
+     Replays the old block walk against the freshly rendered (keyed) DOM; a
+     legacy key maps to whatever authored key that element now carries.
+     Unmappable keys are dropped with a console note. raw slides keep b-keys. */
+  function migrateLegacy(deck,data){
+    var secs=deck.querySelectorAll('.slide');
+    (data.slides||[]).forEach(function(s,i){
+      if(!s.overrides||s.layout==='raw') return;
+      var keys=Object.keys(s.overrides);
+      if(!keys.some(function(k){ return /^b\d/.test(k); })) return;
+      var sec=secs[i]; if(!sec) return;
+      var top=rawBlocks(sec), out={}, drop=[];
+      keys.forEach(function(k){
+        if(!/^b\d/.test(k)){ out[k]=s.overrides[k]; return; }
+        var seg=k.split('.'), node=top[parseInt(seg[0].slice(1),10)];
+        for(var d=1; node&&d<seg.length; d++) node=keyableChildren(node)[parseInt(seg[d],10)];
+        var nk=node&&node.getAttribute('data-el');
+        if(nk&&!out[nk]) out[nk]=s.overrides[k]; else drop.push(k); });
+      s.overrides=out;
+      if(drop.length) try{ console.info('slide-forge: migrated slide '+(i+1)+' overrides to v3 keys; dropped unmappable: '+drop.join(', ')); }catch(e){} });
+    SG._legacyKeys=false; if(F.save) F.save(); }
+
+  /* ---- orphan-override GC (runs in commit): drop overrides whose element no
+     longer exists after a structural content edit. Undoable (snapshot is taken
+     before the mutation) and logged, never silent. */
+  function gcOverrides(deck){ var dropped=[];
+    var secs=deck.querySelectorAll('.slide');
+    (SG.data.slides||[]).forEach(function(s,i){
+      if(!s.overrides||s.layout==='raw') return; var sec=secs[i]; if(!sec) return;
+      Object.keys(s.overrides).forEach(function(k){
+        if(!sec.querySelector('[data-el="'+k+'"]')){ delete s.overrides[k]; dropped.push((i+1)+':'+k); } });
+      if(!Object.keys(s.overrides).length) delete s.overrides; });
+    if(dropped.length) try{ console.info('slide-forge: removed '+dropped.length+' orphaned override(s) — '+dropped.join(', ')); }catch(e){} }
+
+  function decorateSection(sec,slide){
+    if(!slide) return;
+    if(slide.layout==='raw') rawBlocks(sec).forEach(function(b,bi){ rawKeyEl(b,'b'+bi,0); });
+    blocks(sec).forEach(function(b){ b.classList.add('forge-block'); });
+    var ov=slide.overrides||{};
+    Object.keys(ov).forEach(function(k){
+      var n=sec.querySelector('[data-el="'+k+'"]'); if(n) applyOverride(n,ov[k]); });
+    (slide.freeObjects||[]).forEach(function(fo){
+      var n=el('div','forge-block forge-free '+(fo.type||'txt')); n.setAttribute('data-free',fo.id);
+      if(fo.type==='html') n.innerHTML=fo.html||'';
+      else if(fo.type!=='box') n.textContent=fo.text||'Text';
+      sec.appendChild(n); applyFree(n,fo); }); }
+
   F.decorate=function(deck,data){ data=data||SG.data; var slides=data.slides||[];
+    if(SG._legacyKeys) migrateLegacy(deck,data);
     [].slice.call(deck.querySelectorAll('.slide')).forEach(function(sec,i){
-      var slide=slides[i]; if(!slide) return; var ov=slide.overrides||{};
-      blocks(sec).forEach(function(b,bi){ keyEl(b,'b'+bi,ov,0); });
-      (slide.freeObjects||[]).forEach(function(fo){
-        var n=el('div','forge-block forge-free '+(fo.type||'txt')); n.setAttribute('data-free',fo.id);
-        if(fo.type==='box'){ n.style.width=(fo.w||220)+'px'; n.style.height=(fo.h||120)+'px'; }
-        else if(fo.type==='html'){ n.innerHTML=fo.html||'';
-          if(fo.w) n.style.width=fo.w+'px'; if(fo.h) n.style.height=fo.h+'px'; }
-        else { n.textContent=fo.text||'Text'; }
-        sec.appendChild(n); applyFree(n,fo); });
-    });
+      decorateSection(sec,slides[i]); });
     /* while editing, resolve every animation to its finished state: no hidden
        .sg-onenter elements, no entrance replay on each live re-render */
     if(editing()&&SG.finalizeAnimations) SG.finalizeAnimations(deck); };
@@ -164,13 +231,23 @@
     node.style.animationDelay=(o.animDelay?o.animDelay+'s':''); }
   function replayAnim(node){ if(!node) return; node.classList.remove('run'); void node.offsetWidth; node.classList.add('run'); }
   function applyOverride(b,o){ b.style.transform=o?transformStr(o):''; applyAnim(b,o); if(!o) return; b.style.transformOrigin='center center'; applyStyle(b,o);
+    if(o.w!=null&&o.w>0){ b.style.width=o.w+'px'; b.style.boxSizing='border-box'; }
+    if(o.h!=null&&o.h>0) b.style.height=o.h+'px';
     if(o.hide) b.style.display='none';
-    if(o.html!=null && !keyableChildren(b).length) b.innerHTML=SG.rich(o.html); }
+    if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
-    applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px'; }
+    applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
+    if(fo.type==='box'){ n.style.width=(fo.w||220)+'px'; n.style.height=(fo.h||120)+'px'; }
+    else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; } }
 
   var _render=SG.render; SG.render=function(deck,data){ _render(deck,data); F.decorate(deck,data); };
+  var _renderSlide=SG.renderSlide; SG.renderSlide=function(deck,i){
+    var sec=_renderSlide(deck,i);
+    if(sec){ decorateSection(sec,(SG.data.slides||[])[i]);
+      if(editing()&&SG.finalizeAnimations) SG.finalizeAnimations(sec); }
+    /* sec===null means the engine fell back to a full render (already decorated) */
+    return sec; };
 
   /* =====================================================================
      UNIFIED ELEMENT MODEL + SELECTION (multi-select capable)
@@ -276,14 +353,18 @@
     if(gh!=null){ var h=el('div','forge-gl h'); h.style.top=gh+'px'; g.appendChild(h); } }
 
   /* =====================================================================
-     DRAG — move (with snap, multi), resize (scale), rotate.
+     DRAG — move (with snap, multi), resize (corner = width/height with text
+     REFLOW; Alt+corner = proportional scale, the v2 behavior), rotate.
+     Template blocks resize width only (height stays auto so text rewraps);
+     free boxes / copied groups resize both axes.
      ===================================================================== */
-  function startDrag(e,mode){ if(!F.sels.length) return; e.preventDefault(); e.stopPropagation();
+  function startDrag(e,mode,corner){ if(!F.sels.length) return; e.preventDefault(); e.stopPropagation();
     var s=scale(), prim=F.sels[0];
     var parts=F.sels.map(function(x){ var d=elData(x); return {sel:x,d:d,d0:clone(d),box0:boxOf(x.node)}; });
     F.pushUndo();
     var nb=prim.node.getBoundingClientRect(); var cx=nb.left+nb.width/2, cy=nb.top+nb.height/2;
     var sx=e.clientX, sy=e.clientY, sec=prim.section, cand=mode==='move'?snapCandidates(sec):null, moved=false;
+    var cL=/l/.test(corner||''), cT=/t/.test(corner||'');
     function move(ev){ var dx=(ev.clientX-sx)/s, dy=(ev.clientY-sy)/s; moved=true;
       if(mode==='move'){
         var p0=parts[0], pb={x:p0.box0.x+dx,y:p0.box0.y+dy,w:p0.box0.w,h:p0.box0.h};
@@ -293,6 +374,14 @@
       } else if(mode==='rot'){ var r=Math.round(Math.atan2(ev.clientY-cy,ev.clientX-cx)*180/Math.PI+90);
         if(!ev.altKey){ var snapR=Math.round(r/15)*15; if(Math.abs(snapR-r)<=4) r=snapR; }
         parts.forEach(function(p){ p.d.rot=r; p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); });
+      } else if(mode==='size'){
+        parts.forEach(function(p){
+          p.d.w=Math.max(40,Math.round(p.box0.w+(cL?-dx:dx)));
+          if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
+          if(p.sel.kind==='free'&&(p.d.type==='box'||p.d.type==='html')){
+            p.d.h=Math.max(30,Math.round(p.box0.h+(cT?-dy:dy)));
+            if(cT) p.d.y=Math.round((p.d0.y||0)+dy); }
+          p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); });
       } else { var d0=Math.hypot(sx-cx,sy-cy)||1, d1=Math.hypot(ev.clientX-cx,ev.clientY-cy);
         parts.forEach(function(p){ p.d.scale=clamp((p.d0.scale||1)*(d1/d0),0.2,6);
           p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); }); }
@@ -365,10 +454,14 @@
     fmtChips.forEach(function(c){ c[0].classList.toggle('on',curFmt(c[1])); }); }
   function onEditSel(){ positionFmtBar(); }
   function onEditKey(e){ if(e.key==='Escape'){ e.preventDefault(); cancelEdit(); } else if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); endEdit(); } }
-  function isLeafText(node){ return node && !node.hasAttribute('data-free') && node.hasAttribute('data-el') && !keyableChildren(node).length; }
+  /* editable leaf: anything data-bound (deterministic write-back), or a keyed
+     element with no keyed descendants (raw/derived text -> html override). */
+  function isLeafText(node){ if(!node||node.hasAttribute('data-free')) return false;
+    if(node.hasAttribute('data-bind')) return true;
+    return node.hasAttribute('data-el') && !node.querySelector('[data-el]')
+      && (node.textContent||'').trim().length>0; }
   function startEdit(node){ if(F.editing===node) return; if(F.editing) endEdit();
     clearSel(); F.buildInspect(); F.editing=node; F._editOrig=node.innerHTML;
-    F._editOrigMarks=serializeMarks(node.innerHTML);      /* for content write-back mapping */
     node.setAttribute('contenteditable','true'); node.focus();
     if(!fmtBar) buildFmtBar();
     node.addEventListener('keyup',onEditSel); node.addEventListener('mouseup',onEditSel); node.addEventListener('keydown',onEditKey);
@@ -378,24 +471,16 @@
     node.removeEventListener('blur',endEdit);
     node.removeAttribute('contenteditable'); if(fmtBar) fmtBar.classList.remove('on'); }
   function cancelEdit(){ var node=F.editing; if(!node) return; teardownEdit(node); node.innerHTML=F._editOrig; }
-  /* find the unique string field inside `content` equal to `val` — returns
-     {obj,key} or null (null also when the match is ambiguous). */
-  function findContentField(content,val){ var hit=null, dup=false;
-    (function walk(o){ if(dup||o==null||typeof o!=='object') return;
-      Object.keys(o).forEach(function(k){ var v=o[k];
-        if(typeof v==='string'){ if(v===val){ if(hit) dup=true; else hit={obj:o,key:k}; } }
-        else if(v&&typeof v==='object') walk(v); }); })(content);
-    return dup?null:hit; }
   function endEdit(){ var node=F.editing; if(!node) return; teardownEdit(node);
     if(node.innerHTML===F._editOrig) return;                       /* no change: no-op */
-    var markers=serializeMarks(node.innerHTML), orig=F._editOrigMarks;
-    var i=slideIdxOf(node), key=node.getAttribute('data-el'); if(i<0||!key) return;
+    var markers=serializeMarks(node.innerHTML);
+    var i=slideIdxOf(node), key=node.getAttribute('data-el'), bind=node.getAttribute('data-bind');
+    if(i<0||!key) return;
     F.do('edit text',function(data){ var s=data.slides[i];
-      /* prefer writing the edit back into `content` (keeps the sidebar and any
-         future layout switch in sync); fall back to an html override only when
-         the source field can't be identified unambiguously. */
-      var f=findContentField(s.content||{},orig);
-      if(f){ f.obj[f.key]=markers;
+      /* data-bind names the exact content field this leaf renders — write back
+         deterministically. Unbound leaves (raw slides, derived text like item
+         numbers) store an html override instead (reversible via Reset). */
+      if(bind){ SG.setPath(s.content=s.content||{},bind,markers);
         if(s.overrides&&s.overrides[key]&&s.overrides[key].html!=null){   /* clear stale shadow */
           delete s.overrides[key].html;
           if(!Object.keys(s.overrides[key]).length) delete s.overrides[key]; } }
@@ -417,9 +502,10 @@
     /* deep copy: carry the container's full markup (nested items included) */
     var cl=x.node.cloneNode(true);
     [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free')).forEach(function(n){ n.remove(); });
-    [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){ n.removeAttribute('data-el');
+    [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){
+      n.removeAttribute('data-el'); n.removeAttribute('data-bind'); n.removeAttribute('data-arr');
       n.classList.remove('forge-block','forge-sel','forge-sel-multi'); });
-    cl.removeAttribute('data-el'); cl.removeAttribute('data-free');
+    cl.removeAttribute('data-el'); cl.removeAttribute('data-bind'); cl.removeAttribute('data-arr'); cl.removeAttribute('data-free');
     cl.classList.remove('forge-block','forge-sel','forge-sel-multi','forge-free');
     cl.style.transform=''; cl.style.zIndex='';
     var spec={type:'html', html:cl.outerHTML, x:Math.round(box.x), y:Math.round(box.y),
@@ -439,8 +525,8 @@
      in place (identical element, identical behavior); anything else becomes a
      free copy that carries the full markup + style properties. */
   F.dupSel=function(){ if(!F.sels.length) return;
-    if(F.sels.length===1){ var x=F.sel;
-      if(x.kind!=='free'&&/\./.test(x.key||'')&&F.dupItem(x.slideIdx,x.node)) return; }
+    if(F.sels.length===1){ var x=F.sel, it=x.kind!=='free'?itemOf(x.key):null;
+      if(it&&x.key===it.path+'.'+it.idx&&F.dupItem(x.slideIdx,x.node)) return; }
     F.copySel(); F._pasteN=0; F.paste(); };
 
   /* detach a template text element to a free object at the same position/size/
@@ -453,30 +539,64 @@
     if(n) selectNode(n,false); };
 
   /* =====================================================================
-     CONTAINER <-> CONTENT-ARRAY MAPPING — lets the tree and context menu
-     add/duplicate/remove ITEMS of a layout (agenda rows, stats, cells...)
-     with type-correct shapes. A container maps to the unique content array
-     whose length equals its keyed-children count; ambiguity = no offer.
+     CONTAINER <-> CONTENT-ARRAY MAPPING (v3) — containers carry data-arr (the
+     content path of the array they render) and items carry index-bearing keys
+     ("stats.2", "left.items.0"), so item ops are exact: no length-matching
+     inference, and interleaved DOM (pipeline connectors) can't defeat them.
+     Item ops REMAP sibling override keys so styling follows the list edit.
      ===================================================================== */
-  function arrayForContainer(slideIdx,node){ var kids=keyableChildren(node); if(!kids.length) return null;
-    var s=SG.data.slides[slideIdx]; if(!s) return null; var cands=[];
-    (function walk(o){ if(!o||typeof o!=='object') return;
-      Object.keys(o).forEach(function(k){ var v=o[k];
-        if(Array.isArray(v)){ if(v.length===kids.length&&v.length) cands.push({obj:o,key:k}); }
-        else if(v&&typeof v==='object') walk(v); }); })(s.content||{});
-    return cands.length===1?cands[0]:null; }
-  /* the item index a nested element occupies within its parent container */
-  function itemIndexOf(node){ var p=node.parentElement&&node.parentElement.closest('[data-el]');
-    if(!p) return -1; return keyableChildren(p).indexOf(node); }
-  F.addItem=function(slideIdx,containerNode){ var m=arrayForContainer(slideIdx,containerNode); if(!m) return false;
-    F.do('add item',function(){ var a=m.obj[m.key]; a.push(newItemLike(a[a.length-1])); }); return true; };
-  F.dupItem=function(slideIdx,node){ var p=node.parentElement&&node.parentElement.closest('[data-el]'); if(!p) return false;
-    var m=arrayForContainer(slideIdx,p), idx=itemIndexOf(node); if(!m||idx<0) return false;
-    F.do('duplicate item',function(){ var a=m.obj[m.key]; a.splice(idx+1,0,clone(a[idx])); }); return true; };
-  F.removeItem=function(slideIdx,node){ var p=node.parentElement&&node.parentElement.closest('[data-el]'); if(!p) return false;
-    var m=arrayForContainer(slideIdx,p), idx=itemIndexOf(node); if(!m||idx<0) return false;
+  /* deepest {path,idx} an element key encodes: 'left.items.2.title' ->
+     {path:'left.items', idx:2}; keys with no numeric segment -> null */
+  function itemOf(key){ var seg=String(key||'').split('.');
+    for(var e=seg.length;e>0;e--){ if(/^\d+$/.test(seg[e-1]))
+      return {path:seg.slice(0,e-1).join('.'),idx:+seg[e-1]}; }
+    return null; }
+  function contentArr(slideIdx,path){ var s=SG.data.slides[slideIdx]; if(!s||!path) return null;
+    var a=SG.getPath(s.content||{},path); return Array.isArray(a)?a:null; }
+  /* shift override keys under `path` after an item insert (+1 at idx) or
+     removal (-1 at idx: the removed item's overrides go with it) */
+  function remapItemOverrides(s,path,idx,delta){ if(!s.overrides) return;
+    var pre=path+'.', out={};
+    Object.keys(s.overrides).forEach(function(k){
+      if(k.indexOf(pre)!==0){ out[k]=s.overrides[k]; return; }
+      var seg=k.slice(pre.length).split('.'), n=parseInt(seg[0],10);
+      if(isNaN(n)){ out[k]=s.overrides[k]; return; }
+      if(delta<0){ if(n===idx) return; if(n>idx) seg[0]=String(n-1); }
+      else if(n>=idx) seg[0]=String(n+1);
+      out[pre+seg.join('.')]=s.overrides[k]; });
+    s.overrides=out; }
+  /* copy one item's overrides to another index (duplicate keeps its styling) */
+  function copyItemOverrides(s,path,from,to){ if(!s.overrides) return;
+    var a=path+'.'+from, out={};
+    Object.keys(s.overrides).forEach(function(k){
+      if(k===a||k.indexOf(a+'.')===0) out[path+'.'+to+k.slice(a.length)]=clone(s.overrides[k]); });
+    Object.keys(out).forEach(function(k){ s.overrides[k]=out[k]; }); }
+  function swapItemOverrides(s,path,a,b){ if(!s.overrides) return;
+    var pa=path+'.'+a, pb=path+'.'+b, out={};
+    Object.keys(s.overrides).forEach(function(k){
+      if(k===pa||k.indexOf(pa+'.')===0) out[pb+k.slice(pa.length)]=s.overrides[k];
+      else if(k===pb||k.indexOf(pb+'.')===0) out[pa+k.slice(pb.length)]=s.overrides[k];
+      else out[k]=s.overrides[k]; });
+    s.overrides=out; }
+  F.addItem=function(slideIdx,containerNode){
+    var path=containerNode.getAttribute&&containerNode.getAttribute('data-arr');
+    var a=contentArr(slideIdx,path); if(!a) return false;
+    F.do('add item',function(data){ var arr2=SG.getPath(data.slides[slideIdx].content,path);
+      arr2.push(arr2.length?newItemLike(arr2[arr2.length-1]):{title:''}); }); return true; };
+  F.dupItem=function(slideIdx,node){
+    var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
+    if(!contentArr(slideIdx,it.path)) return false;
+    F.do('duplicate item',function(data){ var s=data.slides[slideIdx];
+      var arr2=SG.getPath(s.content,it.path); arr2.splice(it.idx+1,0,clone(arr2[it.idx]));
+      remapItemOverrides(s,it.path,it.idx+1,+1);
+      copyItemOverrides(s,it.path,it.idx,it.idx+1); }); return true; };
+  F.removeItem=function(slideIdx,node){
+    var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
+    if(!contentArr(slideIdx,it.path)) return false;
     clearSel();
-    F.do('remove item',function(){ m.obj[m.key].splice(idx,1); }); return true; };
+    F.do('remove item',function(data){ var s=data.slides[slideIdx];
+      SG.getPath(s.content,it.path).splice(it.idx,1);
+      remapItemOverrides(s,it.path,it.idx,-1); }); return true; };
 
   /* =====================================================================
      ALIGN & DISTRIBUTE — multi-select verbs, slide-space math.
@@ -509,18 +629,23 @@
     F.sels.forEach(function(x){ var d=elData(x); d.z=(d.z||(x.kind==='free'?3:2))+dir;
       x.kind==='free'?applyFree(x.node,d):applyOverride(x.node,d); }); F.save(); };
   F.deleteSel=function(){ if(!F.sels.length) return; var sels=F.sels.slice();
-    /* plan first (needs live DOM for item mapping), then mutate in one undo step */
+    /* plan first, then mutate in one undo step. An element whose key encodes an
+       item slot ("stats.2") deletes that ITEM; other blocks reset overrides. */
     var acts=sels.map(function(x){
       if(x.kind==='free') return {t:'free',i:x.slideIdx,id:x.id};
-      if(/\./.test(x.key||'')){ var p=x.node.parentElement&&x.node.parentElement.closest('[data-el]');
-        if(p){ var m=arrayForContainer(x.slideIdx,p), idx=itemIndexOf(x.node);
-          if(m&&idx>=0) return {t:'item',m:m,idx:idx}; } }
+      var it=x.slideIdx!=null?itemOf(x.key):null;
+      if(it&&x.key!==null&&/^\S+$/.test(x.key)&&contentArr(x.slideIdx,it.path)
+        &&x.key===it.path+'.'+it.idx)                      /* the item itself, not a leaf inside it */
+        return {t:'item',i:x.slideIdx,path:it.path,idx:it.idx};
       return {t:'reset',i:x.slideIdx,key:x.key}; });
     clearSel();
     F.do('delete',function(data){
+      /* group item removals per slide+array, delete high->low with remap */
       acts.filter(function(a){ return a.t==='item'; })
-        .sort(function(a,b){ return b.idx-a.idx; })            /* high->low keeps indices valid */
-        .forEach(function(a){ a.m.obj[a.m.key].splice(a.idx,1); });
+        .sort(function(a,b){ return b.idx-a.idx; })
+        .forEach(function(a){ var s=data.slides[a.i];
+          SG.getPath(s.content,a.path).splice(a.idx,1);
+          remapItemOverrides(s,a.path,a.idx,-1); });
       acts.forEach(function(a){ var s=data.slides[a.i];
         if(a.t==='free'&&s) s.freeObjects=(s.freeObjects||[]).filter(function(f){ return f.id!==a.id; });
         else if(a.t==='reset'&&s&&s.overrides) delete s.overrides[a.key]; }); }); };
@@ -554,7 +679,7 @@
       var d=elData(prim)||{};
       var col=el('input'); col.type='color'; col.title='Text color';
       col.value=/^#/.test(d.color||'')?String(d.color).slice(0,7):'#ffffff';
-      col.oninput=function(){ F.pushUndo(); var dd=elData(prim); dd.color=col.value;
+      col.oninput=function(){ F.pushUndoCoalesced('float-color'); var dd=elData(prim); dd.color=col.value;
         prim.kind==='free'?applyFree(prim.node,dd):applyOverride(prim.node,dd); pulse(prim.node); F.saveDebounced(); };
       col.onmousedown=function(e){ e.stopPropagation(); };
       floatBar.appendChild(col);
@@ -588,13 +713,12 @@
     var isFree=node.hasAttribute('data-free');
     if(!isSelected(node)) selectNode(node,false);
     if(isLeafText(node)) ctxMenu.appendChild(ctxItem('✎ Edit text',null,function(){ startEdit(node); }));
-    if(!isFree&&/\./.test(node.getAttribute('data-el')||'')){
-      var si=slideIdxOf(node), p=node.parentElement&&node.parentElement.closest('[data-el]');
-      if(p&&arrayForContainer(si,p)){
+    if(!isFree){ var si=slideIdxOf(node), it=itemOf(node.getAttribute('data-el'));
+      if(it&&contentArr(si,it.path)){
         ctxMenu.appendChild(ctxItem('⧉ Duplicate item (in layout)',null,function(){ F.dupItem(si,node); }));
-        ctxMenu.appendChild(ctxItem('✕ Remove item','warn',function(){ F.removeItem(si,node); })); } }
-    if(!isFree&&!isLeafText(node)&&arrayForContainer(slideIdxOf(node),node))
-      ctxMenu.appendChild(ctxItem('＋ Add item',null,function(){ F.addItem(slideIdxOf(node),node); }));
+        ctxMenu.appendChild(ctxItem('✕ Remove item','warn',function(){ F.removeItem(si,node); })); }
+      if(node.getAttribute('data-arr'))
+        ctxMenu.appendChild(ctxItem('＋ Add item',null,function(){ F.addItem(si,node); })); }
     if(!isFree&&isLeafText(node)) ctxMenu.appendChild(ctxItem('⇱ Detach to free text',null,function(){ F.detachSel(); }));
     ctxMenu.appendChild(ctxItem(isFree?'⧉ Duplicate':'⧉ Duplicate as free copy (deep)',null,function(){ F.dupSel(); }));
     ctxMenu.appendChild(ctxItem('⿻ Copy',null,function(){ F.copySel(); }));
@@ -616,7 +740,8 @@
     deck.addEventListener('pointerdown',function(e){ if(!editing()) return;
       if(e.button!==0) return;
       if(F.editing){ if(F.editing.contains(e.target)) return; endEdit(); return; }
-      var hnd=e.target.closest('.forge-h'); if(hnd){ startDrag(e, hnd.dataset.h==='rot'?'rot':'resize'); return; }
+      var hnd=e.target.closest('.forge-h'); if(hnd){
+        startDrag(e, hnd.dataset.h==='rot'?'rot':(e.altKey?'scale':'size'), hnd.dataset.h); return; }
       if(e.altKey){ var deep=e.target.closest('[data-el]'); if(deep){ e.preventDefault(); selectNode(deep,e.shiftKey); return; } }
       var blk=e.target.closest('.forge-block');
       if(blk){ if(e.shiftKey){ selectNode(blk,true); return; }
@@ -661,7 +786,7 @@
     if(/^Arrow/.test(e.key)){ e.preventDefault(); e.stopPropagation();
       if(F.sels.length){                                   /* nudge selection (Shift = 10px) */
         var step=e.shiftKey?10:1, dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0, dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
-        if(!F._nudging){ F.pushUndo(); F._nudging=true; setTimeout(function(){ F._nudging=false; },800); }
+        F.pushUndoCoalesced('nudge');
         F.sels.forEach(function(x){ shiftSel(x,dx,dy); }); refreshHandles(); syncGeomFields(); positionFloat(); F.saveDebounced();
       } else {                                             /* no selection: navigate slides */
         var dir=(e.key==='ArrowRight'||e.key==='ArrowDown')?1:-1;
@@ -739,17 +864,17 @@
   function selectInput(opts,val,on){ var s=el('select'); opts.forEach(function(o){ var v=Array.isArray(o)?o[1]:o, lab=Array.isArray(o)?o[0]:o; var op=el('option',null,lab); op.value=v; if(v===val)op.selected=true; s.appendChild(op); }); s.onchange=function(){ on(s.value); }; return s; }
   function boundText(obj,key,multiline){ var n=el(multiline?'textarea':'input'); if(!multiline) n.type='text';
     n.className='wide'; n.value=obj[key]==null?'':obj[key]; if(multiline) n.rows=Math.min(8,Math.max(2,String(obj[key]||'').split('\n').length));
-    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ obj[key]=n.value; F.renderLive(); }; return n; }
+    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ obj[key]=n.value; F.renderLiveSlide(); }; return n; }
   function boundNum(obj,key){ var n=el('input'); n.type='number'; n.value=obj[key]==null?'':obj[key];
-    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); obj[key]=isNaN(v)?0:v; F.renderLive(); }; return n; }
+    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); obj[key]=isNaN(v)?0:v; F.renderLiveSlide(); }; return n; }
   function boundCheck(obj,key){ var n=el('input'); n.type='checkbox'; n.checked=!!obj[key];
-    n.onchange=function(){ F.pushUndo(); obj[key]=n.checked; F.renderLive(); }; return n; }
+    n.onchange=function(){ F.pushUndo(); obj[key]=n.checked; F.renderLiveSlide(); }; return n; }
 
   /* generic content form: reflects slides[i].content — plain fields, nested
      objects, and arrays as reorderable cards with add/remove. */
   function contentForm(host,obj,slideIdx,path){
     Object.keys(obj).forEach(function(k){ var v=obj[k];
-      if(Array.isArray(v)) arrayEditor(host,obj,k,slideIdx);
+      if(Array.isArray(v)) arrayEditor(host,obj,k,slideIdx,(path||'')+k);
       else if(v!==null&&typeof v==='object'){ var grp=el('div','forge-card');
         grp.appendChild(el('div','forge-card-h','<span>'+pretty(k)+'</span>'));
         contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); }
@@ -762,7 +887,8 @@
     if(item&&typeof item==='object'){ var o={}; Object.keys(item).forEach(function(k){
       var v=item[k]; o[k]=typeof v==='number'?0:typeof v==='boolean'?false:Array.isArray(v)?[]:(v&&typeof v==='object')?newItemLike(v):''; }); return o; }
     return ''; }
-  function arrayEditor(host,obj,k,slideIdx){ var wrap=el('div','forge-arr');
+  function arrayEditor(host,obj,k,slideIdx,apath){ var wrap=el('div','forge-arr');
+    function slideOf(data){ return data.slides[slideIdx]; }
     var head=el('div','forge-arr-h','<span>'+pretty(k)+'</span>'); var addB=el('button','forge-chip add','＋');
     addB.title='Add item'; addB.onclick=function(){ F.do('add item',function(){ var arr=obj[k];
       arr.push(arr.length?newItemLike(arr[arr.length-1]):{title:''}); }); };
@@ -772,13 +898,17 @@
       var tools=el('span','forge-card-tools');
       function chip(lab,title,fn,cls,dis){ var b=el('button','forge-chip '+(cls||''),lab); b.title=title; if(dis)b.disabled=true;
         b.onclick=fn; tools.appendChild(b); }
-      chip('↑','Move up',function(){ F.do('reorder',function(){ var a=obj[k]; var t=a[i-1]; a[i-1]=a[i]; a[i]=t; }); },null,i===0);
-      chip('↓','Move down',function(){ F.do('reorder',function(){ var a=obj[k]; var t=a[i+1]; a[i+1]=a[i]; a[i]=t; }); },null,i===obj[k].length-1);
-      chip('✕','Remove',function(){ F.do('remove item',function(){ obj[k].splice(i,1); }); },'warn');
+      /* reorder/remove keep sibling override keys attached to their items */
+      chip('↑','Move up',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i-1]; a[i-1]=a[i]; a[i]=t;
+        if(apath) swapItemOverrides(slideOf(data),apath,i-1,i); }); },null,i===0);
+      chip('↓','Move down',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i+1]; a[i+1]=a[i]; a[i]=t;
+        if(apath) swapItemOverrides(slideOf(data),apath,i,i+1); }); },null,i===obj[k].length-1);
+      chip('✕','Remove',function(){ F.do('remove item',function(data){ obj[k].splice(i,1);
+        if(apath) remapItemOverrides(slideOf(data),apath,i,-1); }); },'warn');
       h.appendChild(tools); card.appendChild(h);
-      if(item!==null&&typeof item==='object') contentForm(card,item,slideIdx);
-      else { var holder={v:item}; var t=el('textarea'); t.rows=2; t.value=item==null?'':item;
-        t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ obj[k][i]=t.value; F.renderLive(); };
+      if(item!==null&&typeof item==='object') contentForm(card,item,slideIdx,apath+'.'+i+'.');
+      else { var t=el('textarea'); t.rows=2; t.value=item==null?'':item;
+        t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ obj[k][i]=t.value; F.renderLiveSlide(); };
         var f=el('div','forge-field'); f.appendChild(t); card.appendChild(f); }
       wrap.appendChild(card); });
     host.appendChild(wrap); }
@@ -788,9 +918,9 @@
      sidebar: labels x series with add/remove, live preview on every keystroke.
      ===================================================================== */
   function gridNum(get,set){ var n=el('input'); n.type='number'; n.className='forge-cell'; n.value=get();
-    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); set(isNaN(v)?0:v); F.renderLive(); }; return n; }
+    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); set(isNaN(v)?0:v); F.renderLiveSlide(); }; return n; }
   function gridTxt(get,set){ var n=el('input'); n.type='text'; n.className='forge-cell'; n.value=get();
-    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ set(n.value); F.renderLive(); }; return n; }
+    n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ set(n.value); F.renderLiveSlide(); }; return n; }
   function chartPanel(host,c,slideIdx){
     c.data=c.data||{labels:[],series:[]}; c.options=c.options||{};
     ['title','kicker','note'].forEach(function(k){ if(c[k]!=null) host.appendChild(field(pretty(k),boundText(c,k))); });
@@ -798,7 +928,7 @@
     var o=c.options;
     host.appendChild(fieldRow('Unit suffix',gridTxt(function(){ return o.unit||''; },function(v){ o.unit=v; })));
     var sv=el('input'); sv.type='checkbox'; sv.checked=!!o.showValues;
-    sv.onchange=function(){ F.pushUndo(); o.showValues=sv.checked; F.renderLive(); };
+    sv.onchange=function(){ F.pushUndo(); o.showValues=sv.checked; F.renderLiveSlide(); };
     host.appendChild(fieldRow('Show values',sv));
     /* the grid */
     var wrap=el('div','forge-grid'); var d=c.data;
@@ -831,14 +961,17 @@
     host.appendChild(el('div','forge-hint','Charts recolor with the theme and brand automatically \u2014 series use --chart-1\u20266.')); }
   function tablePanel(host,c,slideIdx){
     c.columns=c.columns||['','A','B']; c.rows=c.rows||[]; c.options=c.options||{};
+    function slideOf(data){ return data.slides[slideIdx]; }
     ['title','kicker','note'].forEach(function(k){ if(c[k]!=null) host.appendChild(field(pretty(k),boundText(c,k))); });
     var wrap=el('div','forge-grid');
     var head=el('div','forge-grid-row head');
     c.columns.forEach(function(_,j){ var cellw=el('span','forge-grid-h');
       cellw.appendChild(gridTxt(function(){ return c.columns[j]; },function(v){ c.columns[j]=v; }));
       var x=el('button','forge-chip warn','\u2715'); x.title='Remove column';
-      x.onclick=function(){ F.do('remove column',function(){ c.columns.splice(j,1);
-        c.rows.forEach(function(r){ r.splice(j,1); }); }); };
+      x.onclick=function(){ F.do('remove column',function(data){ c.columns.splice(j,1);
+        c.rows.forEach(function(r){ r.splice(j,1); });
+        var s=slideOf(data); remapItemOverrides(s,'columns',j,-1);
+        c.rows.forEach(function(_,ri){ remapItemOverrides(s,'rows.'+ri,j,-1); }); }); };
       cellw.appendChild(x); head.appendChild(cellw); });
     var addC=el('button','forge-chip add','\uff0b'); addC.title='Add column';
     addC.onclick=function(){ F.do('add column',function(){ c.columns.push('');
@@ -848,14 +981,15 @@
       c.columns.forEach(function(_,j){ row.appendChild(gridTxt(
         function(){ return r[j]!=null?r[j]:''; },function(v){ r[j]=v; })); });
       var x=el('button','forge-chip warn','\u2715'); x.title='Remove row';
-      x.onclick=function(){ F.do('remove row',function(){ c.rows.splice(i,1); }); };
+      x.onclick=function(){ F.do('remove row',function(data){ c.rows.splice(i,1);
+        remapItemOverrides(slideOf(data),'rows',i,-1); }); };
       row.appendChild(x); wrap.appendChild(row); });
     var addR=el('button','forge-chip add','\uff0b row'); addR.style.marginTop='6px';
     addR.onclick=function(){ F.do('add row',function(){ c.rows.push(c.columns.map(function(){ return ''; })); }); };
     host.appendChild(wrap); host.appendChild(addR);
     var hc=el('input'); hc.type='number'; hc.value=c.options.highlightCol!=null?c.options.highlightCol:'';
     hc.placeholder='none'; hc.onfocus=function(){ F.pushUndo(); };
-    hc.oninput=function(){ var v=parseInt(hc.value,10); if(isNaN(v)) delete c.options.highlightCol; else c.options.highlightCol=v; F.renderLive(); };
+    hc.oninput=function(){ var v=parseInt(hc.value,10); if(isNaN(v)) delete c.options.highlightCol; else c.options.highlightCol=v; F.renderLiveSlide(); };
     host.appendChild(fieldRow('Highlight column #',hc)); }
 
   /* =====================================================================
@@ -873,13 +1007,23 @@
     var name=c&&!/^sg-/.test(c)?c.replace(/-/g,' '):node.tagName.toLowerCase();
     var txt=(node.textContent||'').trim().replace(/\s+/g,' ').slice(0,26);
     return name+(txt?' · '+txt:''); }
+  /* build the hierarchy from the authored keys themselves ("stats.2" is a
+     child of "stats"), so the tree matches the CONTENT structure even when the
+     DOM interleaves (pipeline connectors) or nests differently. */
+  function keyedTree(sec){ var map={}, roots=[];
+    [].slice.call(sec.querySelectorAll('[data-el]')).forEach(function(n){
+      map[n.getAttribute('data-el')]={node:n,kids:[]}; });
+    Object.keys(map).forEach(function(k){ var p=k.lastIndexOf('.');
+      var par=p>0?map[k.slice(0,p)]:null;
+      if(par) par.kids.push(map[k]); else roots.push(map[k]); });
+    return roots; }
   function elementsTree(host,slideIdx){
     var sec0=deckEl().querySelectorAll('.slide')[slideIdx]; if(!sec0) return;
     var wrap=el('div','forge-tree');
     var selKey=(F.sel&&F.sel.slideIdx===slideIdx)?(F.sel.key||F.sel.id):null;
-    function row(node,depth){
+    function row(entry,depth){
+      var node=entry.node, kids=entry.kids;
       var key=node.getAttribute('data-el')||node.getAttribute('data-free');
-      var kids=node.hasAttribute('data-free')?[]:keyableChildren(node);
       var openKey=slideIdx+':'+key, isOpen=F._treeOpen[openKey]!==false;
       var r=el('div','forge-tree-row'+(selKey===key?' cur':''));
       r.style.paddingLeft=(6+depth*14)+'px';
@@ -889,10 +1033,10 @@
       var lb=el('span','forge-tree-lb'); lb.textContent=treeLabel(node); r.appendChild(lb);
       var tools=el('span','tools');
       if(!node.hasAttribute('data-free')){
-        if(kids.length&&arrayForContainer(slideIdx,node))
+        if(node.getAttribute('data-arr'))
           treeChip(tools,'＋','Add item (matches this list\u2019s shape)',function(){ F.addItem(slideIdx,node); });
-        var p=node.parentElement&&node.parentElement.closest('[data-el]');
-        if(p&&arrayForContainer(slideIdx,p)){
+        var it=itemOf(key);
+        if(it&&key===it.path+'.'+it.idx&&contentArr(slideIdx,it.path)){
           treeChip(tools,'⧉','Duplicate item',function(){ F.dupItem(slideIdx,node); });
           treeChip(tools,'✕','Remove item',function(){ F.removeItem(slideIdx,node); },true); } }
       else treeChip(tools,'✕','Delete object',function(){ selectNode(node,false); F.deleteSel(); },true);
@@ -900,8 +1044,8 @@
       r.onclick=function(){ selectNode(node,false); };
       wrap.appendChild(r);
       if(isOpen) kids.forEach(function(ch){ row(ch,depth+1); }); }
-    blocks(sec0).forEach(function(b){ row(b,0); });
-    [].slice.call(sec0.querySelectorAll('.forge-free')).forEach(function(fn){ row(fn,0); });
+    keyedTree(sec0).forEach(function(entry){ row(entry,0); });
+    [].slice.call(sec0.querySelectorAll('.forge-free')).forEach(function(fn){ row({node:fn,kids:[]},0); });
     host.appendChild(wrap); }
 
   /* =====================================================================
@@ -1033,7 +1177,7 @@
     var grid=el('div','forge-tokens');
     TOKENS.forEach(function(tk){
       var lab=el('label','forge-token'); var cur=(themeObj&&themeObj[tk])||getComputedStyle(D.documentElement).getPropertyValue(tk).trim();
-      lab.appendChild(colorInput(cur,function(v){ F.pushUndo();
+      lab.appendChild(colorInput(cur,function(v){ F.pushUndoCoalesced('theme:'+tk);
         if(typeof SG.data.theme!=='object'||!SG.data.theme){ SG.data.theme={}; }
         SG.data.theme[tk]=v; F.renderLive(); }));
       lab.appendChild(el('span',null,tk)); grid.appendChild(lab); });
@@ -1060,7 +1204,7 @@
     b.colors=b.colors||{}; b.fonts=b.fonts||{};
     s.appendChild(field('Brand name',boundText(b,'name')));
     [['accent1','Accent 1 (primary)'],['accent2','Accent 2'],['accent3','Accent 3']].forEach(function(p){
-      s.appendChild(fieldRow(p[1],colorInput(b.colors[p[0]]||'',function(v){ F.pushUndo(); b.colors[p[0]]=v; F.renderLive(); }))); });
+      s.appendChild(fieldRow(p[1],colorInput(b.colors[p[0]]||'',function(v){ F.pushUndoCoalesced('brand:'+p[0]); b.colors[p[0]]=v; F.renderLive(); }))); });
     s.appendChild(field('Display font',selectInput(BRAND_FONTS,b.fonts.display||'',function(v){
       F.pushUndo(); if(v) b.fonts.display=v; else delete b.fonts.display; F.renderLive(); })));
     s.appendChild(field('Body font',selectInput(BRAND_FONTS,b.fonts.body||'',function(v){
@@ -1099,25 +1243,28 @@
   function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free';
     var s=sec(body,(isFree?('Free '+((d.type==='box')?'box':'text')):('Element '+sel.key)));
     if(isFree&&d.type!=='box'){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
-      t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLive(); };
+      t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
     geomInputs={};
     function num(label,key,step){ var n=el('input'); n.type='number'; if(step)n.step=step; n.value=d[key]||(key==='scale'?1:0);
       n.onfocus=function(){ F.pushUndo(); };
-      n.oninput=function(){ var v=parseFloat(n.value); d[key]=isNaN(v)?0:v;
+      n.oninput=function(){ var v=parseFloat(n.value);
+        if((key==='w'||key==='h')&&(isNaN(v)||v<=0)) delete d[key];   /* 0/blank = back to natural size */
+        else d[key]=isNaN(v)?0:v;
         isFree?applyFree(sel.node,d):applyOverride(sel.node,d); refreshHandles(); positionFloat(); pulse(sel.node); F.saveDebounced(); };
       geomInputs[key]=n; s.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
-    if(isFree&&d.type==='box'){ num('Width','w'); num('Height','h'); }
+    num('Width','w');                                       /* width reflows text (0 = natural) */
+    if(isFree&&(d.type==='box'||d.type==='html')) num('Height','h');
     if(isFree&&d.type!=='box') num('Font size','size');
     var s2=sec(body,'Style');
-    s2.appendChild(fieldRow('Text color',colorInput(d.color,function(v){ F.pushUndo(); d.color=v;
+    s2.appendChild(fieldRow('Text color',colorInput(d.color,function(v){ F.pushUndoCoalesced('obj-color'); d.color=v;
       isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
     s2.appendChild(field('Font',selectInput(F.fontChoices,d.font||'',function(v){ F.pushUndo(); d.font=v;
       isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.save(); })));
-    s2.appendChild(fieldRow('Accent',colorInput((d.theme&&d.theme['--cyan'])||'',function(v){ F.pushUndo();
+    s2.appendChild(fieldRow('Accent',colorInput((d.theme&&d.theme['--cyan'])||'',function(v){ F.pushUndoCoalesced('obj-accent');
       d.theme=d.theme||{}; d.theme['--cyan']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
-    s2.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndo();
+    s2.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
       d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
     var s3=sec(body,'Animation');
     function reapply(){ isFree?applyFree(sel.node,d):applyOverride(sel.node,d); }
@@ -1248,7 +1395,8 @@
   F.showKeys=function(){ var o=D.getElementById('forge-keys');
     if(o){ o.style.display=o.style.display==='none'?'flex':'none'; return; }
     o=el('div','forge-chrome'); o.id='forge-keys';
-    var rows=[['Drag / Alt','Move with snap guides / snap off'],['Double-click','Edit text in place'],
+    var rows=[['Drag / Alt','Move with snap guides / snap off'],
+      ['Drag corner / Alt+corner','Resize width \u2014 text reflows / scale'],['Double-click','Edit text in place'],
       ['Shift-click / marquee','Multi-select'],['Ctrl+C · V · D','Copy / paste / duplicate (deep)'],
       ['Ctrl+G / Ctrl+Shift+G','Group / ungroup'],['Arrows / Shift+arrows','Nudge 1px / 10px'],
       ['Delete','Delete / reset selection'],['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],

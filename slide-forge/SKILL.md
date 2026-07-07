@@ -156,7 +156,8 @@ The delivered file does double duty, so close by telling them how to use both ha
 - **Present:** open the file, click to advance, press `F` for fullscreen.
 - **Edit (no install):** click **Edit** (bottom-right). Then they can **click any element and drag to
   move it** — smart guides snap it to centers, edges and neighbours (hold **Alt** to snap freely).
-  Drag a corner to resize, the green handle to rotate, and **double-click any text to edit it in
+  Drag a corner to **resize — text rewraps** to the new width (hold **Alt** on a corner to scale
+  proportionally instead), the green handle to rotate, and **double-click any text to edit it in
   place** (a floating **B / ✦ / `<>`** toolbar formats the selection). **Shift-click or drag a box on
   empty canvas to select several elements at once**, then use the floating toolbar to **align &
   distribute** them. **Copy / paste / duplicate** with `Cmd/Ctrl+C·V·D`, nudge with arrow keys
@@ -170,12 +171,10 @@ The delivered file does double duty, so close by telling them how to use both ha
   a timer. Set an animation's trigger to **On click** to reveal content **step-by-step** with → /
   Space / click, PowerPoint-style; the Slide panel's Animations list manages every effect in one
   place. Press **?** in Edit mode for the full shortcut list.
-- **Saving:** on Chrome/Edge, **Save .html** / `Cmd/Ctrl+S` saves **in place** (first save asks
-  where; after that it's silent). Other browsers download a fresh copy.
-- **Saving:** edits autosave in the browser, but the portable save is **Save .html** (top bar /
-  `Cmd/Ctrl+S`) — it downloads a fresh self-contained file with their changes baked in. (A browser
-  can't overwrite the file in place, so editing produces a new download — mention this so it isn't a
-  surprise.)
+- **Saving:** edits autosave in the browser, but the file itself is the source of truth — save with
+  **Save .html** / `Cmd/Ctrl+S`. On Chrome/Edge this writes **in place** (first save asks where;
+  after that it's silent). Other browsers can't overwrite an opened file, so they download a fresh
+  self-contained copy with the changes baked in — mention this so it isn't a surprise.
 
 `references/editor.md` has the complete editor reference if the user wants depth or asks how a
 specific interaction maps to the saved data.

@@ -24,10 +24,12 @@ Press **Enter** (or click away) to commit, **Esc** to cancel. The edit is serial
 text and stored as that element's `html` override (see below), so it round-trips and exports clean.
 
 **2. Object (geometry, style & animation) — overrides layered on a template element or free object.**
-Click an element on the slide to select it; the **Object** panel exposes position (X/Y), scale,
-rotation, **text color**, **accent**, **font** (from the theme fonts), a **surface** color, and an
-**Animation** effect (+ delay). These write to a per-slide `overrides` map (for template elements,
-keyed by `data-el` like `b0`) or to a free object. Arrow keys nudge a selected object (Shift = 10px).
+Click an element on the slide to select it; the **Object** panel exposes position (X/Y),
+**width/height** (width reflows text; 0 = natural size), scale, rotation, **text color**,
+**accent**, **font** (from the theme fonts), a **surface** color, and an **Animation** effect
+(+ delay). These write to a per-slide `overrides` map (for template elements, keyed by the
+element's **authored `data-el` key** — a content path like `title` or `stats.2`) or to a free
+object. Arrow keys nudge a selected object (Shift = 10px).
 "Reset element" drops the override; "Delete object" removes a free object.
 
 **Animation binding.** The Object panel's **Animation** section assigns one effect to the selected
@@ -36,16 +38,16 @@ element from a curated catalog (entrance: *fade-rise, reveal-wipe, typewriter, k
 effects replay when the slide opens (and a **▶ Replay** button previews them while editing);
 continuous effects loop. Stored as `overrides[key].anim` / `.animDelay`.
 
-**Nested elements (array items & their fields).** Beyond the top-level blocks (`b0`, `b1`…), the
-editor also keys **array items and their child fields** with positional dotted keys (`b6.0`,
-`b6.0.1`). Select them via the **Nested** list in the Object panel (a child picker with a ↑ parent
-button), or **Alt-click** the element on the canvas to drill straight in. Once selected, all of the
+**Nested elements (array items & their fields).** Every meaningful element carries an authored
+key: named blocks (`title`, `rail`), array items by content path (`stats.2`, `left.items.0`) and
+their child fields (`stats.2.label`). Select them via the **Elements tree** in the Inspector, or
+**Alt-click** the element on the canvas to drill straight in. Once selected, all of the
 above — style, geometry, and **animation** — apply to that individual item or field.
 
 ```jsonc
 { "layout": "stat-grid",
   "content": { "title": "By the numbers", "stats": [ {"count":94,"unit":"%","label":"…"} ] },
-  "overrides": { "b0": { "x":120, "y":60, "rot":-2, "scale":1.1,
+  "overrides": { "title": { "x":120, "y":60, "w":420, "rot":-2, "scale":1.1,
                          "color":"#ffd166", "font":"var(--font-mono)",
                          "anim":"reveal-wipe", "animDelay":0.2,
                          "html":"**By** the [[numbers]]",          // on-canvas WYSIWYG edit
@@ -83,9 +85,10 @@ the same verbs. New in v2:
   `Esc` clears; `Cmd/Ctrl+S` saves the `.html`; `Cmd/Ctrl+Z` / `Shift+Z` undo/redo.
 - **Slide row tools.** The left panel's slide rows expose move-up/down, duplicate and delete on hover.
 
-**Schema.** `meta.schemaVersion` is stamped to `2` on load by `SG.migrate()`; v1 decks are valid v2
-decks (all new keys — `overrides[key].z`, `slides[i].notes`, top-level `brand`/`masters` — are
-optional), so old decks open and re-save with no visual diff.
+**Schema.** `meta.schemaVersion` is stamped to `3` on load by `SG.migrate()`. v1/v2 decks open
+cleanly: their positional override keys (`b0`, `b3.1`) are remapped once to the authored keys at
+first render (unmappable ones are dropped with a console note), then the deck re-saves as v3.
+`raw` slides keep positional keys — their HTML has no content schema.
 
 **Source layout.** The template is now built from `src/` by `scripts/build.py`; validate a deck with
 `scripts/validate.py <deck.html|deck.json>`. Claude's authoring workflow is unchanged — copy
@@ -150,3 +153,38 @@ optional), so old decks open and re-save with no visual diff.
 - **Build steps are opt-in.** `defaults.buildSteps` (Deck panel toggle, **off by default**) gates
   click-to-reveal: when off, everything is visible everywhere; when on, On-click elements wait for
   → / Space / click while presenting. Setting a click trigger enables the toggle automatically.
+
+## v3 — authored identity, exact write-back, reflow resize
+
+The engine's layouts now return **node trees** (built with `SG.N`) instead of HTML strings, and
+author identity directly (plan §10). Three attributes drive everything the editor does:
+
+- **`data-el`** — the element's stable key, derived from its content path (`title`, `stats.2`,
+  `left.items.0`). Overrides are keyed by it; it no longer depends on DOM position, so it can't
+  silently reattach to a neighbouring element.
+- **`data-bind`** — the exact `content` field a text leaf renders. On-canvas text edits write back
+  to that path **deterministically**; the old "find the matching string value" heuristic is gone.
+  An `html` override is used only for unbound composites (cover title+accent, code blocks), `raw`
+  slides, and free html objects.
+- **`data-arr`** — on containers, the content path of the array they render. **＋ add / ⧉ duplicate
+  / ✕ remove item** parse the item index from the element key, so they also work where the DOM
+  interleaves (pipeline connectors between nodes).
+
+What that enables:
+
+- **Overrides survive list edits.** Adding/duplicating/removing/reordering items REMAPS sibling
+  override keys (a style on `stats.2` follows its stat when `stats.0` is deleted). Duplicating an
+  item copies its overrides to the new slot. A GC pass in every structural commit drops overrides
+  whose element no longer exists — logged to the console, reversible with Undo.
+- **Resize means resize.** Dragging a corner handle changes the element's **width** — text rewraps
+  like PowerPoint (template blocks keep auto height; free boxes/copied groups resize both axes).
+  **Alt+corner** is the old proportional scale. `overrides[key].w/h`, editable in the Inspector
+  (0 clears back to natural size).
+- **Targeted re-render.** Typing in the sidebar re-renders only the current slide
+  (`SG.renderSlide`), so large decks stay snappy; structural and theme changes still re-render all.
+- **One undo per gesture.** Color-picker drags, token tweaks and arrow-nudge runs coalesce into a
+  single undo snapshot instead of flooding the 80-deep stack.
+
+Verification lives in `tests/` (jsdom): a 26-slide structural parity diff against the frozen v2
+build, and 29 data-layer assertions (item remap, GC, migration, bind write-back, targeted render).
+

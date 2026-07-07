@@ -57,7 +57,7 @@ ITEM = {   # required fields on each item of the named array
 }
 AMBIENTS = {'auto','none','orbs','aurora','grid','rays','grain','contours','scan','waves','glow','constellation'}
 CHART_TYPES = {'bar','bar-h','stacked','line','area','pie','donut','scatter'}
-OVERRIDE_KEYS = {'x','y','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide'}
+OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide'}
 FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color','font','anim','animDelay','animTrigger','animStep','html','theme','group'}
 
 def typeok(v, t):
@@ -139,7 +139,10 @@ def validate(data):
             if not isinstance(ov, dict): errs.append('%s: overrides is not an object' % where)
             else:
                 for k, o in ov.items():
-                    if not re.match(r'^b\d+(\.\d+){0,2}$', k): warns.append('%s: odd override key %r' % (where, k))
+                    # v3: authored content-path keys ("title", "stats.2", "left.items.0");
+                    # raw slides (and pre-v3 decks awaiting migration) use positional b0/b0.1
+                    if not re.match(r'^(b\d+(\.\d+){0,2}|[A-Za-z][\w-]*(\.[\w-]+)*)$', k):
+                        warns.append('%s: odd override key %r' % (where, k))
                     if not isinstance(o, dict): errs.append('%s: overrides[%r] not an object' % (where, k)); continue
                     for f in o:
                         if f not in OVERRIDE_KEYS: warns.append('%s: overrides[%r] unknown field %r' % (where, k, f))
@@ -169,7 +172,7 @@ def validate(data):
     if theme is not None and not isinstance(theme, (str, dict)):
         errs.append('theme must be a string name or a {--var: value} object')
     v = (data.get('meta') or {}).get('schemaVersion')
-    if v is not None and v not in (1, 2):
+    if v is not None and v not in (1, 2, 3):
         errs.append('unknown meta.schemaVersion %r' % v)
     return errs, warns
 

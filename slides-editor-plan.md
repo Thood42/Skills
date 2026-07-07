@@ -417,3 +417,63 @@ one obvious entry point. Implemented on branch `editor-refactor` in `editor-temp
 
 Closes part of the §8.3 "real-browser verification owed" item: these interactions were QA'd in a
 browser (right-click menu, on-canvas edit, inspector pulse, no console errors).
+
+---
+
+## 10. ADR (2026-07-06) — v3 engine: node-tree layouts with authored identity
+
+**Status: accepted, implemented this session.** Follows the design critique in
+`../slide-forge-design-critique.md` (Option B).
+
+### Decision
+
+Replace `layout(content) -> innerHTML string` with `layout(content) -> DOM node tree` built by a
+tiny zero-dependency builder `N(sel, attrs, kids)` (~30 lines). Layout functions now author three
+attributes directly:
+
+- **`data-el`** (attrs.key) — a stable, authored identity key derived from content paths
+  (`title`, `stats.2`, `left.items.0`), replacing the positional post-render `b0`/`b0.1` tagging.
+- **`data-bind`** (attrs.bind) — the `content` path a text leaf renders; on-canvas edits write
+  back to that path deterministically. The value-matching `findContentField` heuristic and most
+  `overrides[key].html` shadowing are gone (the html override remains only as fallback for
+  unbound composites, `raw` slides, and free html objects).
+- **`data-arr`** (attrs.arr) — the content path of the array a container renders, replacing the
+  length-matching `arrayForContainer` inference. Item ops (add/duplicate/remove) parse the item
+  index from the element key, so interleaved DOM (e.g. pipeline connectors) no longer defeats them.
+
+### What this bought (implemented with it)
+
+1. **Override survival.** Item add/duplicate/remove/reorder ops remap sibling override keys
+   (index shift) instead of silently detaching them; a GC pass in `F.commit` drops overrides whose
+   key no longer exists in the rendered slide (logged, undoable).
+2. **Targeted re-render.** `SG.renderSlide(deck, i)` rebuilds one `<section>`; `F.renderLiveSlide()`
+   uses it for content typing. Full render only on structural/global changes.
+3. **True w/h resize with reflow.** Overrides gain `w`/`h`; corner-drag resizes width (text
+   rewraps; free boxes/copied groups also height). Alt+corner keeps the old scale behavior.
+4. **Undo coalescing.** Continuous inputs (color pickers, token grid, nudges) push one snapshot
+   per gesture (`F.pushUndoCoalesced`), ending the picker-drag undo-stack flood.
+
+### Migration (v2 -> v3 decks)
+
+`meta.schemaVersion` bumps to 3. Positional override keys (`/^b\d/`) are remapped once, lazily,
+at first decorate: the old block/keyable-children walk is replayed against the freshly rendered
+DOM to map `b2.1` -> the element's new authored key; unmappable keys are dropped with a console
+note. `raw` slides keep positional keying (their children are author HTML with no schema), so
+old raw-slide overrides survive unchanged.
+
+### Explicitly rejected (again)
+
+Splitting into an app + emitter (critique Option C): editing power did not require leaving the
+single file, and version skew between studio and emitted decks remains the trap §5.2 identified.
+Revisit only for out-of-file needs (asset libraries, PPTX round-trip, collaboration).
+
+### Known limits of v3 (accepted)
+
+- Composite elements (cover/closing title+accent, stat `.num` count+unit, code `<pre>`) are not
+  `data-bind`-able; on-canvas edits there still fall back to an html override. Their parts are
+  individually keyed where feasible instead.
+- Authored keys for array items are still index-based (`stats.2`), so identity follows the slot,
+  not the datum; the remap-on-op + GC machinery is what makes that safe.
+- The parity harness (`/tmp` jsdom scripts, see commit message) normalizes attribute order and
+  ignores the new `data-*` attributes; small documented markup deltas exist where leaves gained
+  wrapper spans to become bindable (timeline desc, hero-asym value/unit).
