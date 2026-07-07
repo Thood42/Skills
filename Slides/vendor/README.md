@@ -1,4 +1,4 @@
-# vendor/ — locally-vendored libraries
+git# vendor/ — locally-vendored libraries
 
 Decks render and self-inspect **offline**, so any library a deck uses must already be
 on local disk here before building or rendering.
