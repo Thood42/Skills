@@ -93,4 +93,6 @@ Editor model (load-bearing facts):
 - **NOTE for future sessions:** this session's file writes through the Windows mount truncated
   several files to their previous byte length (engine.js, editor.js, anim.js, the plan doc). All
   were detected and repaired, but VERIFY file tails (`node --check`, `tail`) after any large write
-  in this workspace.
+  in this workspace. A phantom `.git/index.lock` (stat says exists, unlink says ENOENT) also blocked
+  git; worked around via `GIT_INDEX_FILE=/tmp/... + commit-tree + update-ref`. If git locks up in a
+  future session, delete `.git\index.lock` from the Windows side.
