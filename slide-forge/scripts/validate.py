@@ -36,6 +36,10 @@ S = {
  'editorial':    {'?kicker':'s','lead':'s','columns':'a'},
  'hero-asym':    {'title':'s','?sub':'s','rows':'a'},
  'figure':       {'?kicker':'s','title':'s','?caption':'s','?image':'s'},
+ 'image':        {'?kicker':'s','?title':'s','?caption':'s','image':'s','?fit':'s','?focal':'a','?frame':'s'},
+ 'media-split':  {'?kicker':'s','title':'s','?body':'s','?items':'a','image':'s','?side':'s','?fit':'s','?focal':'a'},
+ 'gallery':      {'?kicker':'s','?title':'s','items':'a'},
+ 'diagram':      {'?kicker':'s','?title':'s','svg':'s','?caption':'s'},
  'metric-dash':  {'?kicker':'s','?title':'s','ring':'o','tiles':'a'},
  'leaderboard':  {'?kicker':'s','?title':'s','rows':'a'},
  'diptych':      {'left':'o','right':'o'},
@@ -53,19 +57,48 @@ ITEM = {   # required fields on each item of the named array
  ('hero-asym','rows'):[('k','s'),('v','sn')], ('metric-dash','tiles'):[('value','sn'),('label','s')],
  ('leaderboard','rows'):[('name','s'),('value','sn')], ('matrix','cells'):[('title','s')],
  ('stack','bands'):[('title','s')], ('quote-mosaic','quotes'):[('quote','s'),('by','s')],
- ('index-mosaic','items'):[('title','s')],
+ ('index-mosaic','items'):[('title','s')], ('gallery','items'):[('image','s')],
 }
 AMBIENTS = {'auto','none','orbs','aurora','grid','rays','grain','contours','scan','waves','glow','constellation'}
 CHART_TYPES = {'bar','bar-h','stacked','line','area','pie','donut','scatter'}
+FIT_MODES = {'cover','contain','fill'}
+FRAME_MODES = {'none','panel','glow','shadow'}
 OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide'}
-FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color','font','anim','animDelay','animTrigger','animStep','html','theme','group'}
+# media plan §3/§3.4/§5/§6: image/svg objects (asset,fit,focal,radius,opacity,
+# frame,alt), a shared "href" link on any free object (§5), and embed fields
+# (§6) — kept in one set since a deck author may hand-edit freeObjects JSON.
+FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color','font','anim','animDelay',
+ 'animTrigger','animStep','html','theme','group','asset','fit','focal','radius','opacity','frame','alt','href',
+ 'url','ratio','mode','poster','sandbox','chrome','title'}
 
 def typeok(v, t):
     return {'s':lambda:isinstance(v,str), 'n':lambda:isinstance(v,(int,float)) and not isinstance(v,bool),
             'b':lambda:isinstance(v,bool), 'o':lambda:isinstance(v,dict), 'a':lambda:isinstance(v,list),
             'sn':lambda:isinstance(v,(str,int,float)) and not isinstance(v,bool)}[t]()
 
-def validate(data):
+def _asset_refs(data):
+    """Every place an asset NAME can appear — kept in lockstep (by convention,
+    same key names) with src/media.js's F.assets.refs() and scripts/assets.py's
+    referenced(). Returns [(where, kind, name), ...]."""
+    out = []
+    def walk(o, where):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in ('image', 'poster', 'logo') and isinstance(v, str) and v:
+                    out.append((where, 'images', v))
+                elif k == 'svg' and isinstance(v, str) and v:
+                    out.append((where, 'svg', v))
+                elif k == 'asset' and isinstance(v, str) and v:
+                    out.append((where, 'svg' if o.get('type') == 'svg' else 'images', v))
+                else:
+                    walk(v, where)
+        elif isinstance(o, list):
+            for v in o: walk(v, where)
+    for i, sl in enumerate(data.get('slides') or []):
+        walk(sl, 'slide %d' % (i + 1))
+    return out
+
+def validate(data, assets=None):
     errs, warns = [], []
     if not isinstance(data, dict): return ['deck-data root is not an object'], []
     slides = data.get('slides')
@@ -124,6 +157,14 @@ def validate(data):
                 errs.append('%s (chart): unknown type %r (one of %s)' % (where, ct, sorted(CHART_TYPES)))
         elif lay == 'chart' and not (c.get('data') or c.get('svg') or c.get('body')):
             warns.append('%s (chart): no data and no svg/body escape hatch - renders empty' % where)
+        if lay in ('image', 'media-split') or lay == 'gallery':
+            items = c.get('items') if lay == 'gallery' else [c]
+            for it in (items or []):
+                if not isinstance(it, dict): continue
+                if 'fit' in it and it['fit'] not in FIT_MODES:
+                    errs.append('%s (%s): fit %r not one of %s' % (where, lay, it['fit'], sorted(FIT_MODES)))
+                if 'frame' in it and it['frame'] not in FRAME_MODES:
+                    errs.append('%s (%s): frame %r not one of %s' % (where, lay, it['frame'], sorted(FRAME_MODES)))
         if lay == 'table':
             ncol = len(c.get('columns') or [])
             for j, r in enumerate(c.get('rows') or []):
@@ -151,6 +192,12 @@ def validate(data):
                 errs.append('%s: freeObjects[%d] needs an object with id' % (where, j)); continue
             for f in fo:
                 if f not in FREE_KEYS: warns.append('%s: freeObjects[%d] unknown field %r' % (where, j, f))
+            if fo.get('fit') is not None and fo['fit'] not in FIT_MODES:
+                errs.append('%s: freeObjects[%d].fit %r not one of %s' % (where, j, fo['fit'], sorted(FIT_MODES)))
+            if fo.get('frame') is not None and fo['frame'] not in FRAME_MODES:
+                errs.append('%s: freeObjects[%d].frame %r not one of %s' % (where, j, fo['frame'], sorted(FRAME_MODES)))
+            if fo.get('type') in ('image', 'svg') and not (fo.get('alt') or '').strip():
+                warns.append('%s: freeObjects[%d] (%s) has no alt text' % (where, j, fo['type']))
     b = data.get('brand')
     if b is not None:
         if not isinstance(b, dict): errs.append('brand must be an object')
@@ -174,20 +221,42 @@ def validate(data):
     v = (data.get('meta') or {}).get('schemaVersion')
     if v is not None and v not in (1, 2, 3):
         errs.append('unknown meta.schemaVersion %r' % v)
+    # asset-existence + alt-text (only possible with the registry alongside the
+    # data, i.e. validating a .html — a bare deck.json can't know what's been
+    # imported, so this pass is skipped there rather than false-erroring)
+    if assets is not None:
+        images = assets.get('images') or {}
+        svgs = assets.get('svg') or {}
+        for where, kind, name in _asset_refs(data):
+            reg = images if kind == 'images' else svgs
+            if name not in reg:
+                errs.append('%s: references %s asset %r, not found in the registry' % (where, kind[:-1] if kind == 'images' else kind, name))
+        for name, entry in images.items():
+            if isinstance(entry, dict) and not (entry.get('alt') or '').strip():
+                warns.append('asset %r has no alt text' % name)
+            if isinstance(entry, dict) and entry.get('store') == 'linked' and not entry.get('path'):
+                errs.append('asset %r is store:"linked" but has no path' % name)
     return errs, warns
 
 def load(path):
+    """Returns (data, assets). assets is None for a bare deck.json — there's
+    no registry to check references against outside a built .html."""
     text = open(path, encoding='utf-8').read()
+    assets = None
     if path.endswith(('.html', '.htm')):
         m = re.search(r'<script[^>]*type="application/json"[^>]*id="deck-data"[^>]*>(.*?)</script>', text, re.S)
         if not m: sys.exit('no <script id="deck-data"> found in ' + path)
+        am = re.search(r'<script[^>]*type="application/json"[^>]*id="deck-assets"[^>]*>(.*?)</script>', text, re.S)
+        if am:
+            try: assets = json.loads(am.group(1))
+            except Exception: assets = None
         text = m.group(1)
-    return json.loads(text)
+    return json.loads(text), assets
 
 def main():
     if len(sys.argv) != 2: sys.exit(__doc__)
-    data = load(sys.argv[1])
-    errs, warns = validate(data)
+    data, assets = load(sys.argv[1])
+    errs, warns = validate(data, assets)
     for w in warns: print('WARN  ' + w)
     for e in errs: print('ERROR ' + e)
     if errs: sys.exit(1)

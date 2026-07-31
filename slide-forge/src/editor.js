@@ -48,7 +48,8 @@
     ["Syne","'Syne',sans-serif"],["Epilogue","'Epilogue',sans-serif"],["Bricolage Grotesque","'Bricolage Grotesque',sans-serif"],
     ["Fraunces","'Fraunces',serif"],["Playfair Display","'Playfair Display',serif"],["Newsreader","'Newsreader',serif"]];
 
-  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var ASSET_FIELDS={image:'image',svg:'svg',poster:'image'};    /* content field name -> asset kind, for the picker widget */
   var CHART_TYPES=["bar","bar-h","stacked","line","area","pie","donut","scatter"];
   var TOKENS=["--bg","--bg-2","--ink","--muted","--cyan","--indigo","--mint"];
   var AMBIENTS=["auto","none","orbs","aurora","grid","rays","grain","contours","scan","waves","glow","constellation"];
@@ -78,6 +79,10 @@
     editorial:{kicker:"",lead:"Lead paragraph.",columns:[{head:"Heading",body:"Body text."}]},
     "hero-asym":{title:"Title",sub:"",rows:[{k:"Key",v:"Value",unit:""}]},
     figure:{kicker:"",title:"Title",caption:"",image:""},
+    image:{kicker:"",title:"",caption:"",image:"",fit:"cover",focal:[0.5,0.5],frame:"none"},
+    "media-split":{kicker:"",title:"Title",body:"Body copy.",items:[],image:"",side:"left",fit:"cover",focal:[0.5,0.5]},
+    gallery:{kicker:"",title:"Gallery",items:[{image:"",caption:""}]},
+    diagram:{kicker:"",title:"Diagram",svg:"",caption:""},
     "metric-dash":{kicker:"",title:"Metrics",ring:{value:50,suffix:"%",label:"Label"},tiles:[{value:"0",unit:"",label:"Tile"}]},
     leaderboard:{kicker:"",title:"Leaderboard",rows:[{name:"Name",value:"0"}]},
     diptych:{left:{tag:"",title:"Left",body:""},right:{tag:"",title:"Right",body:""}},
@@ -938,6 +943,35 @@
     n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); obj[key]=isNaN(v)?0:v; F.renderLiveSlide(); }; return n; }
   function boundCheck(obj,key){ var n=el('input'); n.type='checkbox'; n.checked=!!obj[key];
     n.onchange=function(){ F.pushUndo(); obj[key]=n.checked; F.renderLiveSlide(); }; return n; }
+  /* asset-picker widget (media plan §4): a thumbnail + <select> of every
+     registry asset of the right kind, plus an inline "Import…" option that
+     imports a new file straight from the content form. Used for any content
+     field named image/svg/poster (ASSET_FIELDS). */
+  function assetPickerField(obj,key,kind){
+    var wrap=el('div','forge-assetpick');
+    var thumb=el('div','forge-assetpick-thumb');
+    function paintThumb(){ thumb.innerHTML=''; var v=obj[key]; if(!v) return;
+      if(kind==='svg'){ thumb.innerHTML=(SG.svgMarkup&&SG.svgMarkup(v))||''; }
+      else { var m=SG.imageMeta&&SG.imageMeta(v); if(m&&m.src){ var img=el('img'); img.src=m.src; img.alt=''; thumb.appendChild(img); } } }
+    var sel=el('select');
+    function paintOptions(){ sel.innerHTML='';
+      var none=el('option','','— none —'); none.value=''; sel.appendChild(none);
+      var names=Object.keys((kind==='svg'?SG.assets.svg:SG.assets.images)||{}).sort();
+      names.forEach(function(n){ var o=el('option','',n); o.value=n; if(n===obj[key]) o.selected=true; sel.appendChild(o); });
+      var imp=el('option','','＋ Import…'); imp.value='__import__'; sel.appendChild(imp); }
+    sel.onchange=function(){
+      if(sel.value==='__import__'){
+        var inp=el('input'); inp.type='file'; inp.accept=kind==='svg'?'.svg':'image/*'; inp.hidden=true;
+        inp.onchange=function(){ var f=inp.files&&inp.files[0]; inp.value=''; if(!f||!F.assets){ paintOptions(); return; }
+          F.pushUndo();
+          F.assets.importFile(f).then(function(res){ obj[key]=res.name; F.save(); paintOptions(); paintThumb(); F.renderLiveSlide(); })
+            .catch(function(){ F.undo.pop(); F.syncToolbar(); paintOptions(); }); };
+        D.body.appendChild(inp); inp.click(); setTimeout(function(){ inp.remove(); },4000);
+        paintOptions(); return; }
+      F.pushUndo(); obj[key]=sel.value; paintThumb(); F.renderLiveSlide(); F.save(); };
+    paintOptions(); paintThumb();
+    wrap.appendChild(thumb); wrap.appendChild(sel);
+    return wrap; }
 
   /* generic content form: reflects slides[i].content — plain fields, nested
      objects, and arrays as reorderable cards with add/remove. */
@@ -949,6 +983,7 @@
         contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); }
       else if(typeof v==='boolean') host.appendChild(fieldRow(pretty(k),boundCheck(obj,k)));
       else if(typeof v==='number') host.appendChild(field(pretty(k),boundNum(obj,k)));
+      else if(ASSET_FIELDS[k]&&F.assets) host.appendChild(field(pretty(k),assetPickerField(obj,k,ASSET_FIELDS[k])));
       else host.appendChild(field(pretty(k),boundText(obj,k, k==='code'||k==='html'||k==='body'&&String(v).length>80||String(v).length>70||/\n/.test(String(v)) )));
     }); }
   function newItemLike(item){ if(typeof item==='string') return '';

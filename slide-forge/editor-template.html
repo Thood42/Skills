@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 14303a0f3e — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 6795d569a6 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -710,14 +710,62 @@ body.presenting{cursor:none}
 .hero-rail .row .v small{font-size:16px; color:var(--cyan)}
 
 /* FIGURE — full-bleed image with overlaid caption */
+/* ---- media-img: shared <img> wrapper for figure/image/media-split/gallery
+   (a real <img>, not CSS background-image, so a missing "linked" asset can
+   fire the native error event and fall back to .sf-unavail — media plan §4) */
+.media-img{ position:relative; overflow:hidden; background:linear-gradient(135deg,var(--bg-2),var(--bg)); }
+.media-img img{ width:100%; height:100%; display:block; }
+.media-img .sf-unavail{ position:absolute; inset:0; border-radius:inherit; }
+
 .figure{padding:0}
-.figure .fig-img{position:absolute; inset:0; background-size:cover; background-position:center; z-index:0}
+.figure .fig-img{position:absolute; inset:0; z-index:0}
 .figure .fig-shade{position:absolute; inset:0; z-index:1;
   background:linear-gradient(90deg, rgba(5,8,15,.86) 0%, rgba(5,8,15,.45) 45%, rgba(5,8,15,.12) 100%)}
 .figure .fig-body{position:relative; z-index:2; height:100%; display:flex; flex-direction:column;
   justify-content:flex-end; padding:var(--pad)}
 .figure .fig-title{font-family:var(--font-display); font-weight:800; font-size:58px; line-height:1.04; letter-spacing:-.02em; max-width:20ch}
 .figure .fig-cap{margin-top:16px; font-size:18px; color:var(--muted); max-width:52ch}
+
+/* IMAGE — full-bleed or framed single image (media plan §4) */
+.image{padding:0}
+.img-full{position:absolute; inset:0; z-index:0; border-radius:0}
+.img-full.frame-panel{inset:36px; border-radius:16px; border:1px solid var(--brd)}
+.img-full.frame-glow{box-shadow:inset 0 0 0 1px var(--brd-2), 0 0 60px color-mix(in srgb, var(--cyan) 25%, transparent)}
+.img-full.frame-shadow{inset:36px; border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.image::after{content:""; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%)}
+.img-cap-band{position:relative; z-index:2; padding:var(--pad) var(--pad) 0}
+.img-caption{position:relative; z-index:2; margin:14px 88px 0; font-size:16px; color:var(--muted); max-width:56ch;
+  text-shadow:0 2px 12px rgba(0,0,0,.6)}
+
+/* MEDIA-SPLIT — picture one side, prose/bullets the other */
+.media-split{display:grid; grid-template-columns:1fr 1fr; gap:40px; flex:1; min-height:0; align-items:stretch}
+.media-split .ms-media{border-radius:18px; min-height:0}
+.media-split .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0}
+.ms-body{margin-top:16px; font-size:17px; line-height:1.6; color:var(--muted); max-width:48ch}
+.ms-items{margin-top:16px; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px}
+.ms-items li{position:relative; padding-left:22px; font-size:16px; color:var(--muted)}
+.ms-items li::before{content:""; position:absolute; left:0; top:9px; width:8px; height:8px; border-radius:50%;
+  background:var(--cyan)}
+
+/* GALLERY — 2-6 image grid, each tile independently add/remove-able */
+.gallery{margin-top:34px; flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  grid-auto-rows:1fr; gap:16px}
+.gal-tile{position:relative; border-radius:14px; min-height:120px}
+.gal-cap{position:absolute; left:0; right:0; bottom:0; padding:10px 14px; font-size:13px; color:#fff;
+  background:linear-gradient(0deg, rgba(0,0,0,.65), transparent)}
+
+/* DIAGRAM — inlines a sanitized SVG diagram asset, currentColor-themed */
+.diagram-stage{flex:1; margin-top:30px; display:flex; align-items:center; justify-content:center;
+  min-height:0; color:var(--ink)}
+.diagram-stage svg{max-width:100%; max-height:100%}
+.diagram-cap{margin-top:14px; font-size:14px; color:var(--faint); text-align:center}
+
+@media print{
+  /* .media-img .sf-unavail (2 classes) would otherwise out-specificity the
+     base .sf-unavail print rule that un-absolutizes it for the page flow */
+  .media-img .sf-unavail{ position:relative !important; }
+}
 
 /* METRIC-DASH — mixed dashboard: kpi ring + stat tiles */
 .dash{display:grid; grid-template-columns:auto 1fr; gap:34px; align-items:center; flex:1; margin-top:30px}
@@ -1349,6 +1397,23 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     if(url) kids.push(N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'));
     return N('div.sf-unavail',{'data-reason':reason},kids); };
 
+  /* mediaImgWrap(name,attrs,imgStyle): a real <img> (not CSS background) so a
+     missing "linked" asset can fire the native error event and fall back to
+     SG.unavailable() — a CSS background-image failure is silent and can't be
+     detected. attrs.key/bind land on the WRAPPER (object identity); the img
+     itself just carries alt + fit. Used by figure/image/media-split/gallery. */
+  function mediaImgWrap(name,attrs,imgStyle){
+    var m=imageMeta(name);
+    var wrap=N('div.media-img',attrs||{});
+    var img=N('img',{src:(m&&m.src)||'',alt:(attrs&&attrs.alt)||(m&&m.alt)||'',style:imgStyle||''});
+    wrap.appendChild(img);
+    if(!m||!m.src){ wrap.appendChild(SG.unavailable({url:name||'',reason:'missing'})); }
+    else img.addEventListener('error',function(){ img.style.display='none';
+      if(!wrap.querySelector('.sf-unavail')) wrap.appendChild(SG.unavailable({url:m.src,reason:'missing'})); });
+    return wrap; }
+  function fitStyle(c){ var fx=(c.focal&&c.focal[0]!=null)?c.focal[0]:0.5, fy=(c.focal&&c.focal[1]!=null)?c.focal[1]:0.5;
+    return 'object-fit:'+(c.fit||'cover')+';object-position:'+(fx*100)+'% '+(fy*100)+'%'; }
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
@@ -1529,13 +1594,53 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
               r.unit?N('small',{key:P+'.unit'},' '+r.unit):null ]) ]); })) ]) ]; };
 
   L.figure=function(c){
-    var url=imageURL(c.image);
-    var bg=url?('background-image:url("'+url.replace(/"/g,'%22')+'")')
-              :'background:linear-gradient(135deg,var(--bg-2),var(--bg))';
-    return [ N('div.fig-img',{key:'image',style:bg}), N('div.fig-shade',{key:'shade'}),
+    var hasImg=!!imageURL(c.image);
+    var img=hasImg?mediaImgWrap(c.image,{key:'image'},'object-fit:cover;object-position:'+
+        ((c.focal&&c.focal[0]!=null?c.focal[0]:0.5)*100)+'% '+((c.focal&&c.focal[1]!=null?c.focal[1]:0.5)*100)+'%')
+      :N('div.media-img',{key:'image',style:'background:linear-gradient(135deg,var(--bg-2),var(--bg))'});
+    img.classList.add('fig-img');
+    return [ img, N('div.fig-shade',{key:'shade'}),
       N('div.fig-body',{key:'body'},[ kickerN(c.kicker),
         N('div.fig-title.sg-reveal-wipe.sg-onenter',{bind:'title',html:rich(c.title)}),
         c.caption?N('p.fig-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
+
+  /* IMAGE — full-bleed or framed single image (media plan §4). Supersedes
+     hand-rolled `raw` image slides for the common case. */
+  L.image=function(c){
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('img-full','frame-'+(c.frame||'none'));
+    return [ img,
+      (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
+      c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
+
+  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
+  L['media-split']=function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('ms-media');
+    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
+      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
+      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
+        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+
+  /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
+  L.gallery=function(c){
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.gallery',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
+        var tile=mediaImgWrap(it.image,{key:P},fitStyle(it));
+        tile.classList.add('gal-tile');
+        if(it.caption) tile.appendChild(N('div.gal-cap',{bind:P+'.caption',html:rich(it.caption)}));
+        return tile; })) ]; };
+
+  /* DIAGRAM — inlines a sanitized SVG diagram asset, theme-color aware via
+     currentColor (the intended path for architecture/flow diagrams). */
+  L.diagram=function(c){
+    var markup=svgMarkup(c.svg);
+    var stage=N('div.diagram-stage',{key:'svg'});
+    if(markup) stage.innerHTML=markup; else stage.appendChild(SG.unavailable({url:c.svg||'',reason:'missing'}));
+    return [ kickerN(c.kicker), titleN(c.title), stage,
+      c.caption?N('p.diagram-cap',{bind:'caption',html:rich(c.caption)}):null ]; };
 
   L['metric-dash']=function(c){
     var r=c.ring||{};
@@ -1651,7 +1756,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
      INNER containers only, so putting the layout name on the section would let an
      inner class (e.g. .matrix, .timeline, .stat-grid) restyle the slide and break
      .slide{position:absolute;inset:0}. We add a harmless lyt-<name> hook instead. */
-  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1};
+  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1,image:1};
 
   /* build ONE <section> — shared by full render and targeted re-render */
   function buildSection(s,i,total,defAmb,brand){
@@ -2270,6 +2375,15 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
   display:none; align-items:center; gap:12px; padding:9px 14px; border-radius:10px;
   background:#3a2f17; border:1px solid rgba(255,210,150,.3); color:#f0d29a; font-size:12.5px;
   box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:560px; }
+/* content-form asset picker (media plan §4: image/svg/poster content fields) */
+.forge-assetpick{ display:flex; align-items:center; gap:8px; width:100%; }
+.forge-assetpick-thumb{ flex:none; width:34px; height:34px; border-radius:6px; overflow:hidden;
+  background:repeating-conic-gradient(#1a1f2a 0% 25%,#141922 0% 50%) 0 0/10px 10px;
+  display:flex; align-items:center; justify-content:center; }
+.forge-assetpick-thumb img{ width:100%; height:100%; object-fit:cover; }
+.forge-assetpick-thumb svg{ width:80%; height:80%; }
+.forge-assetpick select{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
+  border-radius:6px; color:#eaf1fb; font-size:12px; padding:5px 6px; }
 </style>
 </head>
 <body>
@@ -2677,7 +2791,8 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
     ["Syne","'Syne',sans-serif"],["Epilogue","'Epilogue',sans-serif"],["Bricolage Grotesque","'Bricolage Grotesque',sans-serif"],
     ["Fraunces","'Fraunces',serif"],["Playfair Display","'Playfair Display',serif"],["Newsreader","'Newsreader',serif"]];
 
-  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var ASSET_FIELDS={image:'image',svg:'svg',poster:'image'};    /* content field name -> asset kind, for the picker widget */
   var CHART_TYPES=["bar","bar-h","stacked","line","area","pie","donut","scatter"];
   var TOKENS=["--bg","--bg-2","--ink","--muted","--cyan","--indigo","--mint"];
   var AMBIENTS=["auto","none","orbs","aurora","grid","rays","grain","contours","scan","waves","glow","constellation"];
@@ -2707,6 +2822,10 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
     editorial:{kicker:"",lead:"Lead paragraph.",columns:[{head:"Heading",body:"Body text."}]},
     "hero-asym":{title:"Title",sub:"",rows:[{k:"Key",v:"Value",unit:""}]},
     figure:{kicker:"",title:"Title",caption:"",image:""},
+    image:{kicker:"",title:"",caption:"",image:"",fit:"cover",focal:[0.5,0.5],frame:"none"},
+    "media-split":{kicker:"",title:"Title",body:"Body copy.",items:[],image:"",side:"left",fit:"cover",focal:[0.5,0.5]},
+    gallery:{kicker:"",title:"Gallery",items:[{image:"",caption:""}]},
+    diagram:{kicker:"",title:"Diagram",svg:"",caption:""},
     "metric-dash":{kicker:"",title:"Metrics",ring:{value:50,suffix:"%",label:"Label"},tiles:[{value:"0",unit:"",label:"Tile"}]},
     leaderboard:{kicker:"",title:"Leaderboard",rows:[{name:"Name",value:"0"}]},
     diptych:{left:{tag:"",title:"Left",body:""},right:{tag:"",title:"Right",body:""}},
@@ -3567,6 +3686,35 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
     n.onfocus=function(){ F.pushUndo(); }; n.oninput=function(){ var v=parseFloat(n.value); obj[key]=isNaN(v)?0:v; F.renderLiveSlide(); }; return n; }
   function boundCheck(obj,key){ var n=el('input'); n.type='checkbox'; n.checked=!!obj[key];
     n.onchange=function(){ F.pushUndo(); obj[key]=n.checked; F.renderLiveSlide(); }; return n; }
+  /* asset-picker widget (media plan §4): a thumbnail + <select> of every
+     registry asset of the right kind, plus an inline "Import…" option that
+     imports a new file straight from the content form. Used for any content
+     field named image/svg/poster (ASSET_FIELDS). */
+  function assetPickerField(obj,key,kind){
+    var wrap=el('div','forge-assetpick');
+    var thumb=el('div','forge-assetpick-thumb');
+    function paintThumb(){ thumb.innerHTML=''; var v=obj[key]; if(!v) return;
+      if(kind==='svg'){ thumb.innerHTML=(SG.svgMarkup&&SG.svgMarkup(v))||''; }
+      else { var m=SG.imageMeta&&SG.imageMeta(v); if(m&&m.src){ var img=el('img'); img.src=m.src; img.alt=''; thumb.appendChild(img); } } }
+    var sel=el('select');
+    function paintOptions(){ sel.innerHTML='';
+      var none=el('option','','— none —'); none.value=''; sel.appendChild(none);
+      var names=Object.keys((kind==='svg'?SG.assets.svg:SG.assets.images)||{}).sort();
+      names.forEach(function(n){ var o=el('option','',n); o.value=n; if(n===obj[key]) o.selected=true; sel.appendChild(o); });
+      var imp=el('option','','＋ Import…'); imp.value='__import__'; sel.appendChild(imp); }
+    sel.onchange=function(){
+      if(sel.value==='__import__'){
+        var inp=el('input'); inp.type='file'; inp.accept=kind==='svg'?'.svg':'image/*'; inp.hidden=true;
+        inp.onchange=function(){ var f=inp.files&&inp.files[0]; inp.value=''; if(!f||!F.assets){ paintOptions(); return; }
+          F.pushUndo();
+          F.assets.importFile(f).then(function(res){ obj[key]=res.name; F.save(); paintOptions(); paintThumb(); F.renderLiveSlide(); })
+            .catch(function(){ F.undo.pop(); F.syncToolbar(); paintOptions(); }); };
+        D.body.appendChild(inp); inp.click(); setTimeout(function(){ inp.remove(); },4000);
+        paintOptions(); return; }
+      F.pushUndo(); obj[key]=sel.value; paintThumb(); F.renderLiveSlide(); F.save(); };
+    paintOptions(); paintThumb();
+    wrap.appendChild(thumb); wrap.appendChild(sel);
+    return wrap; }
 
   /* generic content form: reflects slides[i].content — plain fields, nested
      objects, and arrays as reorderable cards with add/remove. */
@@ -3578,6 +3726,7 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
         contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); }
       else if(typeof v==='boolean') host.appendChild(fieldRow(pretty(k),boundCheck(obj,k)));
       else if(typeof v==='number') host.appendChild(field(pretty(k),boundNum(obj,k)));
+      else if(ASSET_FIELDS[k]&&F.assets) host.appendChild(field(pretty(k),assetPickerField(obj,k,ASSET_FIELDS[k])));
       else host.appendChild(field(pretty(k),boundText(obj,k, k==='code'||k==='html'||k==='body'&&String(v).length>80||String(v).length>70||/\n/.test(String(v)) )));
     }); }
   function newItemLike(item){ if(typeof item==='string') return '';

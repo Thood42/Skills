@@ -384,3 +384,12 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
   display:none; align-items:center; gap:12px; padding:9px 14px; border-radius:10px;
   background:#3a2f17; border:1px solid rgba(255,210,150,.3); color:#f0d29a; font-size:12.5px;
   box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:560px; }
+/* content-form asset picker (media plan §4: image/svg/poster content fields) */
+.forge-assetpick{ display:flex; align-items:center; gap:8px; width:100%; }
+.forge-assetpick-thumb{ flex:none; width:34px; height:34px; border-radius:6px; overflow:hidden;
+  background:repeating-conic-gradient(#1a1f2a 0% 25%,#141922 0% 50%) 0 0/10px 10px;
+  display:flex; align-items:center; justify-content:center; }
+.forge-assetpick-thumb img{ width:100%; height:100%; object-fit:cover; }
+.forge-assetpick-thumb svg{ width:80%; height:80%; }
+.forge-assetpick select{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
+  border-radius:6px; color:#eaf1fb; font-size:12px; padding:5px 6px; }

@@ -62,14 +62,62 @@ body.presenting{cursor:none}
 .hero-rail .row .v small{font-size:16px; color:var(--cyan)}
 
 /* FIGURE — full-bleed image with overlaid caption */
+/* ---- media-img: shared <img> wrapper for figure/image/media-split/gallery
+   (a real <img>, not CSS background-image, so a missing "linked" asset can
+   fire the native error event and fall back to .sf-unavail — media plan §4) */
+.media-img{ position:relative; overflow:hidden; background:linear-gradient(135deg,var(--bg-2),var(--bg)); }
+.media-img img{ width:100%; height:100%; display:block; }
+.media-img .sf-unavail{ position:absolute; inset:0; border-radius:inherit; }
+
 .figure{padding:0}
-.figure .fig-img{position:absolute; inset:0; background-size:cover; background-position:center; z-index:0}
+.figure .fig-img{position:absolute; inset:0; z-index:0}
 .figure .fig-shade{position:absolute; inset:0; z-index:1;
   background:linear-gradient(90deg, rgba(5,8,15,.86) 0%, rgba(5,8,15,.45) 45%, rgba(5,8,15,.12) 100%)}
 .figure .fig-body{position:relative; z-index:2; height:100%; display:flex; flex-direction:column;
   justify-content:flex-end; padding:var(--pad)}
 .figure .fig-title{font-family:var(--font-display); font-weight:800; font-size:58px; line-height:1.04; letter-spacing:-.02em; max-width:20ch}
 .figure .fig-cap{margin-top:16px; font-size:18px; color:var(--muted); max-width:52ch}
+
+/* IMAGE — full-bleed or framed single image (media plan §4) */
+.image{padding:0}
+.img-full{position:absolute; inset:0; z-index:0; border-radius:0}
+.img-full.frame-panel{inset:36px; border-radius:16px; border:1px solid var(--brd)}
+.img-full.frame-glow{box-shadow:inset 0 0 0 1px var(--brd-2), 0 0 60px color-mix(in srgb, var(--cyan) 25%, transparent)}
+.img-full.frame-shadow{inset:36px; border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.image::after{content:""; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%)}
+.img-cap-band{position:relative; z-index:2; padding:var(--pad) var(--pad) 0}
+.img-caption{position:relative; z-index:2; margin:14px 88px 0; font-size:16px; color:var(--muted); max-width:56ch;
+  text-shadow:0 2px 12px rgba(0,0,0,.6)}
+
+/* MEDIA-SPLIT — picture one side, prose/bullets the other */
+.media-split{display:grid; grid-template-columns:1fr 1fr; gap:40px; flex:1; min-height:0; align-items:stretch}
+.media-split .ms-media{border-radius:18px; min-height:0}
+.media-split .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0}
+.ms-body{margin-top:16px; font-size:17px; line-height:1.6; color:var(--muted); max-width:48ch}
+.ms-items{margin-top:16px; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px}
+.ms-items li{position:relative; padding-left:22px; font-size:16px; color:var(--muted)}
+.ms-items li::before{content:""; position:absolute; left:0; top:9px; width:8px; height:8px; border-radius:50%;
+  background:var(--cyan)}
+
+/* GALLERY — 2-6 image grid, each tile independently add/remove-able */
+.gallery{margin-top:34px; flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  grid-auto-rows:1fr; gap:16px}
+.gal-tile{position:relative; border-radius:14px; min-height:120px}
+.gal-cap{position:absolute; left:0; right:0; bottom:0; padding:10px 14px; font-size:13px; color:#fff;
+  background:linear-gradient(0deg, rgba(0,0,0,.65), transparent)}
+
+/* DIAGRAM — inlines a sanitized SVG diagram asset, currentColor-themed */
+.diagram-stage{flex:1; margin-top:30px; display:flex; align-items:center; justify-content:center;
+  min-height:0; color:var(--ink)}
+.diagram-stage svg{max-width:100%; max-height:100%}
+.diagram-cap{margin-top:14px; font-size:14px; color:var(--faint); text-align:center}
+
+@media print{
+  /* .media-img .sf-unavail (2 classes) would otherwise out-specificity the
+     base .sf-unavail print rule that un-absolutizes it for the page flow */
+  .media-img .sf-unavail{ position:relative !important; }
+}
 
 /* METRIC-DASH — mixed dashboard: kpi ring + stat tiles */
 .dash{display:grid; grid-template-columns:auto 1fr; gap:34px; align-items:center; flex:1; margin-top:30px}

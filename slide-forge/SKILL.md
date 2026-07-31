@@ -104,16 +104,27 @@ per-slide channels you normally leave absent — `overrides` and `freeObjects` �
 
 ---
 
-## Assets: user-provided icons & images only
+## Assets: user-provided icons, images & diagrams only
 
 This skill does **not** generate or fetch imagery. Use only files the user supplies.
 
 - Drop their `*.svg` icons into `assets/icons/` and reference by filename: `{ "icon": "rocket" }`
   or `{ "iconAsset": "rocket" }` (the `stack`/`pipeline` layouts take `iconAsset`). Author icons with
   `stroke="currentColor"` / `fill="currentColor"` so they inherit the theme color.
-- Drop their images into `assets/images/` and reference by filename: `{ "image": "architecture" }`.
-- Inline them so the file stays single-file and offline:
-  `python3 scripts/assets.py inject <deck>.html <deck>.json`.
+- Drop their images into `assets/images/` and reference by filename: `{ "image": "architecture" }`
+  — used by `figure`, `image`, `media-split`, `gallery`.
+- Drop their diagram `*.svg` files into `assets/diagrams/` and reference by filename:
+  `{ "svg": "request-flow" }` on the `diagram` layout. Author them the same theme-aware way as icons
+  (`currentColor`); unlike icons these can carry their own multi-color palette too.
+- Inline everything so the file stays single-file and offline:
+  `python3 scripts/assets.py inject <deck>.html <deck>.json`. Images embed **at full quality with no
+  size ceiling** — a deck is allowed to be large because the user supplied large images; don't
+  downscale or compress source files yourself. (`--link-over N` exists for the opt-in case where the
+  user wants `deck.html` + an `assets/` folder shipped side by side instead — only use it if asked.)
+- Alt text lives on the asset (`assets.py` leaves it blank; the user fills it in from the editor's
+  Asset library). You don't need to author it.
+- A missing/unreachable image or diagram never renders blank — it falls back to a small "Content
+  unavailable" card, in the deck and in the printed PDF alike.
 
 If the user provided no assets, build a clean text-and-shape deck — the layouts look complete without
 icons. Never substitute stock or AI imagery the user didn't ask for.
@@ -142,9 +153,12 @@ variables, so nothing hard-codes a color.
 - **Use the user's words.** When they gave specific copy, keep it. When they gave a topic, write
   the copy yourself in this tight style and tell them they can edit any of it in the editor.
 
-The 24 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
+The 28 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
 timeline · pipeline · closing · manifesto · editorial · hero-asym · figure · metric-dash ·
-leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · before-after — plus `raw`.
+leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · before-after · image ·
+media-split · gallery · diagram — plus `raw`. Reach for `image`/`media-split`/`gallery`/`diagram`
+whenever the user supplied photos, screenshots, or diagram SVGs — they're the purpose-built layouts
+for that content, better than shoehorning imagery into `figure` or a `raw` slide.
 `references/layouts.md` is the full field reference; read it while authoring.
 
 ---

@@ -169,6 +169,23 @@
     if(url) kids.push(N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'));
     return N('div.sf-unavail',{'data-reason':reason},kids); };
 
+  /* mediaImgWrap(name,attrs,imgStyle): a real <img> (not CSS background) so a
+     missing "linked" asset can fire the native error event and fall back to
+     SG.unavailable() — a CSS background-image failure is silent and can't be
+     detected. attrs.key/bind land on the WRAPPER (object identity); the img
+     itself just carries alt + fit. Used by figure/image/media-split/gallery. */
+  function mediaImgWrap(name,attrs,imgStyle){
+    var m=imageMeta(name);
+    var wrap=N('div.media-img',attrs||{});
+    var img=N('img',{src:(m&&m.src)||'',alt:(attrs&&attrs.alt)||(m&&m.alt)||'',style:imgStyle||''});
+    wrap.appendChild(img);
+    if(!m||!m.src){ wrap.appendChild(SG.unavailable({url:name||'',reason:'missing'})); }
+    else img.addEventListener('error',function(){ img.style.display='none';
+      if(!wrap.querySelector('.sf-unavail')) wrap.appendChild(SG.unavailable({url:m.src,reason:'missing'})); });
+    return wrap; }
+  function fitStyle(c){ var fx=(c.focal&&c.focal[0]!=null)?c.focal[0]:0.5, fy=(c.focal&&c.focal[1]!=null)?c.focal[1]:0.5;
+    return 'object-fit:'+(c.fit||'cover')+';object-position:'+(fx*100)+'% '+(fy*100)+'%'; }
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
@@ -349,13 +366,53 @@
               r.unit?N('small',{key:P+'.unit'},' '+r.unit):null ]) ]); })) ]) ]; };
 
   L.figure=function(c){
-    var url=imageURL(c.image);
-    var bg=url?('background-image:url("'+url.replace(/"/g,'%22')+'")')
-              :'background:linear-gradient(135deg,var(--bg-2),var(--bg))';
-    return [ N('div.fig-img',{key:'image',style:bg}), N('div.fig-shade',{key:'shade'}),
+    var hasImg=!!imageURL(c.image);
+    var img=hasImg?mediaImgWrap(c.image,{key:'image'},'object-fit:cover;object-position:'+
+        ((c.focal&&c.focal[0]!=null?c.focal[0]:0.5)*100)+'% '+((c.focal&&c.focal[1]!=null?c.focal[1]:0.5)*100)+'%')
+      :N('div.media-img',{key:'image',style:'background:linear-gradient(135deg,var(--bg-2),var(--bg))'});
+    img.classList.add('fig-img');
+    return [ img, N('div.fig-shade',{key:'shade'}),
       N('div.fig-body',{key:'body'},[ kickerN(c.kicker),
         N('div.fig-title.sg-reveal-wipe.sg-onenter',{bind:'title',html:rich(c.title)}),
         c.caption?N('p.fig-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
+
+  /* IMAGE — full-bleed or framed single image (media plan §4). Supersedes
+     hand-rolled `raw` image slides for the common case. */
+  L.image=function(c){
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('img-full','frame-'+(c.frame||'none'));
+    return [ img,
+      (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
+      c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
+
+  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
+  L['media-split']=function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('ms-media');
+    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
+      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
+      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
+        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+
+  /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
+  L.gallery=function(c){
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.gallery',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
+        var tile=mediaImgWrap(it.image,{key:P},fitStyle(it));
+        tile.classList.add('gal-tile');
+        if(it.caption) tile.appendChild(N('div.gal-cap',{bind:P+'.caption',html:rich(it.caption)}));
+        return tile; })) ]; };
+
+  /* DIAGRAM — inlines a sanitized SVG diagram asset, theme-color aware via
+     currentColor (the intended path for architecture/flow diagrams). */
+  L.diagram=function(c){
+    var markup=svgMarkup(c.svg);
+    var stage=N('div.diagram-stage',{key:'svg'});
+    if(markup) stage.innerHTML=markup; else stage.appendChild(SG.unavailable({url:c.svg||'',reason:'missing'}));
+    return [ kickerN(c.kicker), titleN(c.title), stage,
+      c.caption?N('p.diagram-cap',{bind:'caption',html:rich(c.caption)}):null ]; };
 
   L['metric-dash']=function(c){
     var r=c.ring||{};
@@ -471,7 +528,7 @@
      INNER containers only, so putting the layout name on the section would let an
      inner class (e.g. .matrix, .timeline, .stat-grid) restyle the slide and break
      .slide{position:absolute;inset:0}. We add a harmless lyt-<name> hook instead. */
-  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1};
+  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1,image:1};
 
   /* build ONE <section> — shared by full render and targeted re-render */
   function buildSection(s,i,total,defAmb,brand){
