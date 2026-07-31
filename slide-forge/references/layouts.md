@@ -7,11 +7,15 @@ Conventions used below:
 - Strings in `subtitle`, `label`, `caption`, `lead`, `body` accept light inline emphasis: `[[glow]]` (accent color), `**bold**`, `` `mono` ``.
 - `count` (a number) makes a value count up on slide-enter; add `"fmt":"compact"` to abbreviate big numbers (`175000000000` → `175B`).
 - `icon` / `iconAsset` resolve a file from `assets/icons/` by name; add `"color":"--mint"` (a theme token) or a literal color to recolor it.
-- `image` resolves a file from `assets/images/` by name.
+- `image` resolves a file from `assets/images/` by name; `svg` (on the `diagram` layout) resolves a file from `assets/diagrams/` by name. Both are inlined by `scripts/assets.py`.
+- `fit` (`cover`|`contain`|`fill`, default `cover`) and `focal` (`[x,y]`, each 0–1, default `[0.5,0.5]`) control how an image fills its frame — same vocabulary as CSS `object-fit`/`object-position`. `frame` (`none`|`panel`|`glow`|`shadow`) adds a presentation treatment.
+- Alt text lives on the **asset**, not per-slide content — set it once in the editor's Asset library (🖼 Assets) or via `assets.py`'s registry, and every slide that uses that image inherits it.
+- A missing or unreachable image/diagram never renders blank: it falls back to a small "Content unavailable" card naming what's missing (media plan §5.1/§7.1).
 
 ## Contents
 Original: [cover](#cover) · [agenda](#agenda) · [divider](#divider) · [stat-grid](#stat-grid) · [bignum](#bignum) · [chart](#chart) · [comparison](#comparison) · [quote](#quote) · [code](#code) · [timeline](#timeline) · [pipeline](#pipeline) · [closing](#closing)
 New: [manifesto](#manifesto) · [editorial](#editorial) · [hero-asym](#hero-asym) · [figure](#figure) · [metric-dash](#metric-dash) · [leaderboard](#leaderboard) · [diptych](#diptych) · [matrix](#matrix) · [stack](#stack) · [quote-mosaic](#quote-mosaic) · [index-mosaic](#index-mosaic) · [before-after](#before-after)
+Media (2026-07-31): [image](#image) · [media-split](#media-split) · [gallery](#gallery) · [diagram](#diagram) · [embed](#embed)
 Escape hatch: [raw](#raw)
 
 ---
@@ -101,6 +105,50 @@ Large numbered section index. `kicker`, `title`, `items:[{title, desc}]` (big nu
 
 ## before-after
 Two-state comparison with an arrow. `kicker`, `title`, `before`/`after` = `{tag, title, items:[…]}`.
+
+---
+
+## image
+Full-bleed or framed single image with an optional caption band — the direct replacement for a hand-rolled `raw` image slide. `kicker`, `title`, `caption`, `image` (asset name, **required**), `fit`, `focal`, `frame`.
+```json
+{ "layout":"image", "content":{ "image":"architecture", "title":"The system, end to end.",
+  "fit":"cover", "frame":"none" } }
+```
+
+## media-split
+Picture one side, prose/bullets the other — the workhorse for "here's a screenshot, here's what it means" slides. `kicker`, `title`, `body`, `items` (bullet list, alternative to `body`), `image` (**required**), `side` (`left`|`right`, default `left`), `fit`, `focal`.
+```json
+{ "layout":"media-split", "content":{ "title":"What changed", "side":"right",
+  "items":["Faster cold start","Smaller bundle","No config"], "image":"dashboard-before-after" } }
+```
+
+## gallery
+2–6 image grid, auto-fit tiles, each with its own caption. `kicker`, `title`, `items:[{image, caption?}]` (**each item's `image` is required**).
+```json
+{ "layout":"gallery", "content":{ "title":"From the field",
+  "items":[ {"image":"booth-1","caption":"Day one"}, {"image":"booth-2"} ] } }
+```
+
+## diagram
+Inlines a sanitized SVG diagram, theme-color aware (author the SVG with `stroke="currentColor"`/`fill="currentColor"` so it follows the deck's accent). `kicker`, `title`, `svg` (asset name from `assets/diagrams/`, **required**), `caption`.
+```json
+{ "layout":"diagram", "content":{ "title":"Request lifecycle", "svg":"request-flow" } }
+```
+
+## embed
+A sandboxed, click-to-interact iframe — the one layout that needs the network (media plan §6/§7.1).
+`kicker`, `title`, `url` (**required**, `http://`/`https://` only), `mode` (`click` default, `live` skips
+the "click to interact" shield for a background visualization, `poster` never loads it at all), `poster`
+(image asset shown behind the caption while loading / if it can't load / always in print), `note`.
+Only use this when the user specifically wants a live external page on a slide — for anything that can
+be a static image, prefer `image`/`figure`/`diagram` instead, since those stay fully offline. Many major
+sites refuse to be framed at all (no reliable way to know in advance); a blocked or unreachable embed
+falls back to a poster card with an "Open in browser" link rather than a blank rectangle, and **every**
+embed renders as that same poster card when printed to PDF, regardless of how it looked on screen.
+```json
+{ "layout":"embed", "content":{ "title":"Live dashboard", "url":"https://example.com/dashboard",
+  "mode":"click", "note":"Click to interact, or open it directly if it doesn't load." } }
+```
 
 ---
 

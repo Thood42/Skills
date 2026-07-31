@@ -152,6 +152,11 @@ body.forge-edit .forge-block:hover{ outline:1.5px dashed rgba(120,170,255,.55); 
 .forge-free{ position:absolute; left:0; top:0; transform-origin:center center; z-index:3; }
 .forge-free.txt{ color:var(--ink); font-family:var(--font-display,inherit); font-size:34px; font-weight:700; }
 .forge-free.box{ background:var(--panel); border:1px solid var(--brd); border-radius:14px; }
+.forge-free.image, .forge-free.svg{ background:var(--panel-2); }
+.forge-free.image img, .forge-free.svg svg{ pointer-events:none; }
+.forge-free.frame-panel{ background:var(--panel); border:1px solid var(--brd); padding:10px; box-sizing:border-box; }
+.forge-free.frame-glow{ box-shadow:0 0 0 1px var(--brd-2), 0 0 34px color-mix(in srgb, var(--cyan) 35%, transparent); }
+.forge-free.frame-shadow{ box-shadow:0 18px 40px rgba(0,0,0,.45); }
 
 /* restore bar --------------------------------------------- */
 #forge-restore{
@@ -331,3 +336,68 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
 .forge-struct-json:focus{ outline:none; border-color:#2a6df4; }
 .forge-struct-btns{ display:flex; gap:8px; margin-top:12px; }
 .forge-subh{ display:flex; align-items:center; }
+
+/* ============================================================
+   MEDIA — asset library panel (media plan §2.5), image/svg free-object
+   inspector fields, and the localStorage-quota warning bar.
+   ============================================================ */
+#forge-assets{ position:fixed; inset:0; z-index:9450; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+.forge-assets-card{ width:min(920px,94vw); max-height:88vh; display:flex; flex-direction:column;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:14px;
+  padding:20px 24px; color:#dbe3ef; box-shadow:0 24px 80px rgba(0,0,0,.6); }
+.forge-assets-head{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.forge-assets-head h3{ margin:0; font-size:15px; flex:1; }
+.forge-assets-undo{ display:none; align-items:center; gap:10px; padding:8px 12px; margin-bottom:10px;
+  background:#1a2233; border:1px solid rgba(255,255,255,.14); border-radius:8px; font-size:12.5px; }
+.forge-assets-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px;
+  overflow:auto; min-height:120px; padding:2px; }
+.forge-asset-card{ background:#10151e; border:1px solid rgba(255,255,255,.10); border-radius:10px;
+  padding:9px; display:flex; flex-direction:column; gap:6px; }
+.forge-asset-thumb{ aspect-ratio:4/3; border-radius:6px; overflow:hidden; display:flex; align-items:center;
+  justify-content:center; background:repeating-conic-gradient(#1a1f2a 0% 25%,#141922 0% 50%) 0 0/16px 16px; }
+.forge-asset-thumb img{ width:100%; height:100%; object-fit:contain; }
+.forge-asset-thumb svg{ width:80%; height:80%; }
+.forge-asset-meta{ display:flex; flex-direction:column; gap:4px; }
+.forge-asset-name{ display:flex; align-items:center; gap:6px; }
+.forge-asset-rename{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
+  border-radius:5px; color:#eaf1fb; font-size:11.5px; padding:3px 6px; }
+.forge-asset-badge{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px;
+  border-radius:999px; background:#173a2a; color:#9af0c4; white-space:nowrap; }
+.forge-asset-badge.linked{ background:#3a2f17; color:#f0d29a; }
+.forge-asset-sub{ font-size:10.5px; color:#7e8aa0; font-family:var(--font-mono,monospace); }
+.forge-asset-meta input[placeholder]{ width:100%; box-sizing:border-box; background:#161b25;
+  border:1px solid rgba(255,255,255,.10); border-radius:5px; color:#cdd6e6; font-size:11px; padding:3px 6px; }
+.forge-asset-actions{ display:flex; flex-wrap:wrap; gap:4px; }
+.forge-asset-linkform{ margin-top:6px; padding-top:8px; border-top:1px dashed rgba(255,255,255,.14);
+  display:flex; flex-direction:column; gap:6px; }
+.forge-asset-linkform input{ width:100%; box-sizing:border-box; background:#161b25;
+  border:1px solid rgba(255,255,255,.12); border-radius:5px; color:#eaf1fb; font-size:11px; padding:5px 7px; }
+.forge-asset-linkform-btns{ display:flex; gap:6px; }
+.forge-assets-meter{ margin-top:12px; font-size:11.5px; color:#7e8aa0; }
+.forge-assets-meter.warm{ color:#f0d29a; }
+.forge-assets-meter.hot{ color:#f0a0a0; }
+.forge-assets-dropzone{ margin-top:10px; padding:14px; text-align:center; font-size:12px; color:#5b6478;
+  border:1.5px dashed rgba(255,255,255,.14); border-radius:10px; }
+.forge-assets-dropzone.over{ border-color:#2a6df4; color:#cdd6e6; background:rgba(42,109,244,.08); }
+#forge-assets-warn{ position:fixed; left:50%; bottom:70px; transform:translateX(-50%); z-index:9100;
+  display:none; align-items:center; gap:12px; padding:9px 14px; border-radius:10px;
+  background:#3a2f17; border:1px solid rgba(255,210,150,.3); color:#f0d29a; font-size:12.5px;
+  box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:560px; }
+/* content-form asset picker (media plan §4: image/svg/poster content fields) */
+.forge-assetpick{ display:flex; align-items:center; gap:8px; width:100%; }
+.forge-assetpick-thumb{ flex:none; width:34px; height:34px; border-radius:6px; overflow:hidden;
+  background:repeating-conic-gradient(#1a1f2a 0% 25%,#141922 0% 50%) 0 0/10px 10px;
+  display:flex; align-items:center; justify-content:center; }
+.forge-assetpick-thumb img{ width:100%; height:100%; object-fit:cover; }
+.forge-assetpick-thumb svg{ width:80%; height:80%; }
+.forge-assetpick select{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
+  border-radius:6px; color:#eaf1fb; font-size:12px; padding:5px 6px; }
+
+/* links (media plan §5) — a small badge in EDIT MODE ONLY, pure CSS so it
+   never needs stripping before download (body loses .forge-edit on save). */
+body.forge-edit .sf-linked{ outline:1px dashed rgba(58,182,255,.5); outline-offset:2px; }
+body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px; right:-9px; z-index:6;
+  width:16px; height:16px; border-radius:50%; background:#2a6df4; color:#fff; font-size:10px;
+  line-height:16px; text-align:center; pointer-events:none; }
+.forge-field-error{ color:#f0a0a0; font-size:11px; margin-top:3px; }

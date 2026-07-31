@@ -38,7 +38,9 @@
     slide.querySelectorAll('.sg-count').forEach(function(n){n.textContent='0';});
   }
   function wire(root){
-    var slides=root.querySelectorAll('.slide');
+    /* accept a whole deck OR a single .slide section (targeted re-render) */
+    var slides=(root.classList&&root.classList.contains('slide'))
+      ? [root] : [].slice.call(root.querySelectorAll('.slide'));
     if(!slides.length){activate(root);return;}              /* standalone: run now */
     slides.forEach(function(s){
       if(s.classList.contains('active'))activate(s);

@@ -104,16 +104,27 @@ per-slide channels you normally leave absent — `overrides` and `freeObjects` �
 
 ---
 
-## Assets: user-provided icons & images only
+## Assets: user-provided icons, images & diagrams only
 
 This skill does **not** generate or fetch imagery. Use only files the user supplies.
 
 - Drop their `*.svg` icons into `assets/icons/` and reference by filename: `{ "icon": "rocket" }`
   or `{ "iconAsset": "rocket" }` (the `stack`/`pipeline` layouts take `iconAsset`). Author icons with
   `stroke="currentColor"` / `fill="currentColor"` so they inherit the theme color.
-- Drop their images into `assets/images/` and reference by filename: `{ "image": "architecture" }`.
-- Inline them so the file stays single-file and offline:
-  `python3 scripts/assets.py inject <deck>.html <deck>.json`.
+- Drop their images into `assets/images/` and reference by filename: `{ "image": "architecture" }`
+  — used by `figure`, `image`, `media-split`, `gallery`.
+- Drop their diagram `*.svg` files into `assets/diagrams/` and reference by filename:
+  `{ "svg": "request-flow" }` on the `diagram` layout. Author them the same theme-aware way as icons
+  (`currentColor`); unlike icons these can carry their own multi-color palette too.
+- Inline everything so the file stays single-file and offline:
+  `python3 scripts/assets.py inject <deck>.html <deck>.json`. Images embed **at full quality with no
+  size ceiling** — a deck is allowed to be large because the user supplied large images; don't
+  downscale or compress source files yourself. (`--link-over N` exists for the opt-in case where the
+  user wants `deck.html` + an `assets/` folder shipped side by side instead — only use it if asked.)
+- Alt text lives on the asset (`assets.py` leaves it blank; the user fills it in from the editor's
+  Asset library). You don't need to author it.
+- A missing/unreachable image or diagram never renders blank — it falls back to a small "Content
+  unavailable" card, in the deck and in the printed PDF alike.
 
 If the user provided no assets, build a clean text-and-shape deck — the layouts look complete without
 icons. Never substitute stock or AI imagery the user didn't ask for.
@@ -142,10 +153,19 @@ variables, so nothing hard-codes a color.
 - **Use the user's words.** When they gave specific copy, keep it. When they gave a topic, write
   the copy yourself in this tight style and tell them they can edit any of it in the editor.
 
-The 24 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
+The 29 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
 timeline · pipeline · closing · manifesto · editorial · hero-asym · figure · metric-dash ·
-leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · before-after — plus `raw`.
+leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · before-after · image ·
+media-split · gallery · diagram · embed — plus `raw`. Reach for `image`/`media-split`/`gallery`/
+`diagram` whenever the user supplied photos, screenshots, or diagram SVGs — they're the
+purpose-built layouts for that content, better than shoehorning imagery into `figure` or a `raw`
+slide. Only reach for `embed` when the user specifically wants a *live* external page on a slide —
+it's the one layout that needs the network; everything else in the deck stays fully offline.
 `references/layouts.md` is the full field reference; read it while authoring.
+
+**Links**: any object can carry `overrides[key].href` / `freeObjects[].href` — `"#3"` jumps to
+slide 3, `"https://…"`/`"mailto:…"` opens in a new tab. You don't normally author these by hand
+(the user adds them from the editor's Link field), but they're valid deck-data if asked for.
 
 ---
 
@@ -156,7 +176,8 @@ The delivered file does double duty, so close by telling them how to use both ha
 - **Present:** open the file, click to advance, press `F` for fullscreen.
 - **Edit (no install):** click **Edit** (bottom-right). Then they can **click any element and drag to
   move it** — smart guides snap it to centers, edges and neighbours (hold **Alt** to snap freely).
-  Drag a corner to resize, the green handle to rotate, and **double-click any text to edit it in
+  Drag a corner to **resize — text rewraps** to the new width (hold **Alt** on a corner to scale
+  proportionally instead), the green handle to rotate, and **double-click any text to edit it in
   place** (a floating **B / ✦ / `<>`** toolbar formats the selection). **Shift-click or drag a box on
   empty canvas to select several elements at once**, then use the floating toolbar to **align &
   distribute** them. **Copy / paste / duplicate** with `Cmd/Ctrl+C·V·D`, nudge with arrow keys
@@ -170,12 +191,10 @@ The delivered file does double duty, so close by telling them how to use both ha
   a timer. Set an animation's trigger to **On click** to reveal content **step-by-step** with → /
   Space / click, PowerPoint-style; the Slide panel's Animations list manages every effect in one
   place. Press **?** in Edit mode for the full shortcut list.
-- **Saving:** on Chrome/Edge, **Save .html** / `Cmd/Ctrl+S` saves **in place** (first save asks
-  where; after that it's silent). Other browsers download a fresh copy.
-- **Saving:** edits autosave in the browser, but the portable save is **Save .html** (top bar /
-  `Cmd/Ctrl+S`) — it downloads a fresh self-contained file with their changes baked in. (A browser
-  can't overwrite the file in place, so editing produces a new download — mention this so it isn't a
-  surprise.)
+- **Saving:** edits autosave in the browser, but the file itself is the source of truth — save with
+  **Save .html** / `Cmd/Ctrl+S`. On Chrome/Edge this writes **in place** (first save asks where;
+  after that it's silent). Other browsers can't overwrite an opened file, so they download a fresh
+  self-contained copy with the changes baked in — mention this so it isn't a surprise.
 
 `references/editor.md` has the complete editor reference if the user wants depth or asks how a
 specific interaction maps to the saved data.

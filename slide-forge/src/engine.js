@@ -1,26 +1,48 @@
 /* =====================================================================
-   DECK ENGINE — data-driven rendering.
+   DECK ENGINE v3 — data-driven rendering with a node-tree layout registry.
    A deck is a JSON document (the deck-data JSON block) rendered through a
-   registry of layout templates. The renderer derives numbering/progress, so
-   adding or reordering slides never means hand-editing pagers. Per-slide
-   "theme" patches override the global :root as scoped CSS variables. Assets
-   (icons/images/styles) are resolved from an inlined registry. The live deck
-   also exports/imports its JSON and prints to PDF.
+   registry of layout templates. v3: layouts return DOM node trees built with
+   N(), and author three identity attributes directly:
+     data-el   (attrs.key)  — stable authored identity key ("title","stats.2")
+     data-bind (attrs.bind) — the content path a text leaf renders; on-canvas
+                              edits write back to this path deterministically
+     data-arr  (attrs.arr)  — the content path of the array a container renders
+   The renderer derives numbering/progress, so adding or reordering slides
+   never means hand-editing pagers. Per-slide "theme" patches override the
+   global :root as scoped CSS variables. Assets (icons/images/styles) are
+   resolved from an inlined registry. The live deck also exports/imports its
+   JSON and prints to PDF. SG.renderSlide(deck,i) rebuilds a single section
+   (targeted re-render for live editing).
    ===================================================================== */
 (function(){
   var W = window, D = document, SG = W.SG = W.SG || {};
 
-  /* ---------- schema migration (additive; v1 decks are valid v2 decks) ----------
-     meta.schemaVersion stamps the deck; migrate() upgrades older decks in place.
-     v2 adds OPTIONAL keys only: overrides[key].z, slides[i].notes, top-level
-     `brand` and `masters` — so migrating a v1 deck is just stamping the version. */
-  SG.SCHEMA_VERSION = 2;
+  /* ---------- schema migration ----------
+     v2 added optional keys only (overrides[key].z, notes, brand, masters).
+     v3 changes override IDENTITY: keys are authored content paths instead of
+     positional b0/b0.1 tags. Old positional keys are remapped lazily at first
+     decorate (the editor replays the old block walk against the fresh DOM) —
+     flagged here via SG._legacyKeys. raw slides keep positional keys. */
+  SG.SCHEMA_VERSION = 3;
   SG.migrate = function(data){ if(!data||typeof data!=='object') return data;
     var m = data.meta = data.meta || {};
     var v = parseInt(m.schemaVersion,10) || 1;
-    if(v < 2){ /* v1 -> v2: purely additive, nothing to rewrite */ }
+    if(v < 3){
+      SG._legacyKeys = (data.slides||[]).some(function(s){
+        return s.overrides && s.layout!=='raw' &&
+          Object.keys(s.overrides).some(function(k){ return /^b\d/.test(k); }); });
+    }
     m.schemaVersion = SG.SCHEMA_VERSION;
     return data; };
+
+  /* ---------- content-path helpers (shared with the editor) ---------- */
+  SG.getPath=function(o,p){ var seg=String(p).split('.');
+    for(var i=0;i<seg.length;i++){ if(o==null) return undefined; o=o[seg[i]]; } return o; };
+  SG.setPath=function(o,p,v){ var seg=String(p).split('.');
+    for(var i=0;i<seg.length-1;i++){ var k=seg[i];
+      if(o[k]==null||typeof o[k]!=='object') o[k]=/^\d+$/.test(seg[i+1])?[]:{};
+      o=o[k]; }
+    o[seg[seg.length-1]]=v; };
 
   /* ---------- small helpers ---------- */
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
@@ -35,19 +57,64 @@
       .replace(/\[\[(.+?)\]\]/g,'<span class="glow">$1</span>')
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/`(.+?)`/g,'<code>$1</code>'); }
+  /* emRich(): the display-type variant some layouts use — [[x]] italicizes */
+  function emRich(s){ return esc(s)
+      .replace(/\[\[(.+?)\]\]/g,'<em>$1</em>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/`(.+?)`/g,'<code>$1</code>'); }
   SG.esc=esc; SG.rich=rich;   /* exposed so the Forge editor can escape/format text too */
-  function kicker(t){ return t?'<div class="eyebrow-row"><span class="kicker">'+rich(t)+'</span></div>':''; }
-  function title(t){ return t?'<h1 class="title">'+rich(t)+'</h1>':''; }
   /* split a string into per-letter kinetic spans (divider headline entrance) */
   function kinetic(s){ var o='',a=String(s).split(''); for(var i=0;i<a.length;i++){
     var ch=a[i]===' '?'&nbsp;':esc(a[i]); o+='<span style="--i:'+i+'">'+ch+'</span>'; } return o; }
 
-  /* ---------- asset registry (icons inline+themeable, images base64) ---------- */
-  SG.assets = SG.assets || {icons:{},images:{},styles:''};
+  /* =====================================================================
+     N — the node builder. N('div.stat-grid', {key,bind,arr,html,style,…}, kids)
+     - sel: tag + classes ('h3', 'div.cmp-col.sup')
+     - attrs.key  -> data-el     attrs.bind -> data-bind (+ data-el if no key)
+     - attrs.arr  -> data-arr    attrs.html -> innerHTML   attrs.text -> textContent
+       anything else -> setAttribute
+     - kids: string | Node | array (nested, null/false skipped)
+     H(str) parses an HTML string into a fragment (for trusted fragments like
+     chart SVG or the closing checkmark). Both are exposed on SG for the editor.
+     ===================================================================== */
+  function N(sel,attrs,kids){
+    if(attrs!=null&&(typeof attrs!=='object'||Array.isArray(attrs)||attrs.nodeType)){ kids=attrs; attrs=null; }
+    var p=String(sel).split('.'), n=D.createElement(p[0]||'div');
+    if(p.length>1) n.className=p.slice(1).join(' ');
+    if(attrs){ if(attrs.bind&&!attrs.key) n.setAttribute('data-el',attrs.bind);
+      Object.keys(attrs).forEach(function(k){ var v=attrs[k]; if(v==null||v===false) return;
+        if(k==='key') n.setAttribute('data-el',v);
+        else if(k==='bind') n.setAttribute('data-bind',v);
+        else if(k==='arr') n.setAttribute('data-arr',v);
+        else if(k==='html') n.innerHTML=v;
+        else if(k==='text') n.textContent=v;
+        else if(k==='style') n.setAttribute('style',v);
+        else n.setAttribute(k,v); }); }
+    (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      if(x.nodeType){ n.appendChild(x); return; }
+      n.appendChild(D.createTextNode(String(x))); })(kids);
+    return n; }
+  function H(s){ var t=D.createElement('template'); t.innerHTML=s==null?'':String(s); return t.content; }
+  SG.N=N; SG.H=H;
+
+  function kickerN(t){ return t?N('div.eyebrow-row',{key:'kicker'},
+    N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
+  function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
+
+  /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
+     v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
+     URI, still accepted forever) OR an object:
+       {store:"embedded", src, w,h, bytes, type, alt}   — inlined, travels with the file
+       {store:"linked",   path, w,h, bytes, type, alt}  — resolved relative to the deck; falls back
+                                                            to SG.unavailable() if the file is missing
+     svg{} is a sibling map of sanitized inline SVG diagram markup (kept apart from icons: icons are
+     small/monochrome/currentColor, diagrams are large and may carry their own palette). */
+  SG.assets = SG.assets || {icons:{},images:{},svg:{},styles:''};
   function loadAssets(){
     var el=D.getElementById('deck-assets'); if(!el) return;
     try{ var a=JSON.parse(el.textContent||'{}');
-      SG.assets={icons:a.icons||{},images:a.images||{},styles:a.styles||''};
+      SG.assets={icons:a.icons||{},images:a.images||{},svg:a.svg||{},styles:a.styles||''};
     }catch(e){}
     if(SG.assets.styles){ var st=D.createElement('style'); st.id='deck-custom-style';
       st.textContent=SG.assets.styles; D.head.appendChild(st); }
@@ -62,207 +129,459 @@
     var cls='ico-wrap'+(typeof spec==='object'&&spec.solid?' solid':'');
     var sty=color?(' style="color:'+(color.indexOf('--')===0?'var('+color+')':color)+'"'):'';
     return '<span class="'+cls+'"'+sty+'>'+svg+'</span>'; }
-  function imageURL(name){ return (SG.assets.images||{})[name]||''; }
+  /* imageMeta(name): normalizes all three registry shapes to {src,w,h,alt,store}.
+     "linked" entries resolve relative to the deck's own location (works from file:// and http://). */
+  function imageMeta(name){ var e=(SG.assets.images||{})[name]; if(!e) return null;
+    if(typeof e==='string') return {src:e,w:0,h:0,alt:'',store:'embedded'};
+    if(e.store==='linked') return {src:e.path,w:e.w||0,h:e.h||0,alt:e.alt||'',store:'linked'};
+    return {src:e.src||'',w:e.w||0,h:e.h||0,alt:e.alt||'',store:'embedded'}; }
+  function imageURL(name){ var m=imageMeta(name); return m?m.src:''; }
+  function svgMarkup(name){ return (SG.assets.svg||{})[name]||''; }
+  SG.imageMeta=imageMeta; SG.imageURL=imageURL; SG.svgMarkup=svgMarkup;
 
   /* =====================================================================
-     LAYOUT REGISTRY  —  name -> function(content) -> innerHTML.
+     UNAVAILABLE — one shared "this needs the network" component (media plan
+     §5.1/§7.1). Used identically for: unreachable/blocked embeds, missing
+     `linked` images, and (as an inline marker) unreachable links. Offline
+     status, embed load-timeout, and missing-file are all DETECTABLE and use
+     this; a specific external link being dead while online is not detectable
+     (opaque cross-origin response) and is NOT claimed here — online link
+     clicks simply go to the browser, which shows its own error.
+     Deck authors can override the wording via meta.strings.unavailable.
+     ===================================================================== */
+  function unavailMsg(){ var m=SG.data&&SG.data.meta&&SG.data.meta.strings;
+    return (m&&m.unavailable)||'Content unavailable'; }
+  var UNAVAIL_REASON={
+    offline:'This element needs a network connection.',
+    timeout:'This page could not be loaded — it may not allow being embedded.',
+    blocked:'This page refused to be embedded.',
+    missing:'This file is missing. It was linked, not saved inside the deck.'};
+  /* SG.unavailable({url,reason,mode}) -> Node. mode:"block" (default; embeds,
+     missing images) or "inline" (small marker appended after linked text). */
+  SG.unavailable=function(spec){ spec=spec||{}; var url=spec.url||'', reason=spec.reason||'offline';
+    var detail=UNAVAIL_REASON[reason]||UNAVAIL_REASON.offline;
+    if(spec.mode==='inline'){
+      return N('span.sf-unavail-inline',{title:detail+(url?' ('+url+')':'')},
+        [N('span.sf-unavail-ico',{'aria-hidden':'true'},'⚠'), ' unavailable']); }
+    var kids=[ N('div.sf-unavail-ico','⚠'),
+      N('div.sf-unavail-body',[ N('div.sf-unavail-h',esc(unavailMsg())), N('p',detail),
+        url?N('div.sf-unavail-url',esc(url)):null ]) ];
+    if(url) kids.push(N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'));
+    return N('div.sf-unavail',{'data-reason':reason},kids); };
+
+  /* mediaImgWrap(name,attrs,imgStyle): a real <img> (not CSS background) so a
+     missing "linked" asset can fire the native error event and fall back to
+     SG.unavailable() — a CSS background-image failure is silent and can't be
+     detected. attrs.key/bind land on the WRAPPER (object identity); the img
+     itself just carries alt + fit. Used by figure/image/media-split/gallery. */
+  function mediaImgWrap(name,attrs,imgStyle){
+    var m=imageMeta(name);
+    var wrap=N('div.media-img',attrs||{});
+    var img=N('img',{src:(m&&m.src)||'',alt:(attrs&&attrs.alt)||(m&&m.alt)||'',style:imgStyle||''});
+    wrap.appendChild(img);
+    if(!m||!m.src){ wrap.appendChild(SG.unavailable({url:name||'',reason:'missing'})); }
+    else img.addEventListener('error',function(){ img.style.display='none';
+      if(!wrap.querySelector('.sf-unavail')) wrap.appendChild(SG.unavailable({url:m.src,reason:'missing'})); });
+    return wrap; }
+  function fitStyle(c){ var fx=(c.focal&&c.focal[0]!=null)?c.focal[0]:0.5, fy=(c.focal&&c.focal[1]!=null)?c.focal[1]:0.5;
+    return 'object-fit:'+(c.fit||'cover')+';object-position:'+(fx*100)+'% '+(fy*100)+'%'; }
+
+  /* embed URL allow-list (media plan §6.3): http/https only — no data:,
+     javascript:, file:, or anything else. Stricter than link hrefs (no
+     mailto: — meaningless as an iframe src). */
+  function embedUrlOk(u){ return /^https?:\/\//i.test(String(u||'')); }
+  SG.embedUrlOk=embedUrlOk;
+
+  /* =====================================================================
+     EMBEDS (media plan §6) — a sandboxed iframe behind a transparent
+     "shield" so it never steals input while editing, and (in present mode)
+     is click-to-interact by default so it never steals arrow/space
+     navigation either. Every embed ALSO gets an always-present, normally
+     display:none poster card: print and SG.static (§7.1) force it visible
+     and the iframe hidden via CSS alone (see engine.css) — no JS needed at
+     capture time, and F.posterize() (editor.js) reuses the same card for
+     cloned contexts (sorter thumbnails, speaker view, copy/paste).
+     ===================================================================== */
+  var SANDBOX_DEFAULT={scripts:true,popups:true,forms:false,sameOrigin:false};
+  function sandboxAttr(sb){ sb=Object.assign({},SANDBOX_DEFAULT,sb||{});
+    var t=['allow-scripts'];                              /* always on — most embeddable sites need it just to render */
+    if(sb.popups) t.push('allow-popups');
+    if(sb.forms) t.push('allow-forms');
+    if(sb.sameOrigin) t.push('allow-same-origin');
+    return t.join(' '); }
+  function embedPosterNode(spec){
+    var url=spec.url||'', posterMeta=spec.poster?imageMeta(spec.poster):null;
+    var kids=[];
+    if(posterMeta&&posterMeta.src) kids.push(N('img',{src:posterMeta.src,alt:''}));
+    kids.push(N('div.sf-embed-poster-body',[
+      N('div.sf-embed-poster-h',esc(spec.title||'Embedded content')),
+      url?N('div.sf-embed-poster-url',esc(url)):null,
+      url?N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'):null ]));
+    return N('div.sf-embed-poster',kids); }
+  /* SG.mountEmbed(host,spec): host is the element that will carry the shield
+     + poster + (unless mode:"poster") the iframe. Called by L.embed (full
+     slide) and editor.js's free-object mount identically. */
+  SG.mountEmbed=function(host,spec){ spec=spec||{};
+    var url=spec.url||'', mode=spec.mode||'click';
+    host.classList.add('sf-embed');
+    var poster=embedPosterNode(spec); host.appendChild(poster);
+    if(!url||!embedUrlOk(url)||mode==='poster'){ poster.style.display='flex'; return; }
+    var shield=N('div.sf-embed-shield',{'data-mode':mode},N('div.sf-embed-hint','Click to interact'));
+    host.appendChild(shield);
+    /* click-to-interact (mode:"click", present mode only — edit mode always
+       keeps the shield up so the object stays draggable/selectable). Esc
+       (bound once in mountNav) restores it so arrow/space navigation works
+       again; this can't reach keystrokes typed INSIDE a cross-origin frame
+       once it has focus — a known, inherent limitation of iframes. */
+    shield.addEventListener('click',function(){
+      if(D.body.classList.contains('forge-edit')) return;
+      if(mode==='click') shield.classList.add('active'); });
+    var wrap=N('div.sf-embed-iframe-wrap'); host.appendChild(wrap);
+    poster.style.display='flex';                          /* shown while loading */
+    var iframe=D.createElement('iframe');
+    iframe.setAttribute('sandbox',sandboxAttr(spec.sandbox));
+    iframe.setAttribute('referrerpolicy','no-referrer');
+    iframe.setAttribute('allow','');                       /* no camera/mic/geolocation/etc. */
+    iframe.setAttribute('loading','lazy');
+    iframe.setAttribute('title',spec.title||'Embedded content');
+    wrap.appendChild(iframe);
+    var settled=false;
+    function showUnavailable(reason){ if(wrap.parentNode) wrap.remove();
+      poster.style.display='none';
+      host.appendChild(SG.unavailable({url:url,reason:reason})); }
+    /* KNOWN LIMIT (media plan §6.2, verified empirically): a site sending
+       X-Frame-Options often still fires 'load' — the browser treats the
+       navigation as complete even though it refused to render — so this
+       is a heartbeat, not a real block-detector. CSP frame-ancestors
+       refusals more often never fire 'load' at all, which the 6s timeout
+       below does catch. Neither path can be made fully reliable
+       cross-origin; this is the accepted trade-off, not a bug to chase. */
+    iframe.addEventListener('load',function(){ if(settled) return; settled=true; poster.style.display='none'; });
+    iframe.addEventListener('error',function(){ if(settled) return; settled=true; showUnavailable('blocked'); });
+    if(!W.navigator.onLine){ settled=true; showUnavailable('offline'); }
+    else { setTimeout(function(){ if(settled) return; settled=true; showUnavailable('timeout'); },6000);
+      iframe.src=url; }
+    return {shield:shield,wrap:wrap,poster:poster}; };
+
+  /* =====================================================================
+     LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
+     Keys are authored: named blocks ("title","rail"), array items by content
+     path ("stats.2"), leaves bound to the field they render ("stats.2.label").
      ===================================================================== */
   var L = SG.layouts = {};
 
   L.cover=function(c){
-    var meta=arr(c.meta).map(function(m){ var t=typeof m==='string'?m:m.text;
-      return (typeof m==='object'&&m.strong)?'<span><b>'+esc(t)+'</b></span>':'<span>'+esc(t)+'</span>'; }).join('');
-    return '<div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>'
-      + kicker(c.kicker)
-      + '<h1 class="title sg-fade-rise sg-onenter">'+rich(c.title||'')
-        + (c.accent?'<span class="glow sg-glow-pulse">'+esc(c.accent)+'</span>':'')+'</h1>'
-      + (c.subtitle?'<p class="subtitle">'+rich(c.subtitle)+'</p>':'')
-      + (meta?'<div class="meta">'+meta+'</div>':''); };
+    return [
+      N('div.orb.a',{key:'orb0'}), N('div.orb.b',{key:'orb1'}), N('div.orb.c',{key:'orb2'}),
+      kickerN(c.kicker),
+      N('h1.title.sg-fade-rise.sg-onenter',{key:'title'},[
+        H(rich(c.title||'')),
+        c.accent?N('span.glow.sg-glow-pulse',{key:'accent',bind:'accent',text:c.accent}):null ]),
+      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null,
+      arr(c.meta).length?N('div.meta',{key:'meta',arr:'meta'},arr(c.meta).map(function(m,i){
+        var t=typeof m==='string'?m:m.text;
+        return (typeof m==='object'&&m.strong)
+          ? N('span',{key:'meta.'+i},N('b',null,t))
+          : N('span',{bind:'meta.'+i,text:t}); })):null ]; };
 
   L.agenda=function(c){
-    var items=arr(c.items).map(function(it,i){
-      return '<div class="ag-item"><div class="ag-num">'+pad(i+1)+'</div><div class="ag-body">'
-        +'<h3>'+rich(it.title)+'</h3>'+(it.desc?'<p>'+rich(it.desc)+'</p>':'')+'</div></div>'; }).join('');
-    return '<div class="rail"></div>'+kicker(c.kicker)+title(c.title)
-      +'<div class="agenda-grid sg-stagger sg-onenter">'+items+'</div>'; };
+    return [ N('div.rail',{key:'rail'}), kickerN(c.kicker), titleN(c.title),
+      N('div.agenda-grid.sg-stagger.sg-onenter',{key:'items',arr:'items'},
+        arr(c.items).map(function(it,i){ var P='items.'+i;
+          return N('div.ag-item',{key:P},[
+            N('div.ag-num',{key:P+'.num'},pad(i+1)),
+            N('div.ag-body',{key:P+'.body'},[
+              N('h3',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; };
 
   L.divider=function(c){
-    return '<div class="big-index">'+esc(c.index||'')+'</div>'
-      +'<h1 class="title"><span class="sg-kinetic sg-onenter">'+kinetic(c.title||'')+'</span></h1>'
-      +(c.subtitle?'<p class="subtitle">'+rich(c.subtitle)+'</p>':''); };
+    return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
+      N('h1.title',{key:'title',bind:'title'},
+        N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
+      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
   L['stat-grid']=function(c){
-    var stats=arr(c.stats).map(function(s){
-      var num = s.count!=null
-        ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
-            +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
-        : esc(s.value);
-      var unit=s.unit?'<small>'+esc(s.unit)+'</small>':'';
-      return '<div class="stat"><div class="num">'+num+unit+'</div><div class="lbl">'+rich(s.label)+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="stat-grid">'+stats+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.stat-grid',{key:'stats',arr:'stats'},arr(c.stats).map(function(s,i){ var P='stats.'+i;
+        var num = s.count!=null
+          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
+              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
+          : esc(s.value);
+        return N('div.stat',{key:P},[
+          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
+          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; };
 
   L.bignum=function(c){
     var hero = c.count!=null
       ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
       : esc(c.value);
-    return kicker(c.kicker)+'<div class="hero-num">'+hero+'</div>'
-      +(c.subtitle?'<p class="subtitle">'+rich(c.subtitle)+'</p>':''); };
+    return [ kickerN(c.kicker), N('div.hero-num',{key:'num',html:hero}),
+      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
   L.chart=function(c){
-    var note=c.note?'<p style="font-family:var(--font-mono);font-size:13px;color:var(--faint)">'+esc(c.note)+'</p>':'';
-    /* v2: author charts as data (type + data.labels/series); SG.charts renders
+    /* v2+: author charts as data (type + data.labels/series); SG.charts renders
        theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
     var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
-    return '<div class="chart-head"><div>'+kicker(c.kicker)+title(c.title)+'</div>'+note+'</div>'
-      +'<div class="chart-wrap">'+body+'</div>'; };
+    return [ N('div.chart-head',{key:'head'},[
+        N('div',null,[kickerN(c.kicker),titleN(c.title)]),
+        c.note?N('p',{key:'note',bind:'note',text:c.note,
+          style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
+      N('div.chart-wrap',{key:'chart',html:body}) ]; };
 
   L.table=function(c){
     var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
-    var head='<tr>'+cols.map(function(h,j){ return '<th'+(j===hi?' class="hi"':'')+'>'+rich(h)+'</th>'; }).join('')+'</tr>';
-    var body=arr(c.rows).map(function(r,i){ return '<tr>'+arr(r).map(function(cell,j){
-      return '<td'+(j===hi?' class="hi"':'')+'>'+rich(String(cell==null?'':cell))+'</td>'; }).join('')+'</tr>'; }).join('');
-    var note=c.note?'<p class="tbl-note">'+esc(c.note)+'</p>':'';
-    return kicker(c.kicker)+title(c.title)
-      +'<div class="tbl-wrap sg-fade-rise sg-onenter"><table class="tbl'+(o.compact?' compact':'')+'"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+note+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:'table'},[
+        N('table.tbl'+(o.compact?'.compact':''),null,[
+          N('thead',null,N('tr',null,cols.map(function(h,j){
+            return N('th'+(j===hi?'.hi':''),{bind:'columns.'+j,html:rich(h)}); }))),
+          N('tbody',null,arr(c.rows).map(function(r,i){
+            return N('tr',null,arr(r).map(function(cell,j){
+              return N('td'+(j===hi?'.hi':''),{bind:'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
+        c.note?N('p.tbl-note',{key:'tnote',bind:'note',text:c.note}):null ]) ]; };
 
   L.comparison=function(c){
-    function col(side,cls){ if(!side) return '';
-      var items=arr(side.items).map(function(x){return '<li>'+rich(x)+'</li>';}).join('');
-      return '<div class="cmp-col '+cls+'">'+(side.tag?'<div class="tag">'+rich(side.tag)+'</div>':'')
-        +'<h3>'+rich(side.title)+'</h3><ul>'+items+'</ul></div>'; }
-    return kicker(c.kicker)+title(c.title)+'<div class="cmp">'
-      +col(c.left,'sup')+'<div class="vs-rail"><div class="vs-badge">'+esc(c.badge||'VS')+'</div></div>'
-      +col(c.right,'uns')+'</div>'; };
+    function col(side,cls,base){ if(!side) return null;
+      return N('div.cmp-col.'+cls,{key:base},[
+        side.tag?N('div.tag',{bind:base+'.tag',html:rich(side.tag)}):null,
+        N('h3',{bind:base+'.title',html:rich(side.title)}),
+        N('ul',{key:base+'.items',arr:base+'.items'},arr(side.items).map(function(x,i){
+          return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.cmp',{key:'cmp'},[ col(c.left,'sup','left'),
+        N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
+        col(c.right,'uns','right') ]) ]; };
 
   L.quote=function(c){
-    return '<div class="quote-mark">&ldquo;</div>'
-      +'<blockquote class="sg-reveal-wipe sg-onenter">'+rich(c.quote)+'</blockquote>'
-      +(c.by?'<div class="by"><div class="line"></div><span>'+rich(c.by)+'</span></div>':'')
-      +(c.subtitle?'<p class="subtitle" style="margin-top:26px">'+rich(c.subtitle)+'</p>':''); };
+    return [ N('div.quote-mark',{key:'mark',html:'&ldquo;'}),
+      N('blockquote.sg-reveal-wipe.sg-onenter',{bind:'quote',html:rich(c.quote)}),
+      c.by?N('div.by',{key:'by'},[N('div.line'),
+        N('span',{key:'by.text',bind:'by',html:rich(c.by)})]):null,
+      c.subtitle?N('p.subtitle',{bind:'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; };
 
   L.code=function(c){
-    return kicker(c.kicker)+title(c.title)+'<div class="code-stage"><div class="code-panel">'
-      +'<div class="code-bar"><span class="dotrow"><i></i><i></i><i></i></span>'+esc(c.filename||'')+'</div>'
-      +'<div class="code-sweep"></div><pre>'+(c.code||'')+'<span class="caret"></span></pre></div>'
-      +(c.caption?'<p class="code-cap">'+rich(c.caption)+'</p>':'')+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.code-stage',{key:'stage'},[
+        N('div.code-panel',{key:'panel'},[
+          N('div.code-bar',{key:'bar'},[N('span.dotrow',{html:'<i></i><i></i><i></i>'}),c.filename||'']),
+          N('div.code-sweep'),
+          N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
+        c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
   L.timeline=function(c){
-    var items=arr(c.items).map(function(it){
-      return '<div class="tl-item"><div class="yr">'+esc(it.year)+'</div>'
-        +'<div class="tl-dot'+(it.now?' now':'')+'"></div>'
-        +'<div class="ev"><b>'+rich(it.title)+'</b>'+rich(it.desc||'')+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)
-      +'<div class="timeline"><div class="tl-track"></div><div class="tl-spark"></div>'
-      +'<div class="tl-items">'+items+'</div></div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.timeline',{key:'timeline'},[
+        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-items',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
+          return N('div.tl-item',{key:P},[
+            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.ev',{key:P+'.ev'},[
+              N('b',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; };
 
   L.pipeline=function(c){
-    var nodes=arr(c.nodes), out='';
-    nodes.forEach(function(n,i){
-      var ico = n.iconAsset?icon(n.iconAsset):'<div class="ico">'+esc(n.icon||'')+'</div>';
-      if(n.iconAsset) ico='<div class="ico">'+ico+'</div>';
-      out+='<div class="pipe-node">'+ico+'<h3>'+rich(n.title)+'</h3>'+(n.desc?'<p>'+rich(n.desc)+'</p>':'')+'</div>';
-      if(i<nodes.length-1) out+='<div class="pipe-conn"><div class="pipe-packet" style="animation-delay:'+(i*0.6)+'s"></div></div>'; });
-    return kicker(c.kicker)+title(c.title)+'<div class="pipe">'+out
-      +(c.loop?'<div class="pipe-loop">'+esc(c.loop)+'</div>':'')+'</div>'; };
+    var nodes=arr(c.nodes), kids=[];
+    nodes.forEach(function(n,i){ var P='nodes.'+i;
+      kids.push(N('div.pipe-node',{key:P},[
+        N('div.ico',{key:P+'.icon',html:n.iconAsset?icon(n.iconAsset):esc(n.icon||'')}),
+        N('h3',{bind:P+'.title',html:rich(n.title)}),
+        n.desc?N('p',{bind:P+'.desc',html:rich(n.desc)}):null ]));
+      if(i<nodes.length-1) kids.push(N('div.pipe-conn',{key:'conn.'+i},
+        N('div.pipe-packet',{style:'animation-delay:'+(i*0.6)+'s'}))); });
+    if(c.loop) kids.push(N('div.pipe-loop',{key:'loop',bind:'loop',text:c.loop}));
+    return [ kickerN(c.kicker), titleN(c.title), N('div.pipe',{key:'pipe',arr:'nodes'},kids) ]; };
 
   L.closing=function(c){
-    var takes=arr(c.takeaways).map(function(t,i){
-      return '<div><div class="n">'+pad(i+1)+'</div><h3>'+rich(t.title)+'</h3><p>'+rich(t.desc)+'</p></div>'; }).join('');
     var check='<svg class="sg-check sg-onenter" viewBox="0 0 52 52" width="30" height="30" fill="none" stroke="var(--mint)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="26" cy="26" r="24"></circle><path class="tick" d="M16 27 L23 34 L37 18"></path></svg>';
-    return '<div class="orb b" style="opacity:.30"></div><div class="orb c"></div>'
-      +kicker(c.kicker)
-      +'<h1 class="title">'+rich(c.title||'')+(c.accent?' <span class="glow">'+esc(c.accent)+'</span>':'')+'</h1>'
-      +'<div class="take sg-stagger sg-onenter">'+takes+'</div>'
-      +(c.note?'<div class="meta">'+check+'<span>'+rich(c.note)+'</span></div>':''); };
+    return [ N('div.orb.b',{key:'orb0',style:'opacity:.30'}), N('div.orb.c',{key:'orb1'}),
+      kickerN(c.kicker),
+      N('h1.title',{key:'title'},[ H(rich(c.title||'')),
+        c.accent?' ':null,
+        c.accent?N('span.glow',{key:'accent',bind:'accent',text:c.accent}):null ]),
+      N('div.take.sg-stagger.sg-onenter',{key:'takeaways',arr:'takeaways'},
+        arr(c.takeaways).map(function(t,i){ var P='takeaways.'+i;
+          return N('div',{key:P},[
+            N('div.n',{key:P+'.n'},pad(i+1)),
+            N('h3',{bind:P+'.title',html:rich(t.title)}),
+            N('p',{bind:P+'.desc',html:rich(t.desc)}) ]); })),
+      c.note?N('div.meta',{key:'note'},[H(check),
+        N('span',{key:'note.text',bind:'note',html:rich(c.note)})]):null ]; };
 
-  L.raw=function(c){ return c.html||''; };  /* escape hatch: literal HTML, still numbered+themed */
+  /* escape hatch: literal HTML, still numbered+themed. Children get positional
+     b0/b0.1 keys from the editor's decorate pass (there is no schema to bind). */
+  L.raw=function(c){ return {raw:c.html||''}; };
 
-  /* ---------- new canvas-derived layouts ---------- */
+  /* ---------- canvas-derived layouts ---------- */
   L.manifesto=function(c){
-    var st=esc(c.statement||'').replace(/\[\[(.+?)\]\]/g,'<em>$1</em>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>');
-    return '<div class="mark"></div><div class="statement sg-glow-pulse-box">'+st+'</div>'
-      +(c.lead?'<p class="lead">'+rich(c.lead)+'</p>':''); };
+    return [ N('div.mark',{key:'mark'}),
+      N('div.statement.sg-glow-pulse-box',{bind:'statement',html:emRich(c.statement||'')}),
+      c.lead?N('p.lead',{bind:'lead',html:rich(c.lead)}):null ]; };
 
   L.editorial=function(c){
-    var cols=arr(c.columns).map(function(col){
-      return '<div class="ed-col"><h3>'+rich(col.head)+'</h3><p>'+rich(col.body)+'</p></div>'; }).join('');
-    return kicker(c.kicker)+'<div class="editorial">'
-      +'<div class="ed-lead sg-reveal-wipe sg-onenter">'+rich(c.lead)+'</div>'
-      +'<div class="ed-cols sg-stagger sg-onenter">'+cols+'</div></div>'; };
+    return [ kickerN(c.kicker),
+      N('div.editorial',{key:'editorial'},[
+        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:'lead',html:rich(c.lead)}),
+        N('div.ed-cols.sg-stagger.sg-onenter',{key:'columns',arr:'columns'},
+          arr(c.columns).map(function(col,i){ var P='columns.'+i;
+            return N('div.ed-col',{key:P},[
+              N('h3',{bind:P+'.head',html:rich(col.head)}),
+              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; };
 
   L['hero-asym']=function(c){
-    var rows=arr(c.rows).map(function(r){
-      return '<div class="row"><div class="k">'+esc(r.k)+'</div><div class="v">'+esc(r.v)
-        +(r.unit?'<small> '+esc(r.unit)+'</small>':'')+'</div></div>'; }).join('');
-    var t=esc(c.title||'').replace(/\[\[(.+?)\]\]/g,'<em>$1</em>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>');
-    return '<div class="hero-asym"><div><div class="htitle">'+t+'</div>'
-      +(c.sub?'<p class="hsub">'+rich(c.sub)+'</p>':'')+'</div>'
-      +'<div class="hero-rail sg-stagger sg-onenter">'+rows+'</div></div>'; };
+    return [ N('div.hero-asym',{key:'hero'},[
+      N('div',{key:'main'},[
+        N('div.htitle',{key:'title',bind:'title',html:emRich(c.title||'')}),
+        c.sub?N('p.hsub',{bind:'sub',html:rich(c.sub)}):null ]),
+      N('div.hero-rail.sg-stagger.sg-onenter',{key:'rows',arr:'rows'},
+        arr(c.rows).map(function(r,i){ var P='rows.'+i;
+          return N('div.row',{key:P},[
+            N('div.k',{bind:P+'.k',text:r.k==null?'':r.k}),
+            N('div.v',{key:P+'.val'},[
+              N('span',{key:P+'.v',bind:P+'.v',text:r.v==null?'':r.v}),
+              r.unit?N('small',{key:P+'.unit'},' '+r.unit):null ]) ]); })) ]) ]; };
 
   L.figure=function(c){
-    var url=imageURL(c.image);
-    var bg=url?'background-image:url('+JSON.stringify(url)+')':'background:linear-gradient(135deg,var(--bg-2),var(--bg))';
-    return '<div class="fig-img" style="'+bg+'"></div><div class="fig-shade"></div>'
-      +'<div class="fig-body">'+kicker(c.kicker)
-      +'<div class="fig-title sg-reveal-wipe sg-onenter">'+rich(c.title)+'</div>'
-      +(c.caption?'<p class="fig-cap">'+rich(c.caption)+'</p>':'')+'</div>'; };
+    var hasImg=!!imageURL(c.image);
+    var img=hasImg?mediaImgWrap(c.image,{key:'image'},'object-fit:cover;object-position:'+
+        ((c.focal&&c.focal[0]!=null?c.focal[0]:0.5)*100)+'% '+((c.focal&&c.focal[1]!=null?c.focal[1]:0.5)*100)+'%')
+      :N('div.media-img',{key:'image',style:'background:linear-gradient(135deg,var(--bg-2),var(--bg))'});
+    img.classList.add('fig-img');
+    return [ img, N('div.fig-shade',{key:'shade'}),
+      N('div.fig-body',{key:'body'},[ kickerN(c.kicker),
+        N('div.fig-title.sg-reveal-wipe.sg-onenter',{bind:'title',html:rich(c.title)}),
+        c.caption?N('p.fig-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
+
+  /* IMAGE — full-bleed or framed single image (media plan §4). Supersedes
+     hand-rolled `raw` image slides for the common case. */
+  L.image=function(c){
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('img-full','frame-'+(c.frame||'none'));
+    return [ img,
+      (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
+      c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
+
+  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
+  L['media-split']=function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
+    img.classList.add('ms-media');
+    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
+      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
+      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
+        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+
+  /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
+  L.gallery=function(c){
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.gallery',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
+        var tile=mediaImgWrap(it.image,{key:P},fitStyle(it));
+        tile.classList.add('gal-tile');
+        if(it.caption) tile.appendChild(N('div.gal-cap',{bind:P+'.caption',html:rich(it.caption)}));
+        return tile; })) ]; };
+
+  /* DIAGRAM — inlines a sanitized SVG diagram asset, theme-color aware via
+     currentColor (the intended path for architecture/flow diagrams). */
+  L.diagram=function(c){
+    var markup=svgMarkup(c.svg);
+    var stage=N('div.diagram-stage',{key:'svg'});
+    if(markup) stage.innerHTML=markup; else stage.appendChild(SG.unavailable({url:c.svg||'',reason:'missing'}));
+    return [ kickerN(c.kicker), titleN(c.title), stage,
+      c.caption?N('p.diagram-cap',{bind:'caption',html:rich(c.caption)}):null ]; };
+
+  /* EMBED — full-slide sandboxed iframe (media plan §6). Deliberately the
+     only layout whose deck stops being fully offline-capable; see the
+     shared unavailable/poster machinery in SG.mountEmbed above. */
+  L.embed=function(c){
+    var stage=N('div.embed-stage',{key:'stage'});
+    SG.mountEmbed(stage,c);
+    return [ (c.kicker||c.title)?N('div.embed-head',{key:'head'},[kickerN(c.kicker),titleN(c.title)]):null,
+      stage, c.note?N('p.embed-note',{bind:'note',html:rich(c.note)}):null ]; };
 
   L['metric-dash']=function(c){
     var r=c.ring||{};
-    var ring='<div class="dash-ring"><div class="sg-ring" data-p="'+esc(r.value||0)+'" data-suffix="'+esc(r.suffix||'%')+'">'
-      +'<span class="sg-ring-v">0</span></div><div class="cap">'+rich(r.label||'')+'</div></div>';
-    var tiles=arr(c.tiles).map(function(t){
-      return '<div class="dash-tile"><div class="v">'+esc(t.value)+(t.unit?'<small>'+esc(t.unit)+'</small>':'')+'</div>'
-        +'<div class="l">'+rich(t.label)+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="dash">'+ring+'<div class="dash-tiles sg-stagger sg-onenter">'+tiles+'</div></div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.dash',{key:'dash'},[
+        N('div.dash-ring',{key:'ring'},[
+          N('div.sg-ring',{'data-p':String(r.value||0),'data-suffix':r.suffix||'%'},
+            N('span.sg-ring-v','0')),
+          N('div.cap',{key:'ring.label',bind:'ring.label',html:rich(r.label||'')}) ]),
+        N('div.dash-tiles.sg-stagger.sg-onenter',{key:'tiles',arr:'tiles'},
+          arr(c.tiles).map(function(t,i){ var P='tiles.'+i;
+            return N('div.dash-tile',{key:P},[
+              N('div.v',{key:P+'.val',html:esc(t.value)+(t.unit?'<small>'+esc(t.unit)+'</small>':'')}),
+              N('div.l',{bind:P+'.label',html:rich(t.label)}) ]); })) ]) ]; };
 
   L.leaderboard=function(c){
     var rows=arr(c.rows), max=0; rows.forEach(function(r){ var v=parseFloat(r.pct!=null?r.pct:r.value)||0; if(v>max)max=v; });
-    var body=rows.map(function(r,i){ var v=parseFloat(r.pct!=null?r.pct:r.value)||0; var w=max?Math.round(v/max*100):0;
-      return '<div class="board-row"><div class="rk">'+pad(i+1)+'</div>'
-        +'<div class="board-bar"><div class="fill" style="width:'+w+'%"></div><div class="nm">'+rich(r.name)+'</div></div>'
-        +'<div class="val">'+esc(r.value)+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="board sg-stagger sg-onenter">'+body+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.board.sg-stagger.sg-onenter',{key:'rows',arr:'rows'},rows.map(function(r,i){
+        var P='rows.'+i, v=parseFloat(r.pct!=null?r.pct:r.value)||0, w=max?Math.round(v/max*100):0;
+        return N('div.board-row',{key:P},[
+          N('div.rk',{key:P+'.rk'},pad(i+1)),
+          N('div.board-bar',{key:P+'.bar'},[
+            N('div.fill',{style:'width:'+w+'%'}),
+            N('div.nm',{bind:P+'.name',html:rich(r.name)}) ]),
+          N('div.val',{key:P+'.value',bind:P+'.value',text:r.value==null?'':r.value}) ]); })) ]; };
 
   L.diptych=function(c){
-    function panel(side,cls){ side=side||{};
-      return '<div class="dip-panel '+cls+'">'+(cls==='left'?'<div class="divline"></div>':'')
-        +(side.tag?'<div class="tag">'+esc(side.tag)+'</div>':'')
-        +'<div class="big">'+rich(side.title)+'</div>'+(side.body?'<p>'+rich(side.body)+'</p>':'')+'</div>'; }
-    return panel(c.left,'left')+panel(c.right,'right'); };
+    function panel(side,cls,base){ side=side||{};
+      return N('div.dip-panel.'+cls,{key:base},[
+        cls==='left'?N('div.divline'):null,
+        side.tag?N('div.tag',{bind:base+'.tag',text:side.tag}):null,
+        N('div.big',{bind:base+'.title',html:rich(side.title)}),
+        side.body?N('p',{bind:base+'.body',html:rich(side.body)}):null ]); }
+    return [ panel(c.left,'left','left'), panel(c.right,'right','right') ]; };
 
   L.matrix=function(c){
-    var cells=arr(c.cells).map(function(q){
-      return '<div class="mx-cell'+(q.hot?' hot':'')+'"><h3>'+rich(q.title)+'</h3><p>'+rich(q.desc)+'</p></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="matrix sg-stagger sg-onenter">'+cells
-      +(c.xlabel?'<div class="mx-axis-x">'+esc(c.xlabel)+'</div>':'')
-      +(c.ylabel?'<div class="mx-axis-y">'+esc(c.ylabel)+'</div>':'')+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.matrix.sg-stagger.sg-onenter',{key:'cells',arr:'cells'},
+        arr(c.cells).map(function(q,i){ var P='cells.'+i;
+          return N('div.mx-cell'+(q.hot?'.hot':''),{key:P},[
+            N('h3',{bind:P+'.title',html:rich(q.title)}),
+            N('p',{bind:P+'.desc',html:rich(q.desc)}) ]); })
+        .concat([ c.xlabel?N('div.mx-axis-x',{key:'xlabel',bind:'xlabel',text:c.xlabel}):null,
+                  c.ylabel?N('div.mx-axis-y',{key:'ylabel',bind:'ylabel',text:c.ylabel}):null ])) ]; };
 
   L.stack=function(c){
-    var bands=arr(c.bands).map(function(b){
-      var ic=b.iconAsset?icon(b.iconAsset):'<span class="si">'+esc(b.icon||'')+'</span>';
-      if(b.iconAsset) ic='<span class="si">'+ic+'</span>';
-      return '<div class="stack-band">'+ic+'<div class="st"><h3>'+rich(b.title)+'</h3>'+(b.desc?'<p>'+rich(b.desc)+'</p>':'')+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="stack sg-stagger sg-onenter">'+bands+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.stack.sg-stagger.sg-onenter',{key:'bands',arr:'bands'},
+        arr(c.bands).map(function(b,i){ var P='bands.'+i;
+          return N('div.stack-band',{key:P},[
+            N('span.si',{key:P+'.icon',html:b.iconAsset?icon(b.iconAsset):esc(b.icon||'')}),
+            N('div.st',{key:P+'.st'},[
+              N('h3',{bind:P+'.title',html:rich(b.title)}),
+              b.desc?N('p',{bind:P+'.desc',html:rich(b.desc)}):null ]) ]); })) ]; };
 
   L['quote-mosaic']=function(c){
-    var qs=arr(c.quotes).map(function(q){
-      return '<div class="mq"><blockquote>'+rich(q.quote)+'</blockquote><div class="by">'+rich(q.by)+'</div></div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="mosaic sg-stagger sg-onenter">'+qs+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.mosaic.sg-stagger.sg-onenter',{key:'quotes',arr:'quotes'},
+        arr(c.quotes).map(function(q,i){ var P='quotes.'+i;
+          return N('div.mq',{key:P},[
+            N('blockquote',{bind:P+'.quote',html:rich(q.quote)}),
+            N('div.by',{bind:P+'.by',html:rich(q.by)}) ]); })) ]; };
 
   L['index-mosaic']=function(c){
-    var items=arr(c.items).map(function(it,i){
-      return '<div class="ix"><div class="ixn">'+pad(i+1)+'</div><h3>'+rich(it.title)+'</h3>'
-        +(it.desc?'<p>'+rich(it.desc)+'</p>':'')+'</div>'; }).join('');
-    return kicker(c.kicker)+title(c.title)+'<div class="indexm sg-stagger sg-onenter">'+items+'</div>'; };
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.indexm.sg-stagger.sg-onenter',{key:'items',arr:'items'},
+        arr(c.items).map(function(it,i){ var P='items.'+i;
+          return N('div.ix',{key:P},[
+            N('div.ixn',{key:P+'.n'},pad(i+1)),
+            N('h3',{bind:P+'.title',html:rich(it.title)}),
+            it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]); })) ]; };
 
   L['before-after']=function(c){
-    function col(s,cls){ s=s||{}; var items=arr(s.items).map(function(x){return '<li>'+rich(x)+'</li>';}).join('');
-      return '<div class="bna-col '+cls+'"><div class="tag">'+rich(s.tag||(cls==='after'?'After':'Before'))+'</div>'
-        +'<h3>'+rich(s.title)+'</h3><ul>'+items+'</ul></div>'; }
-    return kicker(c.kicker)+title(c.title)+'<div class="bna">'+col(c.before,'before')
-      +'<div class="bna-arrow">&rarr;</div>'+col(c.after,'after')+'</div>'; };
+    function col(s,cls,base){ s=s||{};
+      return N('div.bna-col.'+cls,{key:base},[
+        N('div.tag',{bind:base+'.tag',html:rich(s.tag||(cls==='after'?'After':'Before'))}),
+        N('h3',{bind:base+'.title',html:rich(s.title)}),
+        N('ul',{key:base+'.items',arr:base+'.items'},arr(s.items).map(function(x,i){
+          return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
+    return [ kickerN(c.kicker), titleN(c.title),
+      N('div.bna',{key:'bna'},[ col(c.before,'before','before'),
+        N('div.bna-arrow',{html:'&rarr;'}), col(c.after,'after','after') ]) ]; };
 
   /* =====================================================================
      RENDER  —  build slides from data, derive numbering, apply per-slide theme
@@ -286,16 +605,45 @@
     if(brand.fonts){
       if(brand.fonts.display) root.style.setProperty('--font-display',"'"+brand.fonts.display+"','DejaVu Sans',system-ui,sans-serif");
       if(brand.fonts.body) root.style.setProperty('--font-body',"'"+brand.fonts.body+"','DejaVu Sans',system-ui,sans-serif"); } }
-  function brandMark(brand,lay){ if(!brand||!brand.logo) return '';
-    if(lay!=='cover'&&lay!=='closing') return '';
-    var url=imageURL(brand.logo); if(!url) return '';
-    return '<img class="brand-mark" src="'+esc(url)+'" alt="'+esc(brand.name||'logo')+'">'; }
+  function brandMark(brand,lay){ if(!brand||!brand.logo) return null;
+    if(lay!=='cover'&&lay!=='closing') return null;
+    var url=imageURL(brand.logo); if(!url) return null;
+    return N('img.brand-mark',{src:url,alt:brand.name||'logo'}); }
 
   /* Layouts whose CSS targets the <section> itself. Every other layout styles
      INNER containers only, so putting the layout name on the section would let an
      inner class (e.g. .matrix, .timeline, .stat-grid) restyle the slide and break
      .slide{position:absolute;inset:0}. We add a harmless lyt-<name> hook instead. */
-  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1};
+  var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1,image:1};
+
+  /* build ONE <section> — shared by full render and targeted re-render */
+  function buildSection(s,i,total,defAmb,brand){
+    var lay=s.layout||'raw';
+    var sec=D.createElement('section');
+    sec.className='slide'+(SECTION_LAYOUTS[lay]?(' '+lay):'')+' lyt-'+lay+(s.class?(' '+s.class):'');
+    sec.setAttribute('data-i',String(i+1)); sec.setAttribute('role','group');
+    sec.setAttribute('aria-roledescription','slide');
+    sec.setAttribute('aria-label','Slide '+(i+1)+' of '+total);
+    var sty=themeStyle(s.theme); if(sty) sec.setAttribute('style',sty);
+    /* resolve the ambient: a named one injects a universal background layer;
+       "none" silences motion; "auto"/absent keeps the layout's built-in ambient. */
+    var amb=(s.ambient!=null)?s.ambient:defAmb;
+    if(amb==='none'){ sec.setAttribute('data-ambient','none'); }
+    else if(amb&&amb!=='auto'){ sec.appendChild(N('div.amb.amb-'+amb,{'aria-hidden':'true'})); }
+    var fn=L[lay]||L.raw, out;
+    try{ out=fn(s.content||{},{index:i,total:total}); }
+    catch(e){ out=[ N('div.title',{style:'color:var(--cyan)',html:'&#9888; layout "'+esc(s.layout)+'" failed'}),
+                    N('p.subtitle',{text:e.message}) ]; }
+    if(out&&!Array.isArray(out)&&out.raw!=null) sec.insertAdjacentHTML('beforeend',out.raw);
+    else (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      sec.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
+    var bm=brandMark(brand,lay); if(bm) sec.appendChild(bm);
+    if(s.doc) sec.appendChild(N('div.doc-panel',null,[
+      N('div.doc-h',null,'JSON · layout "'+(s.layout||'')+'"'), N('pre',{text:s.doc}) ]));
+    sec.appendChild(N('div.pager',null,pad(i+1)+' / '+pad(total)));
+    sec.appendChild(N('div.progress',{style:'width:'+pctw(i+1,total)+'%'}));
+    return sec; }
 
   SG.render=function(deck,data){
     data=data||SG.data; SG.data=data;
@@ -306,38 +654,46 @@
     if(data.meta){ if(data.meta.title) D.title=data.meta.title;
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);
         SG.rng=SG.makeRng(parseInt(data.meta.seed,10)||1); } }
-    var html='';
-    slides.forEach(function(s,i){
-      var fn=L[s.layout]||L.raw;
-      var inner; try{ inner=fn(s.content||{},{index:i,total:total}); }
-      catch(e){ inner='<div class="title" style="color:var(--cyan)">⚠ layout "'+esc(s.layout)+'" failed</div>'
-        +'<p class="subtitle">'+esc(e.message)+'</p>'; }
-      var lay=s.layout||'raw';
-      var cls='slide'+(SECTION_LAYOUTS[lay]?(' '+lay):'')+' lyt-'+lay+(s.class?(' '+s.class):'');
-      var sty=themeStyle(s.theme);
-      /* resolve the ambient: a named one injects a universal background layer;
-         "none" silences motion; "auto"/absent keeps the layout's built-in ambient. */
-      var amb=(s.ambient!=null)?s.ambient:defAmb, ambLayer='', ambAttr='';
-      if(amb==='none'){ ambAttr=' data-ambient="none"'; }
-      else if(amb&&amb!=='auto'){ ambLayer='<div class="amb amb-'+esc(amb)+'" aria-hidden="true"></div>'; }
-      html+='<section class="'+cls+'" data-i="'+(i+1)+'" role="group" aria-roledescription="slide" aria-label="Slide '+(i+1)+' of '+total+'"'
-        +(sty?' style="'+sty+'"':'')+ambAttr+'>'
-        +ambLayer+inner+brandMark(data.brand,lay)
-        +(s.doc?'<div class="doc-panel"><div class="doc-h">JSON · layout "'+esc(s.layout)+'"</div><pre>'+esc(s.doc)+'</pre></div>':'')
-        +'<div class="pager">'+pad(i+1)+' / '+pad(total)+'</div>'
-        +'<div class="progress" style="width:'+pctw(i+1,total)+'%"></div>'
-        +'</section>';
-    });
-    deck.innerHTML=html;
+    deck.innerHTML='';
+    slides.forEach(function(s,i){ deck.appendChild(buildSection(s,i,total,defAmb,data.brand)); });
     /* re-attach entrance-animation observers to the fresh slide nodes; without
        this the first shown slide keeps .sg-onenter elements at their hidden base */
     if(SG.wireAnims) SG.wireAnims(deck);
   };
 
+  /* targeted re-render: rebuild ONE section in place (content-only edits).
+     Structural changes (slide count, theme, brand) still need SG.render. */
+  SG.renderSlide=function(deck,i){
+    var data=SG.data, slides=arr(data.slides);
+    var secs=deck.querySelectorAll('.slide'), old=secs[i];
+    if(!old||secs.length!==slides.length){ SG.render(deck,data); return null; }
+    var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
+    var sec=buildSection(slides[i],i,slides.length,defAmb,data.brand);
+    if(old.classList.contains('active')) sec.classList.add('active');
+    old.parentNode.replaceChild(sec,old);
+    if(SG.wireAnims) SG.wireAnims(sec);
+    return sec; };
+
   /* =====================================================================
      NAVIGATION + responsive fit + per-slide deep links (re-entrant: rebuilt
      on import). Global listeners bind once; refresh() re-reads the slides.
      ===================================================================== */
+  /* =====================================================================
+     LINKS (media plan §5) — href lives on overrides[key].href / freeObject.href
+     (editor.js's decorate layer sets data-href + role=link + tabindex=0 on the
+     node). #N -> SG.show(N-1); http(s):/mailto: -> a new tab. Deliberately NOT
+     wrapping targets in <a> — that would restructure authored node trees and
+     break data-el identity; a delegated click/Enter handler does the same job. */
+  SG.followLink=function(href){ if(!href) return;
+    var m=/^#(\d+)$/.exec(href);
+    if(m){ if(SG.show) SG.show(parseInt(m[1],10)-1); return; }
+    W.open(href,'_blank','noopener,noreferrer'); };
+  /* a specific dead external link can't be detected (opaque cross-origin
+     response — see media plan §5.1); "the browser has no network at all" CAN
+     be, cheaply, via navigator.onLine. html[data-offline] drives the CSS
+     marker on every non-internal [data-href] element. */
+  function updateOfflineFlag(){ D.documentElement.toggleAttribute('data-offline', !navigator.onLine); }
+
   function mountNav(deck){
     var slides=[], n=0, cur=0;
     function refresh(){ slides=[].slice.call(deck.querySelectorAll('.slide')); n=slides.length; fromHash(); }
@@ -349,10 +705,14 @@
     function fit(){ var s=Math.min(W.innerWidth/1280,W.innerHeight/720); deck.style.transform='scale('+s+')'; }
     SG.show=show; SG.refresh=function(){ refresh(); fit(); };
     if(!SG._bound){ SG._bound=true;
+      updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){ var act=D.querySelector('.sf-embed-shield.active'); if(act){ act.classList.remove('active'); return; } }
         if(/^(input|textarea|select)$/i.test((e.target.tagName||''))) return;
         if(e.target.isContentEditable) return;                       /* WYSIWYG edit in progress */
         if(D.body.classList.contains('forge-edit')) return;          /* editor owns keys in edit mode */
+        if(e.key==='Enter'){ var lk=e.target.closest&&e.target.closest('[data-href]');
+          if(lk){ e.preventDefault(); SG.followLink(lk.getAttribute('data-href')); return; } }
         if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' '||e.key==='PageDown'){ if(SG.stepNext()){ e.preventDefault(); return; } show(cur+1); e.preventDefault(); }
         else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){ show(cur-1); e.preventDefault(); }
         else if(e.key==='Home'){ show(0); } else if(e.key==='End'){ show(n-1); }
@@ -364,7 +724,9 @@
         else if(e.key==='s'||e.key==='S'){ SG.speaker(); } });
       D.addEventListener('fullscreenchange',function(){
         if(!(D.fullscreenElement||D.webkitFullscreenElement)) D.body.classList.remove('presenting'); });
-      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return; if(SG.stepNext()) return; show(cur+1); });
+      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return;
+        var lk=e.target.closest('[data-href]'); if(lk){ SG.followLink(lk.getAttribute('data-href')); return; }
+        if(SG.stepNext()) return; show(cur+1); });
       W.addEventListener('resize',fit);
       W.addEventListener('hashchange',fromHash);
     }
@@ -473,7 +835,8 @@
         if(cur&&secs[i]){ cur.innerHTML='';
           var cl=secs[i].cloneNode(true); cl.classList.add('active');
           [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.doc-panel')).forEach(function(n){ n.remove(); });
-          cur.appendChild(cl); if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
+          cur.appendChild(cl); W.Forge&&W.Forge.posterize&&W.Forge.posterize(cur);
+          if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
         wd.getElementById('spk-notes').textContent=slides[i].notes||'(no notes for this slide)';
         var nx=slides[i+1];
         wd.getElementById('spk-next').textContent=nx?((i+2)+' \u00b7 '+titleOf(nx)):'\u2014 end of deck \u2014';
@@ -498,7 +861,7 @@
     var deck=D.getElementById('deck');
     var dataEl=D.getElementById('deck-data');
     try{ SG.data=SG.migrate(JSON.parse(dataEl.textContent)); }
-    catch(e){ deck.innerHTML='<section class="slide active"><div class="title">⚠ deck-data is not valid JSON</div><p class="subtitle">'+esc(e.message)+'</p></section>'; return; }
+    catch(e){ deck.innerHTML='<section class="slide active"><div class="title">⚠ deck-data is not valid JSON</div><p class="subtitle">'+esc(e.message)+'</p></section>'; SG.data=null; return; }
     SG.render(deck,SG.data);
     mountNav(deck);
     var inp=D.getElementById('deck-import');
