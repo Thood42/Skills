@@ -512,3 +512,15 @@ pass, and they are worth nothing if the asset foundation underneath them is shak
   in favour of one shared unavailable card (including unconditional posterizing in PDF export);
   clipboard image paste deferred; generation-time assets always embedded with no size ceiling, with
   an opt-in `linked` store and an `assets/` folder as a supported arrangement for later additions.
+- **2026-07-31 — implemented, all phases (A → A′ → B → C → D-1 → D-2).** Commits on
+  `claude/slide-forge-ui-import-a974e9`, one per phase; ADR recorded as `slides-editor-plan.md` §11.
+  Verified end-to-end in a real browser at every phase (jsdom can't exercise canvas/Image decoding or
+  live iframe loads — see `tests/README.md`). One thing turned out more imperfect than the plan's
+  prose implied and is now documented from measurement rather than expectation: the embed heartbeat
+  (§6.2) is confirmed to be a mitigation, not a detector — many `X-Frame-Options` refusals still fire
+  the iframe's `load` event, so they render as a blank/broken frame rather than the unavailable card.
+  This is an inherent cross-origin limitation (no reliable signal without cooperation from the
+  embedded page), not a defect in the implementation; see `slides-editor-plan.md` §11 for the full
+  writeup. Phase E's test additions to `tests/editor-ops.mjs` were authored and traced carefully
+  against the implementation but **not executed** (no Node in this sandbox) — run them before relying
+  on them.

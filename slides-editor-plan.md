@@ -477,3 +477,87 @@ Revisit only for out-of-file needs (asset libraries, PPTX round-trip, collaborat
 - The parity harness (`/tmp` jsdom scripts, see commit message) normalizes attribute order and
   ignores the new `data-*` attributes; small documented markup deltas exist where leaves gained
   wrapper spans to become bindable (timeline desc, hero-asym value/unit).
+
+---
+
+## 11. ADR (2026-07-31) — UI import: images, diagrams, links, sandboxed embeds
+
+**Status: accepted, implemented this session.** Full design in `slide-forge-media-plan.md`; this
+entry is the short version + the decisions actually made, matching the format of §10.
+
+### Decision
+
+Four additive capabilities, landed in strict dependency order (asset registry → objects → layouts →
+links → embeds), each verified in a real browser rather than assumed from code review alone (the
+jsdom harness can't exercise canvas/Image decoding or live iframe loads — see `tests/README.md`):
+
+1. **Asset registry v2** (`SG.assets.images[name]`): legacy plain string, or
+   `{store:"embedded",src,w,h,bytes,type,alt}` / `{store:"linked",path,w,h,bytes,type,alt}`. New
+   `svg{}` bucket for diagrams. `SG.imageMeta`/`imageURL`/`svgMarkup` normalize all shapes — a deck
+   with no imported assets is byte-for-byte unaffected (same additive guarantee as §10's v3 engine).
+2. **`SG.unavailable()`** — one component for every "this needs the network and can't reach it"
+   case: missing linked image, blocked/unreachable embed, offline link. Same markup/wording in
+   editor, present, thumbnails, speaker view, and print.
+3. **Image/svg free objects** + four new v3-identity layouts (`image`, `media-split`, `gallery`,
+   `diagram`) + an asset library panel (import/rename/replace/delete/link-conversion) in `src/media.js`
+   + `src/editor.js`.
+4. **Links** (`href` on any override/free-object) and **embeds** (`type:"embed"` free object + the
+   `embed` layout) — a sandboxed iframe behind an edit-mode-always-on "shield," click-to-interact by
+   default in present mode, with a 6s heartbeat and CSS-only (unconditional, `!important`) print/
+   static posterization.
+
+### Decisions taken over the default/safe option (media plan §7)
+
+- **Offline guarantee dropped for network-backed elements**, deliberately, in exchange for one
+  consistent failure mode everywhere (`SG.unavailable()`) rather than per-case blank states. Images
+  and diagrams remain fully offline; only links and embeds trade that away, and only when the author
+  chooses to use them.
+- **Clipboard image paste deferred.** Import lands via drop-on-canvas, the toolbar, and the library
+  panel; existing internal copy/paste is untouched rather than re-plumbing the Ctrl+V handler
+  (`wireKeys`) that currently `preventDefault`s it for the editor's own clipboard.
+- **Generation-time assets always embed, no size ceiling** — `scripts/build.py`'s 450 KB budget was
+  clarified (not changed) to cover the template/code only, built with an empty asset registry; it
+  says nothing about a delivered deck's size. An opt-in `store:"linked"` + `assets/` folder exists
+  for people who'd rather ship deck.html + images side by side.
+
+### What this bought (implemented with it)
+
+1. **One failure mode, not four.** A missing linked image, a blocked embed, and an offline link all
+   render the same small card — recognizable, and never a blank rectangle or a silently-broken frame.
+2. **Print never lies about what's live.** `html[data-static]`/`@media print` force every embed's
+   poster card visible and the iframe hidden via CSS `!important` alone — no JS state to get wrong,
+   and it's correct regardless of what the embed was doing on screen a moment earlier.
+3. **Clones can't multiply live loads.** `F.posterize()` is the one function every clone site (sorter
+   thumbnails, speaker view, deep-copy) calls before displaying a cloned section, stripping iframes
+   and forcing posters visible.
+4. **Aspect-safe media manipulation.** Corner-drag on an image/svg free object locks aspect ratio by
+   default (Shift frees it) — the deliberate inverse of the text-reflow convention elsewhere in the
+   editor, because for media the *shape* is usually what must be preserved.
+
+### Explicitly rejected
+
+- **Mermaid/live diagram rendering** — vendoring a render library is ~1 MB against the 450 KB
+  *template* budget (which the deck-size relaxation above does not touch). Diagrams come in as
+  sanitized static SVG, which already themes correctly via `currentColor`.
+- **A real crop-rectangle tool** — v1 crop is a focal point (`focal:[x,y]`) used with `fit:"cover"`,
+  not a second geometry channel with re-encode-on-export. Revisit only if users ask for precise crops.
+- **Per-URL reachability checking for external links.** A cross-origin probe can't distinguish 200
+  from 404/blocked (opaque response), and polling every URL on every render isn't acceptable anyway.
+  Only `navigator.onLine` (device-wide, cheap, honest) drives the link "unavailable" marker.
+
+### Known limits (accepted, verified empirically — not merely predicted)
+
+- **The embed heartbeat is a mitigation, not a detector.** Confirmed in-browser: a site sending
+  `X-Frame-Options` frequently still fires the iframe's `load` event (the browser considers the
+  navigation complete even though it refused to render), which is indistinguishable from success by
+  the 6s-timeout heuristic. CSP `frame-ancestors` refusals more often never fire `load` at all, which
+  the timeout does catch. No further engineering in this codebase closes that gap — it would need
+  cooperation from the embedded page (e.g. `postMessage`), which is out of scope.
+- **Esc-to-restore-the-shield can't reach a cross-origin iframe that already has focus.** Once a user
+  clicks past the shield into the embedded page's own content, keystrokes there don't bubble to the
+  parent document — an inherent iframe/SOP limitation, not a bug.
+- Raster image import's downscale/re-encode path (`F.assets.importFile`, canvas + `Image`) and live
+  embed load/timeout behavior are **not** covered by the jsdom test harness (no canvas/Image decoding,
+  no subresource fetches there) — both were verified end-to-end in a real browser during
+  implementation instead. A future session with a real-browser test runner (Playwright/Puppeteer)
+  could promote that into automated coverage; `tests/README.md` flags exactly what's missing.
