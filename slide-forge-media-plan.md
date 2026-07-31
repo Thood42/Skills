@@ -347,7 +347,16 @@ Plus an `embed` **layout** for the full-slide case: `{kicker,title,url,ratio,mod
 ### 6.3 Security posture
 
 - **Default sandbox** = `sandbox="allow-scripts allow-popups"`, `referrerpolicy="no-referrer"`,
-  `allow=""` (no camera/mic/geolocation), `loading="lazy"`.
+  `loading="lazy"`. The `allow` (Permissions-Policy) attribute defaults to
+  `accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;
+  web-share` — the same set YouTube/Vimeo's own embed code requests — plus the legacy
+  `allowfullscreen` attribute. **Revised post-launch** (2026-07-31): an originally-empty `allow=""`
+  turned out to block more than intended — verified against a real YouTube embed, whose own player
+  script failed (cascading into a `writeEmbed is not defined` error) when Cache Storage and
+  `compute-pressure` access were blocked by the empty allowlist. Camera, microphone, geolocation,
+  USB, MIDI, etc. are still **not** in the list — the original intent (don't hand an arbitrary
+  embedded URL access to sensitive device features) is unchanged; only the collateral restriction on
+  ordinary media playback was lifted.
 - `allow-same-origin` is an explicit, separately-labelled toggle in the inspector
   (*"Let the page access its own cookies/storage — only for sites you trust"*), because
   `allow-scripts` + `allow-same-origin` together lets the frame reach out of its sandbox when it is
