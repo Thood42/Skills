@@ -716,8 +716,12 @@
       slides.forEach(function(s,k){ s.classList.toggle('active',k===cur); });
       if(location.hash!=='#'+(cur+1)) history.replaceState(null,'','#'+(cur+1)); }
     function fromHash(){ var h=parseInt((location.hash||'').slice(1),10); show(isNaN(h)?0:h-1); }
-    function fit(){ var s=Math.min(W.innerWidth/1280,W.innerHeight/720); deck.style.transform='scale('+s+')'; }
-    SG.show=show; SG.refresh=function(){ refresh(); fit(); };
+    /* SG.viewTransform is an optional hook: the editor installs one so the deck
+       can be fitted to the stage BETWEEN its panels and zoomed/panned. Absent
+       (present mode, plain decks) this is exactly the v3 behavior. */
+    function fit(){ var t=SG.viewTransform&&SG.viewTransform();
+      deck.style.transform=t||('scale('+Math.min(W.innerWidth/1280,W.innerHeight/720)+')'); }
+    SG.show=show; SG.fit=fit; SG.refresh=function(){ refresh(); fit(); };
     if(!SG._bound){ SG._bound=true;
       updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){

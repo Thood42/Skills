@@ -174,23 +174,32 @@ slide 3, `"https://…"`/`"mailto:…"` opens in a new tab. You don't normally a
 The delivered file does double duty, so close by telling them how to use both halves:
 
 - **Present:** open the file, click to advance, press `F` for fullscreen.
-- **Edit (no install):** click **Edit** (bottom-right). Then they can **click any element and drag to
-  move it** — smart guides snap it to centers, edges and neighbours (hold **Alt** to snap freely).
-  Drag a corner to **resize — text rewraps** to the new width (hold **Alt** on a corner to scale
-  proportionally instead), the green handle to rotate, and **double-click any text to edit it in
-  place** (a floating **B / ✦ / `<>`** toolbar formats the selection). **Shift-click or drag a box on
-  empty canvas to select several elements at once**, then use the floating toolbar to **align &
-  distribute** them. **Copy / paste / duplicate** with `Cmd/Ctrl+C·V·D`, nudge with arrow keys
-  (Shift = 10px), and bring elements **forward / back**. Add slides or free **Text/Box** objects from
-  the top bar; reorder, duplicate or delete slides from the row tools in the left panel; recolor the
-  whole deck (Theme) or just the selected element (right panel). **Group** elements with
-  `Cmd/Ctrl+G`; the ▦ button turns the slide list into a **drag-to-reorder thumbnail sorter**.
-  **Undo/redo** is `Cmd/Ctrl+Z` / `Shift+Z`.
+- **Edit (no install):** click **Edit** (bottom-right). The right panel opens on **"On this slide"** —
+  every element on the slide, named in plain English ("Stat 3 — 12×"), not code. Hover a row to find
+  it on the slide, click to select it, and use the **eye** to hide something without deleting it.
+  Selecting anything shows just what applies to it: its own text fields, a **text-size** stepper,
+  colour swatches that follow the theme, **B / ✦ / `<>`** formatting, and **↑ ↓ ⧉ ✕** to reorder,
+  duplicate or remove a list item.
+- **On the slide itself:** **drag any element to move it** — smart guides snap it to centers, edges
+  and neighbours (hold **Alt** to snap freely). Drag a corner to **resize — text rewraps** to the new
+  width (hold **Alt** on a corner to scale proportionally), the green handle to rotate, and
+  **double-click any text to edit it in place** (highlight part of it and a floating **B / ✦ / `<>`**
+  toolbar formats just that range). Click a group once to select it, **click again to step inside**
+  it; the **breadcrumb** above the slide walks back out. **Shift-click or drag a box** to select
+  several at once, then **align & distribute** from the floating toolbar. **Copy / paste / duplicate**
+  with `Cmd/Ctrl+C·V·D`, nudge with arrow keys (Shift = 10px), **Group** with `Cmd/Ctrl+G`.
+- **Getting around:** **⌖ Focus** (bottom-right) zooms to whatever is selected and follows the
+  selection; **− / ＋ / Fit**, `Ctrl+scroll` and `Ctrl 0` control the zoom. **⤢ Manage items…** opens
+  every field on the slide side by side (with an **Advanced (JSON)** tab for power users), and
+  **⊞ Insert** is a searchable gallery of every element type in the deck — a stat card, a timeline
+  event, a quote — droppable onto any slide. The top bar also adds slides, **Text/Box/Image**
+  objects, the **▦ sorter**, **◐ Theme** and **⚙ Deck** settings. **Undo/redo** is `Cmd/Ctrl+Z` /
+  `Shift+Z`; press **?** for every shortcut.
 - **Present like a pro:** add per-slide **presenter notes** in the Slide panel, then press **S**
   while presenting — a **speaker view** popup shows the current slide, your notes, what's next, and
   a timer. Set an animation's trigger to **On click** to reveal content **step-by-step** with → /
   Space / click, PowerPoint-style; the Slide panel's Animations list manages every effect in one
-  place. Press **?** in Edit mode for the full shortcut list.
+  place.
 - **Saving:** edits autosave in the browser, but the file itself is the source of truth — save with
   **Save .html** / `Cmd/Ctrl+S`. On Chrome/Edge this writes **in place** (first save asks where;
   after that it's silent). Other browsers can't overwrite an opened file, so they download a fresh
