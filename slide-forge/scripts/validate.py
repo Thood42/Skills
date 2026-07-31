@@ -73,7 +73,7 @@ HREF_RE = re.compile(r'^(#\d+|https?:.*|mailto:.*)$', re.I)
 # (§6) — kept in one set since a deck author may hand-edit freeObjects JSON.
 FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color','font','anim','animDelay',
  'animTrigger','animStep','html','theme','group','asset','fit','focal','radius','opacity','frame','alt','href',
- 'url','ratio','mode','poster','sandbox','chrome','title'}
+ 'url','ratio','mode','poster','sandbox','chrome','title','fillPrev'}
 
 def typeok(v, t):
     return {'s':lambda:isinstance(v,str), 'n':lambda:isinstance(v,(int,float)) and not isinstance(v,bool),

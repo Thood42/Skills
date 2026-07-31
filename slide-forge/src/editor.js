@@ -286,6 +286,11 @@
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   var MEDIA_FREE={image:1,svg:1};
   var SIZED_FREE={box:1,image:1,svg:1,embed:1};
+  /* free-object types whose corner drag resizes BOTH axes independently (vs.
+     text, where a corner drag only changes width and the text reflows).
+     image/svg additionally default to aspect-locked (see MEDIA_FREE + the
+     Shift-frees-it logic in startDrag) — embed/box/html resize freely. */
+  var TWO_AXIS_FREE={box:1,html:1,image:1,svg:1,embed:1};
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
     applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
@@ -453,7 +458,7 @@
           } else {
             p.d.w=newW;
             if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
-            if(p.sel.kind==='free'&&(p.d.type==='box'||p.d.type==='html'||isMedia)){
+            if(p.sel.kind==='free'&&TWO_AXIS_FREE[p.d.type]){
               p.d.h=Math.max(30,Math.round(p.box0.h+(cT?-dy:dy)));
               if(cT) p.d.y=Math.round((p.d0.y||0)+dy); }
           }
@@ -1529,6 +1534,17 @@
       function reapplyEmbed(){ var n=sel.node; var host=n; /* remount: URL/mode/sandbox changes need a fresh iframe */
         [].slice.call(n.querySelectorAll('.sf-embed-iframe-wrap,.sf-embed-shield,.sf-embed-poster,.sf-unavail')).forEach(function(x){ x.remove(); });
         n.classList.remove('sf-embed'); if(SG.mountEmbed) SG.mountEmbed(host,d); applyFree(n,d); }
+      /* Fill-slide toggle: quick full-bleed sizing (0,0,1280,720), remembers
+         the prior geometry so a second click restores it. Ordinary corner
+         drag / the Width & Height fields keep working normally afterward in
+         either state — this is a starting point, not a locked mode. */
+      var fillBtn=el('button','forge-btn',d.fillPrev?'⛶ Restore previous size':'⛶ Fill slide');
+      fillBtn.style.marginBottom='8px';
+      fillBtn.onclick=function(){ F.pushUndo();
+        if(d.fillPrev){ var p=d.fillPrev; d.x=p.x; d.y=p.y; d.w=p.w; d.h=p.h; delete d.fillPrev; }
+        else { d.fillPrev={x:d.x||0,y:d.y||0,w:d.w||480,h:d.h||270}; d.x=0; d.y=0; d.w=1280; d.h=720; }
+        applyFree(sel.node,d); refreshHandles(); positionFloat(); syncGeomFields(); F.save(); F.buildInspect(); };
+      se.appendChild(fillBtn);
       var urlInp=el('input'); urlInp.type='text'; urlInp.placeholder='https://…'; urlInp.value=d.url||'';
       var urlErr=el('div','forge-field-error'); urlErr.style.display='none';
       urlInp.onfocus=function(){ F.pushUndo(); };
