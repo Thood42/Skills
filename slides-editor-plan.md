@@ -561,3 +561,21 @@ jsdom harness can't exercise canvas/Image decoding or live iframe loads — see 
   no subresource fetches there) — both were verified end-to-end in a real browser during
   implementation instead. A future session with a real-browser test runner (Playwright/Puppeteer)
   could promote that into automated coverage; `tests/README.md` flags exactly what's missing.
+
+### Post-launch fix (2026-07-31) — embed `allow` attribute was too restrictive
+
+User QA against real sites (w3schools, YouTube) surfaced three distinct issues in order, only the
+third of which was an actual bug here — the first two are the accepted, documented limits above:
+
+1. w3schools.com sends `frame-ancestors 'self'` — cannot be framed by anyone, not fixable.
+2. A plain `youtube.com/watch?v=` URL sends `X-Frame-Options: SAMEORIGIN` — user error, not a bug;
+   `youtube.com/embed/VIDEO_ID` is the correct embeddable URL.
+3. **Real bug**: the embed's `allow` (Permissions-Policy) attribute was empty (`allow=""`),
+   intended only to withhold camera/mic/geolocation from an arbitrary embedded URL. Verified against
+   a real YouTube embed that this also blocked Cache Storage and `compute-pressure`, which YouTube's
+   own player script accesses unconditionally — the resulting failures cascaded into a
+   `writeEmbed is not defined` error inside their script. Fixed by scoping the allowlist to what
+   YouTube/Vimeo's own embed code requests (`accelerometer; autoplay; clipboard-write;
+   encrypted-media; gyroscope; picture-in-picture; web-share`) plus the legacy `allowfullscreen`
+   attribute, while leaving camera/mic/geolocation/USB/etc. excluded — see §6.3 of the media plan.
+   Shipped on `claude/embed-sandbox-permissions-fix`, off `master` (PR #1 was already merged).

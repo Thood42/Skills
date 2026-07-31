@@ -202,6 +202,19 @@
      capture time, and F.posterize() (editor.js) reuses the same card for
      cloned contexts (sorter thumbnails, speaker view, copy/paste).
      ===================================================================== */
+  /* Permissions-Policy allowlist for the iframe's `allow` attribute (distinct
+     from the `sandbox` attribute above). An EMPTY allowlist (the original
+     choice here) turns out to block more than intended: it was meant to keep
+     an arbitrary embedded URL away from camera/mic/geolocation/USB/etc., but
+     it also blocks harmless things ordinary video players legitimately use —
+     verified in-browser against a real YouTube embed, which failed with
+     "compute-pressure is not allowed" and (before that) cascading errors from
+     its own player script assuming these were available. This list matches
+     what YouTube/Vimeo's own official embed code requests; camera, mic,
+     geolocation, USB, MIDI, etc. are still NOT in it — the original security
+     intent is unchanged, only the collateral restriction on ordinary media
+     playback is lifted. */
+  var EMBED_ALLOW='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
   var SANDBOX_DEFAULT={scripts:true,popups:true,forms:false,sameOrigin:false};
   function sandboxAttr(sb){ sb=Object.assign({},SANDBOX_DEFAULT,sb||{});
     var t=['allow-scripts'];                              /* always on — most embeddable sites need it just to render */
@@ -241,7 +254,8 @@
     var iframe=D.createElement('iframe');
     iframe.setAttribute('sandbox',sandboxAttr(spec.sandbox));
     iframe.setAttribute('referrerpolicy','no-referrer');
-    iframe.setAttribute('allow','');                       /* no camera/mic/geolocation/etc. */
+    iframe.setAttribute('allow',EMBED_ALLOW);               /* still no camera/mic/geolocation/etc. */
+    iframe.setAttribute('allowfullscreen','');              /* legacy attribute; separate from `allow`'s fullscreen token */
     iframe.setAttribute('loading','lazy');
     iframe.setAttribute('title',spec.title||'Embedded content');
     wrap.appendChild(iframe);
