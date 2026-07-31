@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 6795d569a6 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 36d273438b — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -765,6 +765,20 @@ body.presenting{cursor:none}
   /* .media-img .sf-unavail (2 classes) would otherwise out-specificity the
      base .sf-unavail print rule that un-absolutizes it for the page flow */
   .media-img .sf-unavail{ position:relative !important; }
+}
+
+/* =====================================================================
+   LINKS (media plan §5) — data-href is set by the editor's decorate layer.
+   No visual change by default (the object keeps its normal styling); the
+   offline marker and print annotation are the only automatic cues, kept
+   subtle so a linked title doesn't read as a web-app button.
+   ===================================================================== */
+[data-href]{ cursor:pointer; }
+html[data-offline] [data-href]:not([data-href^="#"])::after{
+  content:" \26A0"; color:var(--cyan); font-size:.7em; vertical-align:super; margin-left:3px; }
+@media print{
+  [data-href]:not([data-href^="#"])::after{
+    content:" (" attr(data-href) ")"; font-size:.6em; color:#666; font-weight:400; }
 }
 
 /* METRIC-DASH — mixed dashboard: kpi ring + stat tiles */
@@ -1820,6 +1834,22 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
      NAVIGATION + responsive fit + per-slide deep links (re-entrant: rebuilt
      on import). Global listeners bind once; refresh() re-reads the slides.
      ===================================================================== */
+  /* =====================================================================
+     LINKS (media plan §5) — href lives on overrides[key].href / freeObject.href
+     (editor.js's decorate layer sets data-href + role=link + tabindex=0 on the
+     node). #N -> SG.show(N-1); http(s):/mailto: -> a new tab. Deliberately NOT
+     wrapping targets in <a> — that would restructure authored node trees and
+     break data-el identity; a delegated click/Enter handler does the same job. */
+  SG.followLink=function(href){ if(!href) return;
+    var m=/^#(\d+)$/.exec(href);
+    if(m){ if(SG.show) SG.show(parseInt(m[1],10)-1); return; }
+    W.open(href,'_blank','noopener,noreferrer'); };
+  /* a specific dead external link can't be detected (opaque cross-origin
+     response — see media plan §5.1); "the browser has no network at all" CAN
+     be, cheaply, via navigator.onLine. html[data-offline] drives the CSS
+     marker on every non-internal [data-href] element. */
+  function updateOfflineFlag(){ D.documentElement.toggleAttribute('data-offline', !navigator.onLine); }
+
   function mountNav(deck){
     var slides=[], n=0, cur=0;
     function refresh(){ slides=[].slice.call(deck.querySelectorAll('.slide')); n=slides.length; fromHash(); }
@@ -1831,10 +1861,13 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     function fit(){ var s=Math.min(W.innerWidth/1280,W.innerHeight/720); deck.style.transform='scale('+s+')'; }
     SG.show=show; SG.refresh=function(){ refresh(); fit(); };
     if(!SG._bound){ SG._bound=true;
+      updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
         if(/^(input|textarea|select)$/i.test((e.target.tagName||''))) return;
         if(e.target.isContentEditable) return;                       /* WYSIWYG edit in progress */
         if(D.body.classList.contains('forge-edit')) return;          /* editor owns keys in edit mode */
+        if(e.key==='Enter'){ var lk=e.target.closest&&e.target.closest('[data-href]');
+          if(lk){ e.preventDefault(); SG.followLink(lk.getAttribute('data-href')); return; } }
         if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' '||e.key==='PageDown'){ if(SG.stepNext()){ e.preventDefault(); return; } show(cur+1); e.preventDefault(); }
         else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){ show(cur-1); e.preventDefault(); }
         else if(e.key==='Home'){ show(0); } else if(e.key==='End'){ show(n-1); }
@@ -1846,7 +1879,9 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         else if(e.key==='s'||e.key==='S'){ SG.speaker(); } });
       D.addEventListener('fullscreenchange',function(){
         if(!(D.fullscreenElement||D.webkitFullscreenElement)) D.body.classList.remove('presenting'); });
-      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return; if(SG.stepNext()) return; show(cur+1); });
+      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return;
+        var lk=e.target.closest('[data-href]'); if(lk){ SG.followLink(lk.getAttribute('data-href')); return; }
+        if(SG.stepNext()) return; show(cur+1); });
       W.addEventListener('resize',fit);
       W.addEventListener('hashchange',fromHash);
     }
@@ -2384,6 +2419,14 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
 .forge-assetpick-thumb svg{ width:80%; height:80%; }
 .forge-assetpick select{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
   border-radius:6px; color:#eaf1fb; font-size:12px; padding:5px 6px; }
+
+/* links (media plan §5) — a small badge in EDIT MODE ONLY, pure CSS so it
+   never needs stripping before download (body loses .forge-edit on save). */
+body.forge-edit .sf-linked{ outline:1px dashed rgba(58,182,255,.5); outline-offset:2px; }
+body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px; right:-9px; z-index:6;
+  width:16px; height:16px; border-radius:50%; background:#2a6df4; color:#fff; font-size:10px;
+  line-height:16px; text-align:center; pointer-events:none; }
+.forge-field-error{ color:#f0a0a0; font-size:11px; margin-top:3px; }
 </style>
 </head>
 <body>
@@ -2977,10 +3020,24 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
   function transformStr(o){ o=o||{}; var t='';
     if(o.x||o.y) t+='translate('+(o.x||0)+'px,'+(o.y||0)+'px) '; if(o.rot) t+='rotate('+o.rot+'deg) ';
     if(o.scale&&o.scale!==1) t+='scale('+o.scale+') '; return t.trim(); }
-  function applyStyle(node,o){ if(!o) return;
+  /* href allow-list (media plan §5): only what the deck engine actually
+     follows (SG.followLink) — rejects javascript:/data:/vbscript: etc. so a
+     forwarded deck can never carry a stored script-executing link. */
+  function sanitizeHref(v){ v=String(v==null?'':v).trim();
+    if(!v) return {ok:true,value:''};
+    if(/^#\d+$/.test(v)) return {ok:true,value:v};
+    if(/^(https?:|mailto:)/i.test(v)) return {ok:true,value:v};
+    return {ok:false,value:v}; }
+  F.sanitizeHref=sanitizeHref;
+  function applyHref(node,o){ var href=o&&o.href;
+    if(href){ node.setAttribute('data-href',href); node.setAttribute('role','link'); node.setAttribute('tabindex','0');
+      node.classList.add('sf-linked'); }
+    else { node.removeAttribute('data-href'); node.removeAttribute('role'); node.removeAttribute('tabindex');
+      node.classList.remove('sf-linked'); } }
+  function applyStyle(node,o){ if(!o){ applyHref(node,o); return; }
     if(o.color) node.style.color=o.color; if(o.font) node.style.fontFamily=o.font;
     if(o.z!=null) node.style.zIndex=o.z;
-    if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); }
+    if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); applyHref(node,o); }
   function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')||node.children.length) return;
     var txt=node.textContent, o=''; for(var i=0;i<txt.length;i++){ var ch=txt[i]===' '?'&nbsp;':SG.esc(txt[i]); o+='<span style="--i:'+i+'">'+ch+'</span>'; }
     node.innerHTML=o; }
@@ -4248,6 +4305,17 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
       d.theme=d.theme||{}; d.theme['--cyan']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
     s2.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
       d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
+    var s6=sec(body,'Link');
+    var hrefInp=el('input'); hrefInp.type='text'; hrefInp.placeholder='https://… · mailto:… · #3'; hrefInp.value=d.href||'';
+    var hrefErr=el('div','forge-field-error'); hrefErr.style.display='none';
+    hrefInp.onfocus=function(){ F.pushUndo(); };
+    hrefInp.onchange=function(){ var r=F.sanitizeHref(hrefInp.value);
+      if(!r.ok){ hrefErr.textContent='Only https://, mailto:, or #<slide number> links are allowed.'; hrefErr.style.display='block'; return; }
+      hrefErr.style.display='none';
+      if(r.value) d.href=r.value; else delete d.href;
+      isFree?applyFree(sel.node,d):applyOverride(sel.node,d); F.save(); };
+    s6.appendChild(field('URL',hrefInp)); s6.appendChild(hrefErr);
+    s6.appendChild(el('div','forge-hint','Jump to a slide with #3, or link out with a full https:// URL. Shows a small ↗ badge here in the editor only.'));
     var s3=sec(body,'Animation');
     function reapply(){ isFree?applyFree(sel.node,d):applyOverride(sel.node,d); }
     s3.appendChild(field('Effect',selectInput(F.animChoices,d.anim||'',function(v){ F.pushUndo(); d.anim=v;

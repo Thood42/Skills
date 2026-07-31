@@ -234,10 +234,24 @@
   function transformStr(o){ o=o||{}; var t='';
     if(o.x||o.y) t+='translate('+(o.x||0)+'px,'+(o.y||0)+'px) '; if(o.rot) t+='rotate('+o.rot+'deg) ';
     if(o.scale&&o.scale!==1) t+='scale('+o.scale+') '; return t.trim(); }
-  function applyStyle(node,o){ if(!o) return;
+  /* href allow-list (media plan §5): only what the deck engine actually
+     follows (SG.followLink) — rejects javascript:/data:/vbscript: etc. so a
+     forwarded deck can never carry a stored script-executing link. */
+  function sanitizeHref(v){ v=String(v==null?'':v).trim();
+    if(!v) return {ok:true,value:''};
+    if(/^#\d+$/.test(v)) return {ok:true,value:v};
+    if(/^(https?:|mailto:)/i.test(v)) return {ok:true,value:v};
+    return {ok:false,value:v}; }
+  F.sanitizeHref=sanitizeHref;
+  function applyHref(node,o){ var href=o&&o.href;
+    if(href){ node.setAttribute('data-href',href); node.setAttribute('role','link'); node.setAttribute('tabindex','0');
+      node.classList.add('sf-linked'); }
+    else { node.removeAttribute('data-href'); node.removeAttribute('role'); node.removeAttribute('tabindex');
+      node.classList.remove('sf-linked'); } }
+  function applyStyle(node,o){ if(!o){ applyHref(node,o); return; }
     if(o.color) node.style.color=o.color; if(o.font) node.style.fontFamily=o.font;
     if(o.z!=null) node.style.zIndex=o.z;
-    if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); }
+    if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); applyHref(node,o); }
   function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')||node.children.length) return;
     var txt=node.textContent, o=''; for(var i=0;i<txt.length;i++){ var ch=txt[i]===' '?'&nbsp;':SG.esc(txt[i]); o+='<span style="--i:'+i+'">'+ch+'</span>'; }
     node.innerHTML=o; }
@@ -1505,6 +1519,17 @@
       d.theme=d.theme||{}; d.theme['--cyan']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
     s2.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
       d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
+    var s6=sec(body,'Link');
+    var hrefInp=el('input'); hrefInp.type='text'; hrefInp.placeholder='https://… · mailto:… · #3'; hrefInp.value=d.href||'';
+    var hrefErr=el('div','forge-field-error'); hrefErr.style.display='none';
+    hrefInp.onfocus=function(){ F.pushUndo(); };
+    hrefInp.onchange=function(){ var r=F.sanitizeHref(hrefInp.value);
+      if(!r.ok){ hrefErr.textContent='Only https://, mailto:, or #<slide number> links are allowed.'; hrefErr.style.display='block'; return; }
+      hrefErr.style.display='none';
+      if(r.value) d.href=r.value; else delete d.href;
+      isFree?applyFree(sel.node,d):applyOverride(sel.node,d); F.save(); };
+    s6.appendChild(field('URL',hrefInp)); s6.appendChild(hrefErr);
+    s6.appendChild(el('div','forge-hint','Jump to a slide with #3, or link out with a full https:// URL. Shows a small ↗ badge here in the editor only.'));
     var s3=sec(body,'Animation');
     function reapply(){ isFree?applyFree(sel.node,d):applyOverride(sel.node,d); }
     s3.appendChild(field('Effect',selectInput(F.animChoices,d.anim||'',function(v){ F.pushUndo(); d.anim=v;

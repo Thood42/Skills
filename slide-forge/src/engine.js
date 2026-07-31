@@ -592,6 +592,22 @@
      NAVIGATION + responsive fit + per-slide deep links (re-entrant: rebuilt
      on import). Global listeners bind once; refresh() re-reads the slides.
      ===================================================================== */
+  /* =====================================================================
+     LINKS (media plan §5) — href lives on overrides[key].href / freeObject.href
+     (editor.js's decorate layer sets data-href + role=link + tabindex=0 on the
+     node). #N -> SG.show(N-1); http(s):/mailto: -> a new tab. Deliberately NOT
+     wrapping targets in <a> — that would restructure authored node trees and
+     break data-el identity; a delegated click/Enter handler does the same job. */
+  SG.followLink=function(href){ if(!href) return;
+    var m=/^#(\d+)$/.exec(href);
+    if(m){ if(SG.show) SG.show(parseInt(m[1],10)-1); return; }
+    W.open(href,'_blank','noopener,noreferrer'); };
+  /* a specific dead external link can't be detected (opaque cross-origin
+     response — see media plan §5.1); "the browser has no network at all" CAN
+     be, cheaply, via navigator.onLine. html[data-offline] drives the CSS
+     marker on every non-internal [data-href] element. */
+  function updateOfflineFlag(){ D.documentElement.toggleAttribute('data-offline', !navigator.onLine); }
+
   function mountNav(deck){
     var slides=[], n=0, cur=0;
     function refresh(){ slides=[].slice.call(deck.querySelectorAll('.slide')); n=slides.length; fromHash(); }
@@ -603,10 +619,13 @@
     function fit(){ var s=Math.min(W.innerWidth/1280,W.innerHeight/720); deck.style.transform='scale('+s+')'; }
     SG.show=show; SG.refresh=function(){ refresh(); fit(); };
     if(!SG._bound){ SG._bound=true;
+      updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
         if(/^(input|textarea|select)$/i.test((e.target.tagName||''))) return;
         if(e.target.isContentEditable) return;                       /* WYSIWYG edit in progress */
         if(D.body.classList.contains('forge-edit')) return;          /* editor owns keys in edit mode */
+        if(e.key==='Enter'){ var lk=e.target.closest&&e.target.closest('[data-href]');
+          if(lk){ e.preventDefault(); SG.followLink(lk.getAttribute('data-href')); return; } }
         if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' '||e.key==='PageDown'){ if(SG.stepNext()){ e.preventDefault(); return; } show(cur+1); e.preventDefault(); }
         else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){ show(cur-1); e.preventDefault(); }
         else if(e.key==='Home'){ show(0); } else if(e.key==='End'){ show(n-1); }
@@ -618,7 +637,9 @@
         else if(e.key==='s'||e.key==='S'){ SG.speaker(); } });
       D.addEventListener('fullscreenchange',function(){
         if(!(D.fullscreenElement||D.webkitFullscreenElement)) D.body.classList.remove('presenting'); });
-      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return; if(SG.stepNext()) return; show(cur+1); });
+      deck.addEventListener('click',function(e){ if(e.target.closest('a,button,input')) return;
+        var lk=e.target.closest('[data-href]'); if(lk){ SG.followLink(lk.getAttribute('data-href')); return; }
+        if(SG.stepNext()) return; show(cur+1); });
       W.addEventListener('resize',fit);
       W.addEventListener('hashchange',fromHash);
     }

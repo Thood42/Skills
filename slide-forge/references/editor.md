@@ -188,3 +188,46 @@ What that enables:
 Verification lives in `tests/` (jsdom): a 26-slide structural parity diff against the frozen v2
 build, and 29 data-layer assertions (item remap, GC, migration, bind write-back, targeted render).
 
+## Media (2026-07-31) — images, diagrams, links, embeds
+
+Implements `slide-forge-media-plan.md`. See that file for the full design and the decisions in its
+§7 (offline guarantee dropped for network-backed elements in favor of one shared "unavailable" card;
+clipboard paste deferred; generation-time assets always embed with no size ceiling).
+
+- **Asset registry v2** (`SG.assets`): `images[name]` is a legacy plain string, or an object —
+  `{store:"embedded", src, w, h, bytes, type, alt}` (travels inside the .html) or
+  `{store:"linked", path, w, h, bytes, type, alt}` (resolved relative to the deck; falls back to the
+  unavailable card if the file is missing). `svg{}` is a sibling bucket for inline diagram markup.
+  `SG.imageMeta`/`imageURL`/`svgMarkup` normalize all shapes.
+- **`SG.unavailable(spec)`** — the one component used for a missing linked image, an unreachable/
+  blocked embed, or (inline variant) a link shown while the browser is offline. Same wording and
+  styling everywhere: editor, present, thumbnails, speaker view, print.
+- **Image/svg free objects** (`type:"image"`/`"svg"`): `{asset, fit, focal:[x,y], radius, opacity,
+  frame, alt, href?}`. Drop a file on the canvas or use the 🖼 Assets library panel to import;
+  corner-drag resizes with the aspect ratio **locked by default** (Shift frees it — the inverse of
+  the text case, where reflow is the point). No clipboard paste in v1 (§7.2 of the media plan) — use
+  drop-import or the library panel.
+- **Asset library panel** (`F.assetsPanel`, toolbar 🖼 Assets): import, insert, inline rename
+  (remaps every reference via `F.assets._remapRefs`), replace file, delete with an undo bar, and
+  "Link instead of embed" (downloads the original + converts the registry entry to a relative path).
+  The size meter is informational only — it never blocks an import.
+- **Media layouts**: `image`, `media-split`, `gallery`, `diagram` (content schemas in
+  `references/layouts.md`). All four follow the v3 identity contract above. `figure` was upgraded to
+  render a real `<img>` instead of a CSS `background-image`, specifically so a missing asset's
+  native `error` event can drive the unavailable fallback (a CSS background failure is silent).
+- **Links**: `href` on any override or free object (`{href:"https://…"}`, `{href:"#3"}`,
+  `{href:"mailto:…"}`). Sanitized on write by an allow-list (`F.sanitizeHref` in editor.js,
+  `HREF_RE` in `scripts/validate.py`) — `javascript:`/`data:`/anything else is rejected outright, not
+  silently dropped. Rendered as `data-href` + `role="link"` + `tabindex="0"` on the existing node
+  (deliberately not wrapped in `<a>`, which would disturb `data-el` identity); a delegated click/
+  Enter handler in `engine.js` (`SG.followLink`) resolves it. A small ↗ badge shows in edit mode
+  only (pure CSS, gone once `body.forge-edit` is removed on save). `html[data-offline]` (from the
+  browser's own `online`/`offline` events) drives a small ⚠ marker on external links — a *specific*
+  dead link while online can't be detected (opaque cross-origin response), so that case is
+  intentionally not claimed.
+- **Storage**: generation-time assets (`assets/images/`, `assets/diagrams/` via `scripts/assets.py`)
+  always embed, no size ceiling — the delivered deck may exceed the 450 KB *template* budget
+  (`scripts/build.py`'s budget covers code only). Editor imports downscale to 1920px/WebP by default
+  and get their own quota-safe localStorage key, separate from deck-JSON autosave, so an oversized
+  asset registry can never cost the user their text edits.
+

@@ -63,7 +63,8 @@ AMBIENTS = {'auto','none','orbs','aurora','grid','rays','grain','contours','scan
 CHART_TYPES = {'bar','bar-h','stacked','line','area','pie','donut','scatter'}
 FIT_MODES = {'cover','contain','fill'}
 FRAME_MODES = {'none','panel','glow','shadow'}
-OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide'}
+OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide','href'}
+HREF_RE = re.compile(r'^(#\d+|https?:.*|mailto:.*)$', re.I)
 # media plan §3/§3.4/§5/§6: image/svg objects (asset,fit,focal,radius,opacity,
 # frame,alt), a shared "href" link on any free object (§5), and embed fields
 # (§6) — kept in one set since a deck author may hand-edit freeObjects JSON.
@@ -187,11 +188,15 @@ def validate(data, assets=None):
                     if not isinstance(o, dict): errs.append('%s: overrides[%r] not an object' % (where, k)); continue
                     for f in o:
                         if f not in OVERRIDE_KEYS: warns.append('%s: overrides[%r] unknown field %r' % (where, k, f))
+                    if o.get('href') and not HREF_RE.match(o['href']):
+                        errs.append('%s: overrides[%r].href %r is not https:/mailto:/#N (media plan section 5 allow-list)' % (where, k, o['href']))
         for j, fo in enumerate(sl.get('freeObjects') or []):
             if not isinstance(fo, dict) or 'id' not in fo:
                 errs.append('%s: freeObjects[%d] needs an object with id' % (where, j)); continue
             for f in fo:
                 if f not in FREE_KEYS: warns.append('%s: freeObjects[%d] unknown field %r' % (where, j, f))
+            if fo.get('href') and not HREF_RE.match(fo['href']):
+                errs.append('%s: freeObjects[%d].href %r is not https:/mailto:/#N (media plan section 5 allow-list)' % (where, j, fo['href']))
             if fo.get('fit') is not None and fo['fit'] not in FIT_MODES:
                 errs.append('%s: freeObjects[%d].fit %r not one of %s' % (where, j, fo['fit'], sorted(FIT_MODES)))
             if fo.get('frame') is not None and fo['frame'] not in FRAME_MODES:

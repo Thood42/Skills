@@ -393,3 +393,11 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
 .forge-assetpick-thumb svg{ width:80%; height:80%; }
 .forge-assetpick select{ flex:1; min-width:0; background:#161b25; border:1px solid rgba(255,255,255,.12);
   border-radius:6px; color:#eaf1fb; font-size:12px; padding:5px 6px; }
+
+/* links (media plan §5) — a small badge in EDIT MODE ONLY, pure CSS so it
+   never needs stripping before download (body loses .forge-edit on save). */
+body.forge-edit .sf-linked{ outline:1px dashed rgba(58,182,255,.5); outline-offset:2px; }
+body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px; right:-9px; z-index:6;
+  width:16px; height:16px; border-radius:50%; background:#2a6df4; color:#fff; font-size:10px;
+  line-height:16px; text-align:center; pointer-events:none; }
+.forge-field-error{ color:#f0a0a0; font-size:11px; margin-top:3px; }

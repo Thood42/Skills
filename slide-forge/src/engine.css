@@ -119,6 +119,20 @@ body.presenting{cursor:none}
   .media-img .sf-unavail{ position:relative !important; }
 }
 
+/* =====================================================================
+   LINKS (media plan §5) — data-href is set by the editor's decorate layer.
+   No visual change by default (the object keeps its normal styling); the
+   offline marker and print annotation are the only automatic cues, kept
+   subtle so a linked title doesn't read as a web-app button.
+   ===================================================================== */
+[data-href]{ cursor:pointer; }
+html[data-offline] [data-href]:not([data-href^="#"])::after{
+  content:" \26A0"; color:var(--cyan); font-size:.7em; vertical-align:super; margin-left:3px; }
+@media print{
+  [data-href]:not([data-href^="#"])::after{
+    content:" (" attr(data-href) ")"; font-size:.6em; color:#666; font-weight:400; }
+}
+
 /* METRIC-DASH — mixed dashboard: kpi ring + stat tiles */
 .dash{display:grid; grid-template-columns:auto 1fr; gap:34px; align-items:center; flex:1; margin-top:30px}
 .dash-ring{display:flex; flex-direction:column; align-items:center; gap:14px}
