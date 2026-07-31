@@ -240,7 +240,14 @@ clipboard paste deferred; generation-time assets always embed with no size ceili
   deep-copy), and print/`SG.static` do the same **unconditionally**, via CSS alone, regardless of the
   on-screen load state — an iframe cannot be captured in a print job (media plan §7.1). Esc-to-restore
   can't reach keystrokes typed *inside* a cross-origin frame once it has focus — an inherent iframe
-  limitation, not something worth chasing further.
+  limitation, not something worth chasing further. Corner-drag resizes an embed **freely on both
+  axes** (unlike image/svg, an embed doesn't default to aspect-locked — a video player's useful shape
+  varies too much to assume 16:9). The Inspector's **⛶ Fill slide** button is a one-click way to size
+  an embed to the full 1280×720 stage; it remembers the prior geometry (`freeObjects[].fillPrev`) so
+  a second click restores it, and ordinary drag/Width/Height editing keeps working normally in either
+  state — it's a starting point, not a locked mode. (2026-07-31 fix: this axis + the fill toggle were
+  added after QA found corner-drag only resized width for embeds — a stale ad hoc type check that
+  predated the fill toggle and simply never included `"embed"`.)
 - **Storage**: generation-time assets (`assets/images/`, `assets/diagrams/` via `scripts/assets.py`)
   always embed, no size ceiling — the delivered deck may exceed the 450 KB *template* budget
   (`scripts/build.py`'s budget covers code only). Editor imports downscale to 1920px/WebP by default
