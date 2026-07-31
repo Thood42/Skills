@@ -198,8 +198,26 @@
     (slide.freeObjects||[]).forEach(function(fo){
       var n=el('div','forge-block forge-free '+(fo.type||'txt')); n.setAttribute('data-free',fo.id);
       if(fo.type==='html') n.innerHTML=fo.html||'';
+      else if(fo.type==='image') mountImageFree(n,fo);
+      else if(fo.type==='svg') mountSvgFree(n,fo);
       else if(fo.type!=='box') n.textContent=fo.text||'Text';
       sec.appendChild(n); applyFree(n,fo); }); }
+
+  /* image/svg free objects (media plan §3): content is mounted ONCE here;
+     geometry/fit/frame styling is re-applied on every drag frame by
+     applyFree, never remounted, so dragging an image never re-decodes it. */
+  function mountImageFree(n,fo){
+    var img=el('img'); img.alt=fo.alt||''; img.draggable=false; img.loading='eager';
+    var m=SG.imageMeta&&SG.imageMeta(fo.asset);
+    if(m&&m.src) img.src=m.src;
+    img.addEventListener('error',function(){
+      img.style.display='none';
+      if(!n.querySelector('.sf-unavail')) n.appendChild(SG.unavailable({url:(m&&m.src)||fo.asset,reason:'missing'})); });
+    n.appendChild(img); }
+  function mountSvgFree(n,fo){
+    var markup=SG.svgMarkup&&SG.svgMarkup(fo.asset);
+    if(markup) n.innerHTML=markup;
+    else n.appendChild(SG.unavailable({url:fo.asset,reason:'missing'})); }
 
   F.decorate=function(deck,data){ data=data||SG.data; var slides=data.slides||[];
     if(SG._legacyKeys) migrateLegacy(deck,data);
@@ -235,11 +253,24 @@
     if(o.h!=null&&o.h>0) b.style.height=o.h+'px';
     if(o.hide) b.style.display='none';
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
+  var MEDIA_FREE={image:1,svg:1};
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
     applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
-    if(fo.type==='box'){ n.style.width=(fo.w||220)+'px'; n.style.height=(fo.h||120)+'px'; }
-    else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; } }
+    if(fo.type==='box'||MEDIA_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:360))+'px'; n.style.height=(fo.h||(fo.type==='box'?160:240))+'px'; }
+    else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; }
+    if(MEDIA_FREE[fo.type]){
+      n.style.overflow='hidden'; n.style.borderRadius=(fo.radius||0)+'px'; n.style.opacity=fo.opacity!=null?fo.opacity:1;
+      n.classList.remove('frame-panel','frame-glow','frame-shadow');
+      if(fo.frame&&fo.frame!=='none') n.classList.add('frame-'+fo.frame);
+      var fit=fo.fit||'cover', fx=(fo.focal&&fo.focal[0]!=null)?fo.focal[0]:0.5, fy=(fo.focal&&fo.focal[1]!=null)?fo.focal[1]:0.5;
+      var img=n.querySelector(':scope > img');
+      if(img){ img.style.width='100%'; img.style.height='100%'; img.style.objectFit=fit;
+        img.style.objectPosition=(fx*100)+'% '+(fy*100)+'%'; img.alt=fo.alt||''; }
+      var svgEl=n.querySelector(':scope > svg');
+      if(svgEl){ svgEl.style.width='100%'; svgEl.style.height='100%'; svgEl.style.display='block';
+        svgEl.setAttribute('preserveAspectRatio', fit==='contain'?'xMidYMid meet':'xMidYMid slice'); }
+    } }
 
   var _render=SG.render; SG.render=function(deck,data){ _render(deck,data); F.decorate(deck,data); };
   var _renderSlide=SG.renderSlide; SG.renderSlide=function(deck,i){
@@ -376,11 +407,23 @@
         parts.forEach(function(p){ p.d.rot=r; p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); });
       } else if(mode==='size'){
         parts.forEach(function(p){
-          p.d.w=Math.max(40,Math.round(p.box0.w+(cL?-dx:dx)));
-          if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
-          if(p.sel.kind==='free'&&(p.d.type==='box'||p.d.type==='html')){
-            p.d.h=Math.max(30,Math.round(p.box0.h+(cT?-dy:dy)));
-            if(cT) p.d.y=Math.round((p.d0.y||0)+dy); }
+          var isMedia=p.sel.kind==='free'&&MEDIA_FREE[p.d.type];
+          var newW=Math.max(40,Math.round(p.box0.w+(cL?-dx:dx)));
+          /* image/svg corner-drag keeps the intrinsic aspect ratio by default;
+             Shift frees it (mirrors the text case, where reflow is the point) */
+          if(isMedia&&!ev.shiftKey){
+            var ratio=(p.box0.h||1)/(p.box0.w||1);
+            var newH=Math.max(30,Math.round(newW*ratio));
+            p.d.w=newW; p.d.h=newH;
+            if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
+            if(cT) p.d.y=Math.round((p.d0.y||0)+(p.box0.h-newH));
+          } else {
+            p.d.w=newW;
+            if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
+            if(p.sel.kind==='free'&&(p.d.type==='box'||p.d.type==='html'||isMedia)){
+              p.d.h=Math.max(30,Math.round(p.box0.h+(cT?-dy:dy)));
+              if(cT) p.d.y=Math.round((p.d0.y||0)+dy); }
+          }
           p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); });
       } else { var d0=Math.hypot(sx-cx,sy-cy)||1, d1=Math.hypot(ev.clientX-cx,ev.clientY-cy);
         parts.forEach(function(p){ p.d.scale=clamp((p.d0.scale||1)*(d1/d0),0.2,6);
@@ -761,6 +804,24 @@
     D.addEventListener('pointerdown',function(e){ if(ctxMenu && ctxMenu.classList.contains('on') && !ctxMenu.contains(e.target)) hideCtxMenu(); },true);
     W.addEventListener('scroll',function(){ hideCtxMenu(); if(F.editing) positionFmtBar(); positionFloat(); },true);
     W.addEventListener('resize',function(){ refreshHandles(); positionFloat(); });
+    /* drop-on-canvas image/svg import (media plan §3.3): converts the drop
+       point to deck-local px through the same scale() the drag code uses,
+       lands each dropped file centred there with a small cascade offset for
+       multi-file drops. No clipboard paste in v1 — see media plan §7.2. */
+    if(F.assets){
+      deck.addEventListener('dragover',function(e){ if(!editing()) return;
+        if(e.dataTransfer&&[].slice.call(e.dataTransfer.types||[]).indexOf('Files')>=0){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; } });
+      deck.addEventListener('drop',function(e){ if(!editing()) return;
+        var files=[].slice.call((e.dataTransfer&&e.dataTransfer.files)||[]).filter(function(f){
+          return /^image\//.test(f.type)||/\.svg$/i.test(f.name||''); });
+        if(!files.length) return; e.preventDefault();
+        var s=scale(), db=deck.getBoundingClientRect();
+        var x0=(e.clientX-db.left)/s, y0=(e.clientY-db.top)/s;
+        files.forEach(function(f,i){
+          F.assets.importFile(f).then(function(res){
+            F.addImage(res.name,res.kind,{x:x0+i*24,y:y0+i*24}); F.save(); })
+          .catch(function(err){ try{ console.warn('slide-forge: drop-import failed for '+f.name,err); }catch(e2){} }); }); });
+    }
   }
 
   /* =====================================================================
@@ -804,7 +865,8 @@
     function btn(label,fn,cls){ var b=el('button','forge-btn '+(cls||''),label); b.onclick=fn; bar.appendChild(b); return b; }
     F._undoBtn=btn('↶ Undo',F.undoOp); F._redoBtn=btn('↷ Redo',F.redoOp); bar.appendChild(el('span','forge-sep'));
     F._addBtn=btn('＋ Slide',function(e){ F.insertMenu(F._addBtn); }); btn('⧉ Duplicate',function(){ F.dupSlide(); });
-    btn('＋ Text',function(){ F.addFree('txt'); }); btn('＋ Box',function(){ F.addFree('box'); }); bar.appendChild(el('span','forge-sep'));
+    btn('＋ Text',function(){ F.addFree('txt'); }); btn('＋ Box',function(){ F.addFree('box'); });
+    btn('🖼 Assets',function(){ F.assetsPanel(); }); bar.appendChild(el('span','forge-sep'));
     btn('▷ Present',function(){ F.toggle(); SG.present&&SG.present(); });
     F._saveBtn=btn('⤓ Save .html',function(){ F.download(); },'primary'); btn('{ } JSON',function(){ SG.exportJSON&&SG.exportJSON(); });
     D.body.appendChild(bar);
@@ -812,6 +874,13 @@
     nav.querySelector('#forge-sorter-toggle').onclick=function(){ F._sorter=!F._sorter; this.classList.toggle('add',F._sorter); F.buildNav(); };
     var insp=el('div','forge-chrome forge-panel'); insp.id='forge-inspect'; insp.setAttribute('role','region'); insp.setAttribute('aria-label','Inspector'); insp.innerHTML='<h4>Inspector</h4><div id="forge-inspbody"></div>'; D.body.appendChild(insp);
     var rb=el('div','forge-chrome'); rb.id='forge-restore'; D.body.appendChild(rb);
+    /* quota warning (media plan section 2.3): shown/hidden by F.assets._onSaveState
+       whenever the asset-registry localStorage write throws -- never silent */
+    var aw=el('div','forge-chrome'); aw.id='forge-assets-warn'; aw.style.display='none';
+    aw.appendChild(el('span',null,'Images are too large to autosave — use ⤓ Save .html so you don’t lose them.'));
+    var awClose=el('button','forge-btn','Dismiss'); awClose.onclick=function(){ aw.style.display='none'; }; aw.appendChild(awClose);
+    D.body.appendChild(aw);
+    if(F.assets) F.assets._onSaveState=function(unsaved){ aw.style.display=unsaved?'flex':'none'; };
     F.syncToolbar();
   };
 
@@ -1001,8 +1070,12 @@
   function treeChip(host,lab,title,fn,warn){ var b=el('button','forge-chip'+(warn?' warn':''),lab);
     b.title=title; b.setAttribute('aria-label',title); b.onclick=function(e){ e.stopPropagation(); fn(); }; host.appendChild(b); return b; }
   function treeLabel(node){
-    if(node.hasAttribute('data-free')){ var fo=node.classList.contains('box')?'Box':node.classList.contains('html')?'Copied group':'Text';
-      return '★ '+fo+(node.textContent?' · '+node.textContent.trim().slice(0,20):''); }
+    if(node.hasAttribute('data-free')){
+      var isMediaNode=node.classList.contains('image')||node.classList.contains('svg');
+      var fo=node.classList.contains('box')?'Box':node.classList.contains('html')?'Copied group'
+        :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram':'Text';
+      var extra=isMediaNode?'':node.textContent;
+      return '★ '+fo+(extra?' · '+extra.trim().slice(0,20):''); }
     var c=(typeof node.className==='string'?node.className:'').split(' ')[0];
     var name=c&&!/^sg-/.test(c)?c.replace(/-/g,' '):node.tagName.toLowerCase();
     var txt=(node.textContent||'').trim().replace(/\s+/g,' ').slice(0,26);
@@ -1047,6 +1120,113 @@
     keyedTree(sec0).forEach(function(entry){ row(entry,0); });
     [].slice.call(sec0.querySelectorAll('.forge-free')).forEach(function(fn){ row({node:fn,kids:[]},0); });
     host.appendChild(wrap); }
+
+  /* =====================================================================
+     ASSET LIBRARY (media plan §2.5) — grid of every imported image/svg
+     diagram: import, insert into the current slide, rename (remaps every
+     reference), replace file, delete (undoable), and "link instead of
+     embed" (media plan §7.3). The size meter is informational only — it
+     never blocks an import.
+     ===================================================================== */
+  function fmtBytes(n){ if(!n) return '0 KB'; if(n>=1024*1024) return (n/1024/1024).toFixed(1)+' MB'; return Math.max(1,Math.round(n/1024))+' KB'; }
+  F.assetsPanel=function(){
+    var old=D.getElementById('forge-assets'); if(old){ old.remove(); return; }
+    if(!F.assets){ return; }                              /* media.js not loaded */
+    var o=el('div','forge-chrome'); o.id='forge-assets';
+    var card=el('div','forge-assets-card');
+    var head=el('div','forge-assets-head'); head.appendChild(el('h3',null,'Assets'));
+    var fileInp=el('input'); fileInp.type='file'; fileInp.accept='image/*,.svg'; fileInp.multiple=true; fileInp.hidden=true;
+    var imp=el('button','forge-btn primary','＋ Import'); imp.onclick=function(){ fileInp.click(); };
+    fileInp.onchange=function(){ var files=[].slice.call(fileInp.files||[]); fileInp.value=''; if(!files.length) return;
+      Promise.all(files.map(function(f){ return F.assets.importFile(f).catch(function(err){
+        try{ console.warn('slide-forge: import failed for '+f.name,err); }catch(e){} return null; }); }))
+        .then(function(){ renderGrid(); F.save(); }); };
+    head.appendChild(imp); head.appendChild(fileInp);
+    var closeBtn=el('button','forge-btn','Close'); closeBtn.onclick=function(){ o.remove(); }; head.appendChild(closeBtn);
+    card.appendChild(head);
+    var undoBar=el('div','forge-assets-undo'); undoBar.style.display='none'; card.appendChild(undoBar);
+    var grid=el('div','forge-assets-grid'); card.appendChild(grid);
+    var meter=el('div','forge-assets-meter'); card.appendChild(meter);
+    var dz=el('div','forge-assets-dropzone','Drop images or .svg diagrams here');
+    card.appendChild(dz);
+    ['dragenter','dragover'].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.add('over'); }); });
+    ['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.remove('over'); }); });
+    dz.addEventListener('drop',function(e){ var files=[].slice.call((e.dataTransfer&&e.dataTransfer.files)||[]); if(!files.length) return;
+      Promise.all(files.map(function(f){ return F.assets.importFile(f).catch(function(){ return null; }); }))
+        .then(function(){ renderGrid(); F.save(); }); });
+
+    function showUndoBar(name){ undoBar.innerHTML=''; undoBar.style.display='flex';
+      undoBar.appendChild(el('span',null,'Deleted "'+name+'".'));
+      var u=el('button','forge-chip','Undo'); u.onclick=function(){ F.assets.undoRemove(); F.save(); renderGrid(); };
+      undoBar.appendChild(u);
+      clearTimeout(F._assetsUndoT); F._assetsUndoT=setTimeout(function(){ undoBar.style.display='none'; },6000); }
+
+    function toggleLinkForm(cardEl,name){
+      var existing=cardEl.querySelector('.forge-asset-linkform'); if(existing){ existing.remove(); return; }
+      var entry=(SG.assets.images||{})[name]; var ext=((entry&&entry.type)||'image/png').split('/')[1]||'png';
+      var form=el('div','forge-asset-linkform');
+      form.appendChild(el('div','forge-hint','Converts this asset to a relative-path reference instead of embedding it. The browser will download the original file — save it at this path next to the deck.'));
+      var inp=el('input'); inp.type='text'; inp.value='assets/images/'+name+'.'+ext; form.appendChild(inp);
+      var row=el('div','forge-asset-linkform-btns');
+      var ok=el('button','forge-btn primary','Convert + download'); var cancel=el('button','forge-btn','Cancel');
+      cancel.onclick=function(){ form.remove(); };
+      ok.onclick=function(){ var blobSrc=F.assets.linkAsset(name,inp.value);
+        if(blobSrc){ var a=el('a'); a.href=blobSrc; a.download=name+'.'+ext; D.body.appendChild(a); a.click(); a.remove(); }
+        F.save(); renderGrid(); };
+      row.appendChild(ok); row.appendChild(cancel); form.appendChild(row); cardEl.appendChild(form); }
+
+    function assetCard(name,kind){
+      var entry=kind==='image'?(SG.assets.images||{})[name]:null;
+      var isLinked=entry&&typeof entry==='object'&&entry.store==='linked';
+      var c=el('div','forge-asset-card');
+      var thumb=el('div','forge-asset-thumb');
+      if(kind==='svg'){ thumb.innerHTML=SG.svgMarkup(name)||''; }
+      else { var m=SG.imageMeta(name); var img=el('img'); img.alt=m.alt||name; img.loading='lazy'; if(m.src) img.src=m.src; thumb.appendChild(img); }
+      c.appendChild(thumb);
+      var meta=el('div','forge-asset-meta');
+      var nameRow=el('div','forge-asset-name');
+      var nameInp=el('input'); nameInp.type='text'; nameInp.value=name; nameInp.className='forge-asset-rename';
+      nameInp.onchange=function(){ if(nameInp.value&&nameInp.value!==name){ F.assets.rename(name,nameInp.value); F.save(); renderGrid(); } };
+      nameRow.appendChild(nameInp);
+      nameRow.appendChild(el('span','forge-asset-badge'+(isLinked?' linked':''),kind==='svg'?'diagram':(isLinked?'linked':'embedded')));
+      meta.appendChild(nameRow);
+      if(kind==='image'&&entry&&typeof entry==='object'){
+        var dims=entry.w&&entry.h?(entry.w+'×'+entry.h):'', weight=entry.bytes?fmtBytes(entry.bytes):'';
+        meta.appendChild(el('div','forge-asset-sub',[dims,weight].filter(Boolean).join(' · ')));
+        var altInp=el('input'); altInp.type='text'; altInp.placeholder='Alt text'; altInp.value=entry.alt||'';
+        altInp.onchange=function(){ entry.alt=altInp.value; F.assets.saveDebounced(); };
+        meta.appendChild(altInp);
+      }
+      c.appendChild(meta);
+      var actions=el('div','forge-asset-actions');
+      function abtn(lab,fn,cls){ var b=el('button','forge-chip'+(cls?' '+cls:''),lab); b.onclick=fn; actions.appendChild(b); return b; }
+      abtn('＋ Insert',function(){ F.addImage(name,kind); o.remove(); });
+      if(kind==='image'){
+        var repl=el('input'); repl.type='file'; repl.accept='image/*'; repl.hidden=true;
+        repl.onchange=function(){ var f=repl.files&&repl.files[0]; repl.value=''; if(!f) return;
+          F.assets.replaceFile(name,f).then(function(){ F.save(); renderGrid(); }); };
+        abtn('⭯ Replace',function(){ repl.click(); }); actions.appendChild(repl);
+        if(!isLinked) abtn('🔗 Link',function(){ toggleLinkForm(c,name); });
+      }
+      abtn('🗑 Delete',function(){ F.assets.remove(name); F.save(); renderGrid(); showUndoBar(name); },'warn');
+      c.appendChild(actions);
+      return c; }
+
+    function renderMeter(){ var count=F.assets.count(), bytes=F.assets.bytes();
+      meter.className='forge-assets-meter'+(bytes>20*1024*1024?' hot':bytes>8*1024*1024?' warm':'');
+      meter.textContent=count+' asset'+(count===1?'':'s')+' · '+fmtBytes(bytes);
+      if(bytes>8*1024*1024) meter.appendChild(el('span',null,' — large decks can exceed email attachment limits; consider "Link instead of embed".')); }
+
+    function renderGrid(){ grid.innerHTML='';
+      var names=Object.keys(SG.assets.images||{}).sort(), svgNames=Object.keys(SG.assets.svg||{}).sort();
+      if(!names.length&&!svgNames.length) grid.appendChild(el('div','forge-hint','No assets yet — Import an image or SVG diagram, or drop files below.'));
+      names.forEach(function(n){ grid.appendChild(assetCard(n,'image')); });
+      svgNames.forEach(function(n){ grid.appendChild(assetCard(n,'svg')); });
+      renderMeter(); }
+    renderGrid();
+    o.appendChild(card);
+    D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
 
   /* =====================================================================
      STRUCTURE EDITOR (expand from the Elements panel) — big modal with the
@@ -1240,9 +1420,9 @@
       s.appendChild(row2); }
     var db=el('button','forge-btn warn','✕ Delete / reset all'); db.onclick=F.deleteSel; s.appendChild(db); }
 
-  function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free';
-    var s=sec(body,(isFree?('Free '+((d.type==='box')?'box':'text')):('Element '+sel.key)));
-    if(isFree&&d.type!=='box'){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
+  function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free'; var isMedia=isFree&&MEDIA_FREE[d.type];
+    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':'text')):('Element '+sel.key)));
+    if(isFree&&d.type!=='box'&&!isMedia){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
       t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
     geomInputs={};
@@ -1255,8 +1435,32 @@
       geomInputs[key]=n; s.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
     num('Width','w');                                       /* width reflows text (0 = natural) */
-    if(isFree&&(d.type==='box'||d.type==='html')) num('Height','h');
-    if(isFree&&d.type!=='box') num('Font size','size');
+    if(isFree&&(d.type==='box'||d.type==='html'||isMedia)) num('Height','h');
+    if(isFree&&d.type!=='box'&&!isMedia) num('Font size','size');
+    if(isMedia){
+      var sm=sec(body,d.type==='svg'?'Diagram':'Image');
+      var altInp=el('input'); altInp.type='text'; altInp.value=d.alt||'';
+      altInp.onfocus=function(){ F.pushUndo(); };
+      altInp.oninput=function(){ d.alt=altInp.value; F.saveDebounced(); };
+      sm.appendChild(field('Alt text',altInp));
+      if(d.type==='image'){
+        sm.appendChild(field('Fit',selectInput([['Cover (crop)','cover'],['Contain (letterbox)','contain'],['Fill (stretch)','fill']],
+          d.fit||'cover',function(v){ F.pushUndo(); d.fit=v; applyFree(sel.node,d); pulse(sel.node); F.save(); })));
+        var fx=el('input'); fx.type='range'; fx.min='0'; fx.max='1'; fx.step='0.01'; fx.value=(d.focal&&d.focal[0]!=null)?d.focal[0]:0.5;
+        var fy=el('input'); fy.type='range'; fy.min='0'; fy.max='1'; fy.step='0.01'; fy.value=(d.focal&&d.focal[1]!=null)?d.focal[1]:0.5;
+        function setFocal(){ d.focal=[parseFloat(fx.value),parseFloat(fy.value)]; applyFree(sel.node,d); F.saveDebounced(); }
+        fx.onfocus=fy.onfocus=function(){ F.pushUndoCoalesced('obj-focal'); }; fx.oninput=fy.oninput=setFocal;
+        sm.appendChild(fieldRow('Focal X',fx)); sm.appendChild(fieldRow('Focal Y',fy));
+      }
+      var rad=el('input'); rad.type='number'; rad.min='0'; rad.value=d.radius||0;
+      rad.onfocus=function(){ F.pushUndo(); }; rad.oninput=function(){ d.radius=parseFloat(rad.value)||0; applyFree(sel.node,d); F.saveDebounced(); };
+      sm.appendChild(fieldRow('Corner radius',rad));
+      var op=el('input'); op.type='range'; op.min='0'; op.max='1'; op.step='0.05'; op.value=d.opacity!=null?d.opacity:1;
+      op.onfocus=function(){ F.pushUndo(); }; op.oninput=function(){ d.opacity=parseFloat(op.value); applyFree(sel.node,d); F.saveDebounced(); };
+      sm.appendChild(fieldRow('Opacity',op));
+      sm.appendChild(field('Frame',selectInput([['None','none'],['Panel','panel'],['Glow','glow'],['Shadow','shadow']],
+        d.frame||'none',function(v){ F.pushUndo(); d.frame=v; applyFree(sel.node,d); pulse(sel.node); F.save(); })));
+    }
     var s2=sec(body,'Style');
     s2.appendChild(fieldRow('Text color',colorInput(d.color,function(v){ F.pushUndoCoalesced('obj-color'); d.color=v;
       isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
@@ -1339,6 +1543,20 @@
     F.do('add '+type,function(data){ var s=data.slides[i]; s.freeObjects=s.freeObjects||[];
       s.freeObjects.push(type==='box'?{id:id,type:'box',x:490,y:280,w:300,h:160}:{id:id,type:'txt',x:520,y:330,text:'New text',size:34}); });
     var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false); };
+  /* insert an image/svg free object referencing an asset already in the
+     registry, sized from its intrinsic aspect ratio (media plan §3). Shared
+     by the asset library panel's "Insert" and canvas drop-import. */
+  F.addImage=function(assetName,kind,atXY){ var i=curSlide(); var id=uid();
+    var isSvg=kind==='svg';
+    var meta=!isSvg&&SG.imageMeta?SG.imageMeta(assetName):null;
+    var w=360,h=240;
+    if(meta&&meta.w&&meta.h){ var s=Math.min(1,640/Math.max(meta.w,meta.h)); w=Math.max(60,Math.round(meta.w*s)); h=Math.max(40,Math.round(meta.h*s)); }
+    var x=atXY?Math.round(atXY.x-w/2):Math.round(640-w/2), y=atXY?Math.round(atXY.y-h/2):Math.round(360-h/2);
+    F.do('add '+(isSvg?'diagram':'image'),function(data){ var sl=data.slides[i]; sl.freeObjects=sl.freeObjects||[];
+      sl.freeObjects.push({id:id,type:isSvg?'svg':'image',asset:assetName,x:x,y:y,w:w,h:h,rot:0,
+        fit:'cover',focal:[0.5,0.5],radius:0,opacity:1,frame:'none',alt:(meta&&meta.alt)||''}); });
+    var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false);
+    return id; };
 
   /* =====================================================================
      SAVE — download a fresh self-contained .html with edits baked in.
@@ -1349,8 +1567,9 @@
     [].slice.call(root.querySelectorAll('.forge-chrome,#forge-fmt,#forge-ctx,#forge-float,.forge-guides,.forge-marquee')).forEach(function(n){ n.remove(); });
     var body=root.querySelector('body'); if(body) body.classList.remove('forge-edit','presenting','hide-docs');
     var deck=root.querySelector('#deck'); if(deck){ deck.innerHTML=''; deck.removeAttribute('style'); }
+    if(F.assets) F.assets.gc();                 /* drop unreferenced assets before shipping the file (media plan §2.3) */
     var dataEl=root.querySelector('#deck-data'); if(dataEl) dataEl.textContent='\n'+JSON.stringify(SG.data,null,2)+'\n';
-    var asEl=root.querySelector('#deck-assets'); if(asEl) asEl.textContent='\n'+JSON.stringify(SG.assets||{icons:{},images:{},styles:''})+'\n';
+    var asEl=root.querySelector('#deck-assets'); if(asEl) asEl.textContent='\n'+JSON.stringify(SG.assets||{icons:{},images:{},svg:{},styles:''})+'\n';
     var t=root.querySelector('title'); if(t&&SG.data.meta&&SG.data.meta.title) t.textContent=SG.data.meta.title;
     return '<!doctype html>\n'+root.outerHTML; }
   function deckFilename(){ return ((SG.data.meta&&SG.data.meta.title)||'deck').replace(/[^\w.-]+/g,'-').toLowerCase()+'.html'; }
@@ -1433,6 +1652,10 @@
 
   function boot(){ SG.boot();
     if(!SG.data) return;                     /* engine showed the JSON-error slide */
+    /* merge back any autosaved assets BEFORE the deck-JSON restore prompt, so
+       a restored deck that references an imported image finds it (media plan
+       §2.3) — additive only, never overwrites what the saved .html shipped with */
+    if(F.assets) F.assets.restore();
     F.buildChrome(); wireDeck(); wireKeys();
     F.buildNav(); F.buildInspect(); checkRestore();
     W.addEventListener('hashchange',function(){ clearSel(); F.buildNav(); F.buildInspect(); });
