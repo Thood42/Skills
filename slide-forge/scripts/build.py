@@ -7,7 +7,12 @@ editing a 4,000-line HTML file. Injection is plain marker substitution — no
 minification, no transforms — so the built file is exactly what you read in src.
 
 Usage:  python3 scripts/build.py [--out editor-template.html]
-Enforces the v2 size budget (450 KB uncompressed, before deck assets).
+Enforces the v2 size budget: 450 KB uncompressed for the TEMPLATE/CODE only
+(built with an empty deck-assets registry, see %DECK_ASSETS% below). This is
+NOT a cap on delivered decks — media plan §7.3 deliberately drops any size
+ceiling on user-supplied imagery embedded via scripts/assets.py or the
+in-editor asset library: a 12 MB deck (because the user supplied 12 MB of
+images) is the correct, expected outcome, not a regression to "fix".
 """
 import sys, os, json, hashlib, argparse, zlib
 
@@ -25,6 +30,7 @@ PARTS = {                       # marker -> src file
     '%ENGINE_JS%':   'engine.js',
     '%EDITOR_CSS%':  'editor.css',
     '%EDITOR_JS%':   'editor.js',
+    '%MEDIA_JS%':    'media.js',
     '%DECK_DATA%':   'deck-data.json',
 }
 
@@ -54,7 +60,7 @@ def main():
     html = html.replace('%BUILD%', 'v3 build %s' % h)
 
     leftover = [m for m in ('%SG_JS%','%DECK_CSS%','%ANIM_CSS%','%ANIM_JS%','%ENGINE_CSS%','%CHARTS_JS%',
-                            '%ENGINE_JS%','%EDITOR_CSS%','%EDITOR_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
+                            '%ENGINE_JS%','%EDITOR_CSS%','%EDITOR_JS%','%MEDIA_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
                 if m in html]
     if leftover:
         sys.exit('unresolved markers: %s' % leftover)

@@ -18,6 +18,7 @@ Skills/
 │   └── tests/                      jsdom parity + editor data-layer tests (needs Node)
 ├── slides-editor-plan.md           architecture & decision record (§10 = v3 ADR)
 ├── slide-forge-design-critique.md  2026-07-06 design review that motivated the v3 engine
+├── slide-forge-media-plan.md       plan: images/diagrams, links, sandboxed iframe embeds
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```
 

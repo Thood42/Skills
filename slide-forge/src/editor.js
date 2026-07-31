@@ -26,7 +26,7 @@
    ===================================================================== */
 (function(){
   var W=window, D=document, SG=W.SG=W.SG||{};
-  var F=W.Forge={};
+  var F=W.Forge=W.Forge||{};                  /* ||= so load order vs. media.js never matters */
 
   /* ---------- embedded themes (named global palettes) ---------- */
   F.themes={

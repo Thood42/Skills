@@ -102,12 +102,19 @@
     N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
   function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
 
-  /* ---------- asset registry (icons inline+themeable, images base64) ---------- */
-  SG.assets = SG.assets || {icons:{},images:{},styles:''};
+  /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
+     v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
+     URI, still accepted forever) OR an object:
+       {store:"embedded", src, w,h, bytes, type, alt}   — inlined, travels with the file
+       {store:"linked",   path, w,h, bytes, type, alt}  — resolved relative to the deck; falls back
+                                                            to SG.unavailable() if the file is missing
+     svg{} is a sibling map of sanitized inline SVG diagram markup (kept apart from icons: icons are
+     small/monochrome/currentColor, diagrams are large and may carry their own palette). */
+  SG.assets = SG.assets || {icons:{},images:{},svg:{},styles:''};
   function loadAssets(){
     var el=D.getElementById('deck-assets'); if(!el) return;
     try{ var a=JSON.parse(el.textContent||'{}');
-      SG.assets={icons:a.icons||{},images:a.images||{},styles:a.styles||''};
+      SG.assets={icons:a.icons||{},images:a.images||{},svg:a.svg||{},styles:a.styles||''};
     }catch(e){}
     if(SG.assets.styles){ var st=D.createElement('style'); st.id='deck-custom-style';
       st.textContent=SG.assets.styles; D.head.appendChild(st); }
@@ -122,7 +129,45 @@
     var cls='ico-wrap'+(typeof spec==='object'&&spec.solid?' solid':'');
     var sty=color?(' style="color:'+(color.indexOf('--')===0?'var('+color+')':color)+'"'):'';
     return '<span class="'+cls+'"'+sty+'>'+svg+'</span>'; }
-  function imageURL(name){ return (SG.assets.images||{})[name]||''; }
+  /* imageMeta(name): normalizes all three registry shapes to {src,w,h,alt,store}.
+     "linked" entries resolve relative to the deck's own location (works from file:// and http://). */
+  function imageMeta(name){ var e=(SG.assets.images||{})[name]; if(!e) return null;
+    if(typeof e==='string') return {src:e,w:0,h:0,alt:'',store:'embedded'};
+    if(e.store==='linked') return {src:e.path,w:e.w||0,h:e.h||0,alt:e.alt||'',store:'linked'};
+    return {src:e.src||'',w:e.w||0,h:e.h||0,alt:e.alt||'',store:'embedded'}; }
+  function imageURL(name){ var m=imageMeta(name); return m?m.src:''; }
+  function svgMarkup(name){ return (SG.assets.svg||{})[name]||''; }
+  SG.imageMeta=imageMeta; SG.imageURL=imageURL; SG.svgMarkup=svgMarkup;
+
+  /* =====================================================================
+     UNAVAILABLE — one shared "this needs the network" component (media plan
+     §5.1/§7.1). Used identically for: unreachable/blocked embeds, missing
+     `linked` images, and (as an inline marker) unreachable links. Offline
+     status, embed load-timeout, and missing-file are all DETECTABLE and use
+     this; a specific external link being dead while online is not detectable
+     (opaque cross-origin response) and is NOT claimed here — online link
+     clicks simply go to the browser, which shows its own error.
+     Deck authors can override the wording via meta.strings.unavailable.
+     ===================================================================== */
+  function unavailMsg(){ var m=SG.data&&SG.data.meta&&SG.data.meta.strings;
+    return (m&&m.unavailable)||'Content unavailable'; }
+  var UNAVAIL_REASON={
+    offline:'This element needs a network connection.',
+    timeout:'This page could not be loaded — it may not allow being embedded.',
+    blocked:'This page refused to be embedded.',
+    missing:'This file is missing. It was linked, not saved inside the deck.'};
+  /* SG.unavailable({url,reason,mode}) -> Node. mode:"block" (default; embeds,
+     missing images) or "inline" (small marker appended after linked text). */
+  SG.unavailable=function(spec){ spec=spec||{}; var url=spec.url||'', reason=spec.reason||'offline';
+    var detail=UNAVAIL_REASON[reason]||UNAVAIL_REASON.offline;
+    if(spec.mode==='inline'){
+      return N('span.sf-unavail-inline',{title:detail+(url?' ('+url+')':'')},
+        [N('span.sf-unavail-ico',{'aria-hidden':'true'},'⚠'), ' unavailable']); }
+    var kids=[ N('div.sf-unavail-ico','⚠'),
+      N('div.sf-unavail-body',[ N('div.sf-unavail-h',esc(unavailMsg())), N('p',detail),
+        url?N('div.sf-unavail-url',esc(url)):null ]) ];
+    if(url) kids.push(N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'));
+    return N('div.sf-unavail',{'data-reason':reason},kids); };
 
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
