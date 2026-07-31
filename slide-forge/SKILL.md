@@ -153,13 +153,19 @@ variables, so nothing hard-codes a color.
 - **Use the user's words.** When they gave specific copy, keep it. When they gave a topic, write
   the copy yourself in this tight style and tell them they can edit any of it in the editor.
 
-The 28 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
+The 29 layouts: cover · agenda · divider · stat-grid · bignum · chart · comparison · quote · code ·
 timeline · pipeline · closing · manifesto · editorial · hero-asym · figure · metric-dash ·
 leaderboard · diptych · matrix · stack · quote-mosaic · index-mosaic · before-after · image ·
-media-split · gallery · diagram — plus `raw`. Reach for `image`/`media-split`/`gallery`/`diagram`
-whenever the user supplied photos, screenshots, or diagram SVGs — they're the purpose-built layouts
-for that content, better than shoehorning imagery into `figure` or a `raw` slide.
+media-split · gallery · diagram · embed — plus `raw`. Reach for `image`/`media-split`/`gallery`/
+`diagram` whenever the user supplied photos, screenshots, or diagram SVGs — they're the
+purpose-built layouts for that content, better than shoehorning imagery into `figure` or a `raw`
+slide. Only reach for `embed` when the user specifically wants a *live* external page on a slide —
+it's the one layout that needs the network; everything else in the deck stays fully offline.
 `references/layouts.md` is the full field reference; read it while authoring.
+
+**Links**: any object can carry `overrides[key].href` / `freeObjects[].href` — `"#3"` jumps to
+slide 3, `"https://…"`/`"mailto:…"` opens in a new tab. You don't normally author these by hand
+(the user adds them from the editor's Link field), but they're valid deck-data if asked for.
 
 ---
 

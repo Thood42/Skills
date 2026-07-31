@@ -15,7 +15,7 @@ Conventions used below:
 ## Contents
 Original: [cover](#cover) · [agenda](#agenda) · [divider](#divider) · [stat-grid](#stat-grid) · [bignum](#bignum) · [chart](#chart) · [comparison](#comparison) · [quote](#quote) · [code](#code) · [timeline](#timeline) · [pipeline](#pipeline) · [closing](#closing)
 New: [manifesto](#manifesto) · [editorial](#editorial) · [hero-asym](#hero-asym) · [figure](#figure) · [metric-dash](#metric-dash) · [leaderboard](#leaderboard) · [diptych](#diptych) · [matrix](#matrix) · [stack](#stack) · [quote-mosaic](#quote-mosaic) · [index-mosaic](#index-mosaic) · [before-after](#before-after)
-Media (2026-07-31): [image](#image) · [media-split](#media-split) · [gallery](#gallery) · [diagram](#diagram)
+Media (2026-07-31): [image](#image) · [media-split](#media-split) · [gallery](#gallery) · [diagram](#diagram) · [embed](#embed)
 Escape hatch: [raw](#raw)
 
 ---
@@ -133,6 +133,21 @@ Picture one side, prose/bullets the other — the workhorse for "here's a screen
 Inlines a sanitized SVG diagram, theme-color aware (author the SVG with `stroke="currentColor"`/`fill="currentColor"` so it follows the deck's accent). `kicker`, `title`, `svg` (asset name from `assets/diagrams/`, **required**), `caption`.
 ```json
 { "layout":"diagram", "content":{ "title":"Request lifecycle", "svg":"request-flow" } }
+```
+
+## embed
+A sandboxed, click-to-interact iframe — the one layout that needs the network (media plan §6/§7.1).
+`kicker`, `title`, `url` (**required**, `http://`/`https://` only), `mode` (`click` default, `live` skips
+the "click to interact" shield for a background visualization, `poster` never loads it at all), `poster`
+(image asset shown behind the caption while loading / if it can't load / always in print), `note`.
+Only use this when the user specifically wants a live external page on a slide — for anything that can
+be a static image, prefer `image`/`figure`/`diagram` instead, since those stay fully offline. Many major
+sites refuse to be framed at all (no reliable way to know in advance); a blocked or unreachable embed
+falls back to a poster card with an "Open in browser" link rather than a blank rectangle, and **every**
+embed renders as that same poster card when printed to PDF, regardless of how it looked on screen.
+```json
+{ "layout":"embed", "content":{ "title":"Live dashboard", "url":"https://example.com/dashboard",
+  "mode":"click", "note":"Click to interact, or open it directly if it doesn't load." } }
 ```
 
 ---

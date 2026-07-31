@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 36d273438b — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build f2e7f64ccc — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -767,6 +767,47 @@ body.presenting{cursor:none}
   .media-img .sf-unavail{ position:relative !important; }
 }
 
+/* DIAGRAM caption (shared spacing with the layouts above it) */
+.diagram-cap{margin-top:14px}
+
+/* EMBED layout */
+.embed-head{ margin-bottom:20px; }
+.embed-stage{ flex:1; min-height:0; position:relative; border-radius:14px; overflow:hidden;
+  background:var(--panel); border:1px solid var(--brd); }
+.embed-note{ margin-top:14px; font-size:13px; color:var(--faint); }
+
+/* =====================================================================
+   EMBEDS (media plan §6) — shield (input gate), iframe wrap, poster card.
+   Free-object embeds reuse these same classes (editor.js mounts into the
+   .forge-free wrapper directly instead of a .embed-stage).
+   ===================================================================== */
+.sf-embed{ position:relative; }
+.sf-embed-shield{ position:absolute; inset:0; z-index:5; pointer-events:auto; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; background:transparent; }
+.sf-embed-hint{ display:none; padding:8px 16px; border-radius:999px; background:rgba(0,0,0,.6);
+  color:#fff; font-size:13px; font-family:var(--font-mono,monospace); }
+body:not(.forge-edit) .sf-embed-shield[data-mode="click"]:not(.active) .sf-embed-hint{ display:block; }
+body:not(.forge-edit) .sf-embed-shield[data-mode="click"].active{ pointer-events:none; }
+body:not(.forge-edit) .sf-embed-shield[data-mode="live"]{ pointer-events:none; }
+.sf-embed-iframe-wrap{ position:absolute; inset:0; z-index:2; }
+.sf-embed-iframe-wrap iframe{ width:100%; height:100%; border:0; display:block; background:#0b0e14; }
+.sf-embed-poster{ position:absolute; inset:0; z-index:3; display:none; flex-direction:column; gap:10px;
+  align-items:center; justify-content:center; text-align:center; padding:24px; box-sizing:border-box;
+  background:linear-gradient(135deg,var(--bg-2),var(--bg)); color:var(--muted); }
+.sf-embed-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.5; z-index:0; }
+.sf-embed-poster-body{ position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; max-width:44ch; }
+.sf-embed-poster-h{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--ink); }
+.sf-embed-poster-url{ font-family:var(--font-mono); font-size:12px; color:var(--faint); word-break:break-all; }
+/* print/static ALWAYS show the poster and hide the live frame, regardless of
+   whatever state it was in on screen — an iframe cannot be captured in a
+   print job (media plan §7.1) */
+html[data-static] .sf-embed-iframe-wrap, html[data-static] .sf-embed-shield{ display:none !important; }
+html[data-static] .sf-embed-poster{ display:flex !important; }
+@media print{
+  .sf-embed-iframe-wrap, .sf-embed-shield{ display:none !important; }
+  .sf-embed-poster{ display:flex !important; position:relative !important; }
+}
+
 /* =====================================================================
    LINKS (media plan §5) — data-href is set by the editor's decorate layer.
    No visual change by default (the object keeps its normal styling); the
@@ -1428,6 +1469,83 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   function fitStyle(c){ var fx=(c.focal&&c.focal[0]!=null)?c.focal[0]:0.5, fy=(c.focal&&c.focal[1]!=null)?c.focal[1]:0.5;
     return 'object-fit:'+(c.fit||'cover')+';object-position:'+(fx*100)+'% '+(fy*100)+'%'; }
 
+  /* embed URL allow-list (media plan §6.3): http/https only — no data:,
+     javascript:, file:, or anything else. Stricter than link hrefs (no
+     mailto: — meaningless as an iframe src). */
+  function embedUrlOk(u){ return /^https?:\/\//i.test(String(u||'')); }
+  SG.embedUrlOk=embedUrlOk;
+
+  /* =====================================================================
+     EMBEDS (media plan §6) — a sandboxed iframe behind a transparent
+     "shield" so it never steals input while editing, and (in present mode)
+     is click-to-interact by default so it never steals arrow/space
+     navigation either. Every embed ALSO gets an always-present, normally
+     display:none poster card: print and SG.static (§7.1) force it visible
+     and the iframe hidden via CSS alone (see engine.css) — no JS needed at
+     capture time, and F.posterize() (editor.js) reuses the same card for
+     cloned contexts (sorter thumbnails, speaker view, copy/paste).
+     ===================================================================== */
+  var SANDBOX_DEFAULT={scripts:true,popups:true,forms:false,sameOrigin:false};
+  function sandboxAttr(sb){ sb=Object.assign({},SANDBOX_DEFAULT,sb||{});
+    var t=['allow-scripts'];                              /* always on — most embeddable sites need it just to render */
+    if(sb.popups) t.push('allow-popups');
+    if(sb.forms) t.push('allow-forms');
+    if(sb.sameOrigin) t.push('allow-same-origin');
+    return t.join(' '); }
+  function embedPosterNode(spec){
+    var url=spec.url||'', posterMeta=spec.poster?imageMeta(spec.poster):null;
+    var kids=[];
+    if(posterMeta&&posterMeta.src) kids.push(N('img',{src:posterMeta.src,alt:''}));
+    kids.push(N('div.sf-embed-poster-body',[
+      N('div.sf-embed-poster-h',esc(spec.title||'Embedded content')),
+      url?N('div.sf-embed-poster-url',esc(url)):null,
+      url?N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'):null ]));
+    return N('div.sf-embed-poster',kids); }
+  /* SG.mountEmbed(host,spec): host is the element that will carry the shield
+     + poster + (unless mode:"poster") the iframe. Called by L.embed (full
+     slide) and editor.js's free-object mount identically. */
+  SG.mountEmbed=function(host,spec){ spec=spec||{};
+    var url=spec.url||'', mode=spec.mode||'click';
+    host.classList.add('sf-embed');
+    var poster=embedPosterNode(spec); host.appendChild(poster);
+    if(!url||!embedUrlOk(url)||mode==='poster'){ poster.style.display='flex'; return; }
+    var shield=N('div.sf-embed-shield',{'data-mode':mode},N('div.sf-embed-hint','Click to interact'));
+    host.appendChild(shield);
+    /* click-to-interact (mode:"click", present mode only — edit mode always
+       keeps the shield up so the object stays draggable/selectable). Esc
+       (bound once in mountNav) restores it so arrow/space navigation works
+       again; this can't reach keystrokes typed INSIDE a cross-origin frame
+       once it has focus — a known, inherent limitation of iframes. */
+    shield.addEventListener('click',function(){
+      if(D.body.classList.contains('forge-edit')) return;
+      if(mode==='click') shield.classList.add('active'); });
+    var wrap=N('div.sf-embed-iframe-wrap'); host.appendChild(wrap);
+    poster.style.display='flex';                          /* shown while loading */
+    var iframe=D.createElement('iframe');
+    iframe.setAttribute('sandbox',sandboxAttr(spec.sandbox));
+    iframe.setAttribute('referrerpolicy','no-referrer');
+    iframe.setAttribute('allow','');                       /* no camera/mic/geolocation/etc. */
+    iframe.setAttribute('loading','lazy');
+    iframe.setAttribute('title',spec.title||'Embedded content');
+    wrap.appendChild(iframe);
+    var settled=false;
+    function showUnavailable(reason){ if(wrap.parentNode) wrap.remove();
+      poster.style.display='none';
+      host.appendChild(SG.unavailable({url:url,reason:reason})); }
+    /* KNOWN LIMIT (media plan §6.2, verified empirically): a site sending
+       X-Frame-Options often still fires 'load' — the browser treats the
+       navigation as complete even though it refused to render — so this
+       is a heartbeat, not a real block-detector. CSP frame-ancestors
+       refusals more often never fire 'load' at all, which the 6s timeout
+       below does catch. Neither path can be made fully reliable
+       cross-origin; this is the accepted trade-off, not a bug to chase. */
+    iframe.addEventListener('load',function(){ if(settled) return; settled=true; poster.style.display='none'; });
+    iframe.addEventListener('error',function(){ if(settled) return; settled=true; showUnavailable('blocked'); });
+    if(!W.navigator.onLine){ settled=true; showUnavailable('offline'); }
+    else { setTimeout(function(){ if(settled) return; settled=true; showUnavailable('timeout'); },6000);
+      iframe.src=url; }
+    return {shield:shield,wrap:wrap,poster:poster}; };
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
@@ -1656,6 +1774,15 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     return [ kickerN(c.kicker), titleN(c.title), stage,
       c.caption?N('p.diagram-cap',{bind:'caption',html:rich(c.caption)}):null ]; };
 
+  /* EMBED — full-slide sandboxed iframe (media plan §6). Deliberately the
+     only layout whose deck stops being fully offline-capable; see the
+     shared unavailable/poster machinery in SG.mountEmbed above. */
+  L.embed=function(c){
+    var stage=N('div.embed-stage',{key:'stage'});
+    SG.mountEmbed(stage,c);
+    return [ (c.kicker||c.title)?N('div.embed-head',{key:'head'},[kickerN(c.kicker),titleN(c.title)]):null,
+      stage, c.note?N('p.embed-note',{bind:'note',html:rich(c.note)}):null ]; };
+
   L['metric-dash']=function(c){
     var r=c.ring||{};
     return [ kickerN(c.kicker), titleN(c.title),
@@ -1863,6 +1990,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     if(!SG._bound){ SG._bound=true;
       updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){ var act=D.querySelector('.sf-embed-shield.active'); if(act){ act.classList.remove('active'); return; } }
         if(/^(input|textarea|select)$/i.test((e.target.tagName||''))) return;
         if(e.target.isContentEditable) return;                       /* WYSIWYG edit in progress */
         if(D.body.classList.contains('forge-edit')) return;          /* editor owns keys in edit mode */
@@ -1990,7 +2118,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         if(cur&&secs[i]){ cur.innerHTML='';
           var cl=secs[i].cloneNode(true); cl.classList.add('active');
           [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.doc-panel')).forEach(function(n){ n.remove(); });
-          cur.appendChild(cl); if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
+          cur.appendChild(cl); W.Forge&&W.Forge.posterize&&W.Forge.posterize(cur);
+          if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
         wd.getElementById('spk-notes').textContent=slides[i].notes||'(no notes for this slide)';
         var nx=slides[i+1];
         wd.getElementById('spk-next').textContent=nx?((i+2)+' \u00b7 '+titleOf(nx)):'\u2014 end of deck \u2014';
@@ -2834,7 +2963,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     ["Syne","'Syne',sans-serif"],["Epilogue","'Epilogue',sans-serif"],["Bricolage Grotesque","'Bricolage Grotesque',sans-serif"],
     ["Fraunces","'Fraunces',serif"],["Playfair Display","'Playfair Display',serif"],["Newsreader","'Newsreader',serif"]];
 
-  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","embed","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
   var ASSET_FIELDS={image:'image',svg:'svg',poster:'image'};    /* content field name -> asset kind, for the picker widget */
   var CHART_TYPES=["bar","bar-h","stacked","line","area","pie","donut","scatter"];
   var TOKENS=["--bg","--bg-2","--ink","--muted","--cyan","--indigo","--mint"];
@@ -2869,6 +2998,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     "media-split":{kicker:"",title:"Title",body:"Body copy.",items:[],image:"",side:"left",fit:"cover",focal:[0.5,0.5]},
     gallery:{kicker:"",title:"Gallery",items:[{image:"",caption:""}]},
     diagram:{kicker:"",title:"Diagram",svg:"",caption:""},
+    embed:{kicker:"",title:"",url:"",mode:"click",poster:"",note:""},
     "metric-dash":{kicker:"",title:"Metrics",ring:{value:50,suffix:"%",label:"Label"},tiles:[{value:"0",unit:"",label:"Tile"}]},
     leaderboard:{kicker:"",title:"Leaderboard",rows:[{name:"Name",value:"0"}]},
     diptych:{left:{tag:"",title:"Left",body:""},right:{tag:"",title:"Right",body:""}},
@@ -2991,6 +3121,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       if(fo.type==='html') n.innerHTML=fo.html||'';
       else if(fo.type==='image') mountImageFree(n,fo);
       else if(fo.type==='svg') mountSvgFree(n,fo);
+      else if(fo.type==='embed') SG.mountEmbed&&SG.mountEmbed(n,fo);
       else if(fo.type!=='box') n.textContent=fo.text||'Text';
       sec.appendChild(n); applyFree(n,fo); }); }
 
@@ -3009,6 +3140,16 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     var markup=SG.svgMarkup&&SG.svgMarkup(fo.asset);
     if(markup) n.innerHTML=markup;
     else n.appendChild(SG.unavailable({url:fo.asset,reason:'missing'})); }
+
+  /* posterize(root): strip every live iframe+shield under root, forcing its
+     poster card visible instead (media plan §6.2 problem 4). Used wherever a
+     slide gets CLONED for a separate display — sorter thumbnails, speaker
+     view, deep-copy — so those never spawn extra live loads of the same URL.
+     (Print/SG.static handle the ACTIVE deck via CSS alone — see engine.css —
+     because that path must never mutate the live, still-interactive DOM.) */
+  F.posterize=function(root){ if(!root) return;
+    [].slice.call(root.querySelectorAll('.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
+    [].slice.call(root.querySelectorAll('.sf-embed-poster')).forEach(function(n){ n.style.display='flex'; }); };
 
   F.decorate=function(deck,data){ data=data||SG.data; var slides=data.slides||[];
     if(SG._legacyKeys) migrateLegacy(deck,data);
@@ -3059,10 +3200,12 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     if(o.hide) b.style.display='none';
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   var MEDIA_FREE={image:1,svg:1};
+  var SIZED_FREE={box:1,image:1,svg:1,embed:1};
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
     applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
-    if(fo.type==='box'||MEDIA_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:360))+'px'; n.style.height=(fo.h||(fo.type==='box'?160:240))+'px'; }
+    if(SIZED_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:fo.type==='embed'?480:360))+'px';
+      n.style.height=(fo.h||(fo.type==='box'?160:fo.type==='embed'?270:240))+'px'; }
     else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; }
     if(MEDIA_FREE[fo.type]){
       n.style.overflow='hidden'; n.style.borderRadius=(fo.radius||0)+'px'; n.style.opacity=fo.opacity!=null?fo.opacity:1;
@@ -3349,7 +3492,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
         rot:d.rot||0, anim:d.anim||'', animDelay:d.animDelay||0};
     /* deep copy: carry the container's full markup (nested items included) */
     var cl=x.node.cloneNode(true);
-    [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free')).forEach(function(n){ n.remove(); });
+    [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free,.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
     [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){
       n.removeAttribute('data-el'); n.removeAttribute('data-bind'); n.removeAttribute('data-arr');
       n.classList.remove('forge-block','forge-sel','forge-sel-multi'); });
@@ -3671,7 +3814,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     F._undoBtn=btn('↶ Undo',F.undoOp); F._redoBtn=btn('↷ Redo',F.redoOp); bar.appendChild(el('span','forge-sep'));
     F._addBtn=btn('＋ Slide',function(e){ F.insertMenu(F._addBtn); }); btn('⧉ Duplicate',function(){ F.dupSlide(); });
     btn('＋ Text',function(){ F.addFree('txt'); }); btn('＋ Box',function(){ F.addFree('box'); });
-    btn('🖼 Assets',function(){ F.assetsPanel(); }); bar.appendChild(el('span','forge-sep'));
+    btn('🖼 Assets',function(){ F.assetsPanel(); }); btn('◲ Embed',function(){ F.embedPrompt(); }); bar.appendChild(el('span','forge-sep'));
     btn('▷ Present',function(){ F.toggle(); SG.present&&SG.present(); });
     F._saveBtn=btn('⤓ Save .html',function(){ F.download(); },'primary'); btn('{ } JSON',function(){ SG.exportJSON&&SG.exportJSON(); });
     D.body.appendChild(bar);
@@ -3714,6 +3857,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       if(secs[i]){ var cl=secs[i].cloneNode(true); cl.classList.add('active');
         [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.doc-panel')).forEach(function(n){ n.remove(); });
         cl.removeAttribute('data-i'); frame.appendChild(cl);
+        F.posterize(frame);
         if(SG.finalizeAnimations) SG.finalizeAnimations(frame); }
       th.appendChild(frame);
       var cap=el('div','forge-thumb-cap','<span>'+(i+1)+' \u00b7 '+s.layout+'</span>');
@@ -4063,6 +4207,28 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     D.body.appendChild(o);
     o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
 
+  /* ---- embed insert (media plan §6): a small URL prompt, not a full modal ---- */
+  F.embedPrompt=function(){
+    var old=D.getElementById('forge-embed-prompt'); if(old){ old.remove(); return; }
+    var o=el('div','forge-chrome'); o.id='forge-embed-prompt';
+    var card=el('div','forge-assets-card'); card.style.width='min(460px,94vw)';
+    card.appendChild(el('h3',null,'Embed a link'));
+    card.appendChild(el('div','forge-hint','Only http(s) URLs are accepted. The deck will need a network connection to show this live — unreachable/blocked pages fall back to a poster card automatically (including always in print).'));
+    var inp=el('input'); inp.type='text'; inp.placeholder='https://…'; inp.style.width='100%'; inp.style.boxSizing='border-box'; inp.style.marginTop='10px';
+    var err=el('div','forge-field-error'); err.style.display='none';
+    card.appendChild(inp); card.appendChild(err);
+    var btns=el('div','forge-struct-btns'); btns.style.marginTop='12px';
+    var ins=el('button','forge-btn primary','＋ Insert'); var cancel=el('button','forge-btn','Cancel');
+    cancel.onclick=function(){ o.remove(); };
+    ins.onclick=function(){ var id=F.addEmbed(inp.value);
+      if(!id){ err.textContent='Enter a valid http:// or https:// URL.'; err.style.display='block'; return; }
+      o.remove(); };
+    inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); ins.click(); } };
+    btns.appendChild(ins); btns.appendChild(cancel); card.appendChild(btns);
+    o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
+    inp.focus(); };
+
   /* =====================================================================
      STRUCTURE EDITOR (expand from the Elements panel) — big modal with the
      elements tree beside a DIRECT JSON editor for the slide. Copy the
@@ -4256,8 +4422,9 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     var db=el('button','forge-btn warn','✕ Delete / reset all'); db.onclick=F.deleteSel; s.appendChild(db); }
 
   function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free'; var isMedia=isFree&&MEDIA_FREE[d.type];
-    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':'text')):('Element '+sel.key)));
-    if(isFree&&d.type!=='box'&&!isMedia){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
+    var isEmbed=isFree&&d.type==='embed';
+    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':isEmbed?'embed':'text')):('Element '+sel.key)));
+    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
       t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
     geomInputs={};
@@ -4270,8 +4437,32 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       geomInputs[key]=n; s.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
     num('Width','w');                                       /* width reflows text (0 = natural) */
-    if(isFree&&(d.type==='box'||d.type==='html'||isMedia)) num('Height','h');
-    if(isFree&&d.type!=='box'&&!isMedia) num('Font size','size');
+    if(isFree&&(d.type==='box'||d.type==='html'||isMedia||isEmbed)) num('Height','h');
+    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed) num('Font size','size');
+    if(isEmbed){
+      var se=sec(body,'Embed');
+      function reapplyEmbed(){ var n=sel.node; var host=n; /* remount: URL/mode/sandbox changes need a fresh iframe */
+        [].slice.call(n.querySelectorAll('.sf-embed-iframe-wrap,.sf-embed-shield,.sf-embed-poster,.sf-unavail')).forEach(function(x){ x.remove(); });
+        n.classList.remove('sf-embed'); if(SG.mountEmbed) SG.mountEmbed(host,d); applyFree(n,d); }
+      var urlInp=el('input'); urlInp.type='text'; urlInp.placeholder='https://…'; urlInp.value=d.url||'';
+      var urlErr=el('div','forge-field-error'); urlErr.style.display='none';
+      urlInp.onfocus=function(){ F.pushUndo(); };
+      urlInp.onchange=function(){ var v=urlInp.value.trim();
+        if(v&&!(SG.embedUrlOk&&SG.embedUrlOk(v))){ urlErr.textContent='Only http:// or https:// URLs are allowed.'; urlErr.style.display='block'; return; }
+        urlErr.style.display='none'; d.url=v; reapplyEmbed(); F.save(); };
+      se.appendChild(field('URL',urlInp)); se.appendChild(urlErr);
+      se.appendChild(field('Mode',selectInput([['Click to interact','click'],['Always live','live'],['Poster only (never loads)','poster']],
+        d.mode||'click',function(v){ F.pushUndo(); d.mode=v; reapplyEmbed(); F.save(); })));
+      se.appendChild(field('Poster',assetPickerField(d,'poster','image')));
+      var titleInp=el('input'); titleInp.type='text'; titleInp.value=d.title||'';
+      titleInp.onfocus=function(){ F.pushUndo(); }; titleInp.onchange=function(){ d.title=titleInp.value; reapplyEmbed(); F.save(); };
+      se.appendChild(field('Title (accessibility + poster caption)',titleInp));
+      d.sandbox=d.sandbox||{};
+      var so=el('input'); so.type='checkbox'; so.checked=!!d.sandbox.sameOrigin;
+      so.onchange=function(){ F.pushUndo(); d.sandbox.sameOrigin=so.checked; reapplyEmbed(); F.save(); };
+      se.appendChild(fieldRow('Trust this site (cookies/storage)',so));
+      se.appendChild(el('div','forge-hint','Only enable "Trust" for sites you control — combined with scripts it lets the page reach outside its sandbox if it shares your deck’s origin.'));
+    }
     if(isMedia){
       var sm=sec(body,d.type==='svg'?'Diagram':'Image');
       var altInp=el('input'); altInp.type='text'; altInp.value=d.alt||'';
@@ -4401,6 +4592,15 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     F.do('add '+(isSvg?'diagram':'image'),function(data){ var sl=data.slides[i]; sl.freeObjects=sl.freeObjects||[];
       sl.freeObjects.push({id:id,type:isSvg?'svg':'image',asset:assetName,x:x,y:y,w:w,h:h,rot:0,
         fit:'cover',focal:[0.5,0.5],radius:0,opacity:1,frame:'none',alt:(meta&&meta.alt)||''}); });
+    var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false);
+    return id; };
+  /* insert a sandboxed embed object (media plan §6). Rejects anything not
+     http(s) up front — same allow-list SG.mountEmbed enforces at render. */
+  F.addEmbed=function(url){ url=(url||'').trim(); if(!SG.embedUrlOk||!SG.embedUrlOk(url)) return null;
+    var i=curSlide(); var id=uid(), w=480, h=270;
+    F.do('add embed',function(data){ var sl=data.slides[i]; sl.freeObjects=sl.freeObjects||[];
+      sl.freeObjects.push({id:id,type:'embed',url:url,x:Math.round(640-w/2),y:Math.round(360-h/2),w:w,h:h,rot:0,
+        mode:'click',sandbox:{scripts:true,popups:true,forms:false,sameOrigin:false},title:''}); });
     var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false);
     return id; };
 

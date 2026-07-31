@@ -119,6 +119,47 @@ body.presenting{cursor:none}
   .media-img .sf-unavail{ position:relative !important; }
 }
 
+/* DIAGRAM caption (shared spacing with the layouts above it) */
+.diagram-cap{margin-top:14px}
+
+/* EMBED layout */
+.embed-head{ margin-bottom:20px; }
+.embed-stage{ flex:1; min-height:0; position:relative; border-radius:14px; overflow:hidden;
+  background:var(--panel); border:1px solid var(--brd); }
+.embed-note{ margin-top:14px; font-size:13px; color:var(--faint); }
+
+/* =====================================================================
+   EMBEDS (media plan §6) — shield (input gate), iframe wrap, poster card.
+   Free-object embeds reuse these same classes (editor.js mounts into the
+   .forge-free wrapper directly instead of a .embed-stage).
+   ===================================================================== */
+.sf-embed{ position:relative; }
+.sf-embed-shield{ position:absolute; inset:0; z-index:5; pointer-events:auto; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; background:transparent; }
+.sf-embed-hint{ display:none; padding:8px 16px; border-radius:999px; background:rgba(0,0,0,.6);
+  color:#fff; font-size:13px; font-family:var(--font-mono,monospace); }
+body:not(.forge-edit) .sf-embed-shield[data-mode="click"]:not(.active) .sf-embed-hint{ display:block; }
+body:not(.forge-edit) .sf-embed-shield[data-mode="click"].active{ pointer-events:none; }
+body:not(.forge-edit) .sf-embed-shield[data-mode="live"]{ pointer-events:none; }
+.sf-embed-iframe-wrap{ position:absolute; inset:0; z-index:2; }
+.sf-embed-iframe-wrap iframe{ width:100%; height:100%; border:0; display:block; background:#0b0e14; }
+.sf-embed-poster{ position:absolute; inset:0; z-index:3; display:none; flex-direction:column; gap:10px;
+  align-items:center; justify-content:center; text-align:center; padding:24px; box-sizing:border-box;
+  background:linear-gradient(135deg,var(--bg-2),var(--bg)); color:var(--muted); }
+.sf-embed-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.5; z-index:0; }
+.sf-embed-poster-body{ position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; max-width:44ch; }
+.sf-embed-poster-h{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--ink); }
+.sf-embed-poster-url{ font-family:var(--font-mono); font-size:12px; color:var(--faint); word-break:break-all; }
+/* print/static ALWAYS show the poster and hide the live frame, regardless of
+   whatever state it was in on screen — an iframe cannot be captured in a
+   print job (media plan §7.1) */
+html[data-static] .sf-embed-iframe-wrap, html[data-static] .sf-embed-shield{ display:none !important; }
+html[data-static] .sf-embed-poster{ display:flex !important; }
+@media print{
+  .sf-embed-iframe-wrap, .sf-embed-shield{ display:none !important; }
+  .sf-embed-poster{ display:flex !important; position:relative !important; }
+}
+
 /* =====================================================================
    LINKS (media plan §5) — data-href is set by the editor's decorate layer.
    No visual change by default (the object keeps its normal styling); the

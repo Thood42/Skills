@@ -225,6 +225,22 @@ clipboard paste deferred; generation-time assets always embed with no size ceili
   browser's own `online`/`offline` events) drives a small ⚠ marker on external links — a *specific*
   dead link while online can't be detected (opaque cross-origin response), so that case is
   intentionally not claimed.
+- **Embeds** (`type:"embed"` free object, or the full-slide `embed` layout): a sandboxed iframe
+  (`sandbox="allow-scripts allow-popups"` by default; `allow-same-origin` is a separate, explicitly
+  labelled "trust this site" toggle) behind a transparent **shield** — always pointer-events:auto
+  while editing (so the object stays draggable/selectable no matter what), and in present mode either
+  click-to-interact (`mode:"click"`, default — the hint disappears once clicked, **Esc** restores it),
+  always-live (`mode:"live"`, no shield at all), or never-loaded (`mode:"poster"`). A 6s heartbeat
+  swaps a loading/blocked/offline embed to the unavailable card instead of a blank rectangle — but
+  this is a heuristic, not a guarantee: verified empirically, many `X-Frame-Options` refusals still
+  fire the iframe's `load` event (the browser considers the navigation complete even though it
+  refused to render), which the heartbeat can't distinguish from success. Every embed ALSO carries an
+  always-present, normally-hidden poster card; `F.posterize()` strips the live iframe and forces that
+  poster visible wherever a slide gets cloned for separate display (sorter thumbnails, speaker view,
+  deep-copy), and print/`SG.static` do the same **unconditionally**, via CSS alone, regardless of the
+  on-screen load state — an iframe cannot be captured in a print job (media plan §7.1). Esc-to-restore
+  can't reach keystrokes typed *inside* a cross-origin frame once it has focus — an inherent iframe
+  limitation, not something worth chasing further.
 - **Storage**: generation-time assets (`assets/images/`, `assets/diagrams/` via `scripts/assets.py`)
   always embed, no size ceiling — the delivered deck may exceed the 450 KB *template* budget
   (`scripts/build.py`'s budget covers code only). Editor imports downscale to 1920px/WebP by default

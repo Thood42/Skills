@@ -186,6 +186,83 @@
   function fitStyle(c){ var fx=(c.focal&&c.focal[0]!=null)?c.focal[0]:0.5, fy=(c.focal&&c.focal[1]!=null)?c.focal[1]:0.5;
     return 'object-fit:'+(c.fit||'cover')+';object-position:'+(fx*100)+'% '+(fy*100)+'%'; }
 
+  /* embed URL allow-list (media plan §6.3): http/https only — no data:,
+     javascript:, file:, or anything else. Stricter than link hrefs (no
+     mailto: — meaningless as an iframe src). */
+  function embedUrlOk(u){ return /^https?:\/\//i.test(String(u||'')); }
+  SG.embedUrlOk=embedUrlOk;
+
+  /* =====================================================================
+     EMBEDS (media plan §6) — a sandboxed iframe behind a transparent
+     "shield" so it never steals input while editing, and (in present mode)
+     is click-to-interact by default so it never steals arrow/space
+     navigation either. Every embed ALSO gets an always-present, normally
+     display:none poster card: print and SG.static (§7.1) force it visible
+     and the iframe hidden via CSS alone (see engine.css) — no JS needed at
+     capture time, and F.posterize() (editor.js) reuses the same card for
+     cloned contexts (sorter thumbnails, speaker view, copy/paste).
+     ===================================================================== */
+  var SANDBOX_DEFAULT={scripts:true,popups:true,forms:false,sameOrigin:false};
+  function sandboxAttr(sb){ sb=Object.assign({},SANDBOX_DEFAULT,sb||{});
+    var t=['allow-scripts'];                              /* always on — most embeddable sites need it just to render */
+    if(sb.popups) t.push('allow-popups');
+    if(sb.forms) t.push('allow-forms');
+    if(sb.sameOrigin) t.push('allow-same-origin');
+    return t.join(' '); }
+  function embedPosterNode(spec){
+    var url=spec.url||'', posterMeta=spec.poster?imageMeta(spec.poster):null;
+    var kids=[];
+    if(posterMeta&&posterMeta.src) kids.push(N('img',{src:posterMeta.src,alt:''}));
+    kids.push(N('div.sf-embed-poster-body',[
+      N('div.sf-embed-poster-h',esc(spec.title||'Embedded content')),
+      url?N('div.sf-embed-poster-url',esc(url)):null,
+      url?N('a.sf-unavail-open',{href:url,target:'_blank',rel:'noopener noreferrer'},'Open in browser ↗'):null ]));
+    return N('div.sf-embed-poster',kids); }
+  /* SG.mountEmbed(host,spec): host is the element that will carry the shield
+     + poster + (unless mode:"poster") the iframe. Called by L.embed (full
+     slide) and editor.js's free-object mount identically. */
+  SG.mountEmbed=function(host,spec){ spec=spec||{};
+    var url=spec.url||'', mode=spec.mode||'click';
+    host.classList.add('sf-embed');
+    var poster=embedPosterNode(spec); host.appendChild(poster);
+    if(!url||!embedUrlOk(url)||mode==='poster'){ poster.style.display='flex'; return; }
+    var shield=N('div.sf-embed-shield',{'data-mode':mode},N('div.sf-embed-hint','Click to interact'));
+    host.appendChild(shield);
+    /* click-to-interact (mode:"click", present mode only — edit mode always
+       keeps the shield up so the object stays draggable/selectable). Esc
+       (bound once in mountNav) restores it so arrow/space navigation works
+       again; this can't reach keystrokes typed INSIDE a cross-origin frame
+       once it has focus — a known, inherent limitation of iframes. */
+    shield.addEventListener('click',function(){
+      if(D.body.classList.contains('forge-edit')) return;
+      if(mode==='click') shield.classList.add('active'); });
+    var wrap=N('div.sf-embed-iframe-wrap'); host.appendChild(wrap);
+    poster.style.display='flex';                          /* shown while loading */
+    var iframe=D.createElement('iframe');
+    iframe.setAttribute('sandbox',sandboxAttr(spec.sandbox));
+    iframe.setAttribute('referrerpolicy','no-referrer');
+    iframe.setAttribute('allow','');                       /* no camera/mic/geolocation/etc. */
+    iframe.setAttribute('loading','lazy');
+    iframe.setAttribute('title',spec.title||'Embedded content');
+    wrap.appendChild(iframe);
+    var settled=false;
+    function showUnavailable(reason){ if(wrap.parentNode) wrap.remove();
+      poster.style.display='none';
+      host.appendChild(SG.unavailable({url:url,reason:reason})); }
+    /* KNOWN LIMIT (media plan §6.2, verified empirically): a site sending
+       X-Frame-Options often still fires 'load' — the browser treats the
+       navigation as complete even though it refused to render — so this
+       is a heartbeat, not a real block-detector. CSP frame-ancestors
+       refusals more often never fire 'load' at all, which the 6s timeout
+       below does catch. Neither path can be made fully reliable
+       cross-origin; this is the accepted trade-off, not a bug to chase. */
+    iframe.addEventListener('load',function(){ if(settled) return; settled=true; poster.style.display='none'; });
+    iframe.addEventListener('error',function(){ if(settled) return; settled=true; showUnavailable('blocked'); });
+    if(!W.navigator.onLine){ settled=true; showUnavailable('offline'); }
+    else { setTimeout(function(){ if(settled) return; settled=true; showUnavailable('timeout'); },6000);
+      iframe.src=url; }
+    return {shield:shield,wrap:wrap,poster:poster}; };
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
@@ -414,6 +491,15 @@
     return [ kickerN(c.kicker), titleN(c.title), stage,
       c.caption?N('p.diagram-cap',{bind:'caption',html:rich(c.caption)}):null ]; };
 
+  /* EMBED — full-slide sandboxed iframe (media plan §6). Deliberately the
+     only layout whose deck stops being fully offline-capable; see the
+     shared unavailable/poster machinery in SG.mountEmbed above. */
+  L.embed=function(c){
+    var stage=N('div.embed-stage',{key:'stage'});
+    SG.mountEmbed(stage,c);
+    return [ (c.kicker||c.title)?N('div.embed-head',{key:'head'},[kickerN(c.kicker),titleN(c.title)]):null,
+      stage, c.note?N('p.embed-note',{bind:'note',html:rich(c.note)}):null ]; };
+
   L['metric-dash']=function(c){
     var r=c.ring||{};
     return [ kickerN(c.kicker), titleN(c.title),
@@ -621,6 +707,7 @@
     if(!SG._bound){ SG._bound=true;
       updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){ var act=D.querySelector('.sf-embed-shield.active'); if(act){ act.classList.remove('active'); return; } }
         if(/^(input|textarea|select)$/i.test((e.target.tagName||''))) return;
         if(e.target.isContentEditable) return;                       /* WYSIWYG edit in progress */
         if(D.body.classList.contains('forge-edit')) return;          /* editor owns keys in edit mode */
@@ -748,7 +835,8 @@
         if(cur&&secs[i]){ cur.innerHTML='';
           var cl=secs[i].cloneNode(true); cl.classList.add('active');
           [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.doc-panel')).forEach(function(n){ n.remove(); });
-          cur.appendChild(cl); if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
+          cur.appendChild(cl); W.Forge&&W.Forge.posterize&&W.Forge.posterize(cur);
+          if(SG.finalizeAnimations) SG.finalizeAnimations(cur); }
         wd.getElementById('spk-notes').textContent=slides[i].notes||'(no notes for this slide)';
         var nx=slides[i+1];
         wd.getElementById('spk-next').textContent=nx?((i+2)+' \u00b7 '+titleOf(nx)):'\u2014 end of deck \u2014';

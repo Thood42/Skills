@@ -48,7 +48,7 @@
     ["Syne","'Syne',sans-serif"],["Epilogue","'Epilogue',sans-serif"],["Bricolage Grotesque","'Bricolage Grotesque',sans-serif"],
     ["Fraunces","'Fraunces',serif"],["Playfair Display","'Playfair Display',serif"],["Newsreader","'Newsreader',serif"]];
 
-  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
+  var LAYOUTS=["cover","agenda","divider","stat-grid","bignum","chart","table","comparison","quote","code","timeline","pipeline","closing","manifesto","editorial","hero-asym","figure","image","media-split","gallery","diagram","embed","metric-dash","leaderboard","diptych","matrix","stack","quote-mosaic","index-mosaic","before-after","raw"];
   var ASSET_FIELDS={image:'image',svg:'svg',poster:'image'};    /* content field name -> asset kind, for the picker widget */
   var CHART_TYPES=["bar","bar-h","stacked","line","area","pie","donut","scatter"];
   var TOKENS=["--bg","--bg-2","--ink","--muted","--cyan","--indigo","--mint"];
@@ -83,6 +83,7 @@
     "media-split":{kicker:"",title:"Title",body:"Body copy.",items:[],image:"",side:"left",fit:"cover",focal:[0.5,0.5]},
     gallery:{kicker:"",title:"Gallery",items:[{image:"",caption:""}]},
     diagram:{kicker:"",title:"Diagram",svg:"",caption:""},
+    embed:{kicker:"",title:"",url:"",mode:"click",poster:"",note:""},
     "metric-dash":{kicker:"",title:"Metrics",ring:{value:50,suffix:"%",label:"Label"},tiles:[{value:"0",unit:"",label:"Tile"}]},
     leaderboard:{kicker:"",title:"Leaderboard",rows:[{name:"Name",value:"0"}]},
     diptych:{left:{tag:"",title:"Left",body:""},right:{tag:"",title:"Right",body:""}},
@@ -205,6 +206,7 @@
       if(fo.type==='html') n.innerHTML=fo.html||'';
       else if(fo.type==='image') mountImageFree(n,fo);
       else if(fo.type==='svg') mountSvgFree(n,fo);
+      else if(fo.type==='embed') SG.mountEmbed&&SG.mountEmbed(n,fo);
       else if(fo.type!=='box') n.textContent=fo.text||'Text';
       sec.appendChild(n); applyFree(n,fo); }); }
 
@@ -223,6 +225,16 @@
     var markup=SG.svgMarkup&&SG.svgMarkup(fo.asset);
     if(markup) n.innerHTML=markup;
     else n.appendChild(SG.unavailable({url:fo.asset,reason:'missing'})); }
+
+  /* posterize(root): strip every live iframe+shield under root, forcing its
+     poster card visible instead (media plan §6.2 problem 4). Used wherever a
+     slide gets CLONED for a separate display — sorter thumbnails, speaker
+     view, deep-copy — so those never spawn extra live loads of the same URL.
+     (Print/SG.static handle the ACTIVE deck via CSS alone — see engine.css —
+     because that path must never mutate the live, still-interactive DOM.) */
+  F.posterize=function(root){ if(!root) return;
+    [].slice.call(root.querySelectorAll('.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
+    [].slice.call(root.querySelectorAll('.sf-embed-poster')).forEach(function(n){ n.style.display='flex'; }); };
 
   F.decorate=function(deck,data){ data=data||SG.data; var slides=data.slides||[];
     if(SG._legacyKeys) migrateLegacy(deck,data);
@@ -273,10 +285,12 @@
     if(o.hide) b.style.display='none';
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   var MEDIA_FREE={image:1,svg:1};
+  var SIZED_FREE={box:1,image:1,svg:1,embed:1};
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
     applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
-    if(fo.type==='box'||MEDIA_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:360))+'px'; n.style.height=(fo.h||(fo.type==='box'?160:240))+'px'; }
+    if(SIZED_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:fo.type==='embed'?480:360))+'px';
+      n.style.height=(fo.h||(fo.type==='box'?160:fo.type==='embed'?270:240))+'px'; }
     else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; }
     if(MEDIA_FREE[fo.type]){
       n.style.overflow='hidden'; n.style.borderRadius=(fo.radius||0)+'px'; n.style.opacity=fo.opacity!=null?fo.opacity:1;
@@ -563,7 +577,7 @@
         rot:d.rot||0, anim:d.anim||'', animDelay:d.animDelay||0};
     /* deep copy: carry the container's full markup (nested items included) */
     var cl=x.node.cloneNode(true);
-    [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free')).forEach(function(n){ n.remove(); });
+    [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free,.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
     [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){
       n.removeAttribute('data-el'); n.removeAttribute('data-bind'); n.removeAttribute('data-arr');
       n.classList.remove('forge-block','forge-sel','forge-sel-multi'); });
@@ -885,7 +899,7 @@
     F._undoBtn=btn('↶ Undo',F.undoOp); F._redoBtn=btn('↷ Redo',F.redoOp); bar.appendChild(el('span','forge-sep'));
     F._addBtn=btn('＋ Slide',function(e){ F.insertMenu(F._addBtn); }); btn('⧉ Duplicate',function(){ F.dupSlide(); });
     btn('＋ Text',function(){ F.addFree('txt'); }); btn('＋ Box',function(){ F.addFree('box'); });
-    btn('🖼 Assets',function(){ F.assetsPanel(); }); bar.appendChild(el('span','forge-sep'));
+    btn('🖼 Assets',function(){ F.assetsPanel(); }); btn('◲ Embed',function(){ F.embedPrompt(); }); bar.appendChild(el('span','forge-sep'));
     btn('▷ Present',function(){ F.toggle(); SG.present&&SG.present(); });
     F._saveBtn=btn('⤓ Save .html',function(){ F.download(); },'primary'); btn('{ } JSON',function(){ SG.exportJSON&&SG.exportJSON(); });
     D.body.appendChild(bar);
@@ -928,6 +942,7 @@
       if(secs[i]){ var cl=secs[i].cloneNode(true); cl.classList.add('active');
         [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.doc-panel')).forEach(function(n){ n.remove(); });
         cl.removeAttribute('data-i'); frame.appendChild(cl);
+        F.posterize(frame);
         if(SG.finalizeAnimations) SG.finalizeAnimations(frame); }
       th.appendChild(frame);
       var cap=el('div','forge-thumb-cap','<span>'+(i+1)+' \u00b7 '+s.layout+'</span>');
@@ -1277,6 +1292,28 @@
     D.body.appendChild(o);
     o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
 
+  /* ---- embed insert (media plan §6): a small URL prompt, not a full modal ---- */
+  F.embedPrompt=function(){
+    var old=D.getElementById('forge-embed-prompt'); if(old){ old.remove(); return; }
+    var o=el('div','forge-chrome'); o.id='forge-embed-prompt';
+    var card=el('div','forge-assets-card'); card.style.width='min(460px,94vw)';
+    card.appendChild(el('h3',null,'Embed a link'));
+    card.appendChild(el('div','forge-hint','Only http(s) URLs are accepted. The deck will need a network connection to show this live — unreachable/blocked pages fall back to a poster card automatically (including always in print).'));
+    var inp=el('input'); inp.type='text'; inp.placeholder='https://…'; inp.style.width='100%'; inp.style.boxSizing='border-box'; inp.style.marginTop='10px';
+    var err=el('div','forge-field-error'); err.style.display='none';
+    card.appendChild(inp); card.appendChild(err);
+    var btns=el('div','forge-struct-btns'); btns.style.marginTop='12px';
+    var ins=el('button','forge-btn primary','＋ Insert'); var cancel=el('button','forge-btn','Cancel');
+    cancel.onclick=function(){ o.remove(); };
+    ins.onclick=function(){ var id=F.addEmbed(inp.value);
+      if(!id){ err.textContent='Enter a valid http:// or https:// URL.'; err.style.display='block'; return; }
+      o.remove(); };
+    inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); ins.click(); } };
+    btns.appendChild(ins); btns.appendChild(cancel); card.appendChild(btns);
+    o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
+    inp.focus(); };
+
   /* =====================================================================
      STRUCTURE EDITOR (expand from the Elements panel) — big modal with the
      elements tree beside a DIRECT JSON editor for the slide. Copy the
@@ -1470,8 +1507,9 @@
     var db=el('button','forge-btn warn','✕ Delete / reset all'); db.onclick=F.deleteSel; s.appendChild(db); }
 
   function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free'; var isMedia=isFree&&MEDIA_FREE[d.type];
-    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':'text')):('Element '+sel.key)));
-    if(isFree&&d.type!=='box'&&!isMedia){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
+    var isEmbed=isFree&&d.type==='embed';
+    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':isEmbed?'embed':'text')):('Element '+sel.key)));
+    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
       t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
     geomInputs={};
@@ -1484,8 +1522,32 @@
       geomInputs[key]=n; s.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
     num('Width','w');                                       /* width reflows text (0 = natural) */
-    if(isFree&&(d.type==='box'||d.type==='html'||isMedia)) num('Height','h');
-    if(isFree&&d.type!=='box'&&!isMedia) num('Font size','size');
+    if(isFree&&(d.type==='box'||d.type==='html'||isMedia||isEmbed)) num('Height','h');
+    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed) num('Font size','size');
+    if(isEmbed){
+      var se=sec(body,'Embed');
+      function reapplyEmbed(){ var n=sel.node; var host=n; /* remount: URL/mode/sandbox changes need a fresh iframe */
+        [].slice.call(n.querySelectorAll('.sf-embed-iframe-wrap,.sf-embed-shield,.sf-embed-poster,.sf-unavail')).forEach(function(x){ x.remove(); });
+        n.classList.remove('sf-embed'); if(SG.mountEmbed) SG.mountEmbed(host,d); applyFree(n,d); }
+      var urlInp=el('input'); urlInp.type='text'; urlInp.placeholder='https://…'; urlInp.value=d.url||'';
+      var urlErr=el('div','forge-field-error'); urlErr.style.display='none';
+      urlInp.onfocus=function(){ F.pushUndo(); };
+      urlInp.onchange=function(){ var v=urlInp.value.trim();
+        if(v&&!(SG.embedUrlOk&&SG.embedUrlOk(v))){ urlErr.textContent='Only http:// or https:// URLs are allowed.'; urlErr.style.display='block'; return; }
+        urlErr.style.display='none'; d.url=v; reapplyEmbed(); F.save(); };
+      se.appendChild(field('URL',urlInp)); se.appendChild(urlErr);
+      se.appendChild(field('Mode',selectInput([['Click to interact','click'],['Always live','live'],['Poster only (never loads)','poster']],
+        d.mode||'click',function(v){ F.pushUndo(); d.mode=v; reapplyEmbed(); F.save(); })));
+      se.appendChild(field('Poster',assetPickerField(d,'poster','image')));
+      var titleInp=el('input'); titleInp.type='text'; titleInp.value=d.title||'';
+      titleInp.onfocus=function(){ F.pushUndo(); }; titleInp.onchange=function(){ d.title=titleInp.value; reapplyEmbed(); F.save(); };
+      se.appendChild(field('Title (accessibility + poster caption)',titleInp));
+      d.sandbox=d.sandbox||{};
+      var so=el('input'); so.type='checkbox'; so.checked=!!d.sandbox.sameOrigin;
+      so.onchange=function(){ F.pushUndo(); d.sandbox.sameOrigin=so.checked; reapplyEmbed(); F.save(); };
+      se.appendChild(fieldRow('Trust this site (cookies/storage)',so));
+      se.appendChild(el('div','forge-hint','Only enable "Trust" for sites you control — combined with scripts it lets the page reach outside its sandbox if it shares your deck’s origin.'));
+    }
     if(isMedia){
       var sm=sec(body,d.type==='svg'?'Diagram':'Image');
       var altInp=el('input'); altInp.type='text'; altInp.value=d.alt||'';
@@ -1615,6 +1677,15 @@
     F.do('add '+(isSvg?'diagram':'image'),function(data){ var sl=data.slides[i]; sl.freeObjects=sl.freeObjects||[];
       sl.freeObjects.push({id:id,type:isSvg?'svg':'image',asset:assetName,x:x,y:y,w:w,h:h,rot:0,
         fit:'cover',focal:[0.5,0.5],radius:0,opacity:1,frame:'none',alt:(meta&&meta.alt)||''}); });
+    var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false);
+    return id; };
+  /* insert a sandboxed embed object (media plan §6). Rejects anything not
+     http(s) up front — same allow-list SG.mountEmbed enforces at render. */
+  F.addEmbed=function(url){ url=(url||'').trim(); if(!SG.embedUrlOk||!SG.embedUrlOk(url)) return null;
+    var i=curSlide(); var id=uid(), w=480, h=270;
+    F.do('add embed',function(data){ var sl=data.slides[i]; sl.freeObjects=sl.freeObjects||[];
+      sl.freeObjects.push({id:id,type:'embed',url:url,x:Math.round(640-w/2),y:Math.round(360-h/2),w:w,h:h,rot:0,
+        mode:'click',sandbox:{scripts:true,popups:true,forms:false,sameOrigin:false},title:''}); });
     var sec=deckEl().querySelectorAll('.slide')[i]; var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) selectNode(n,false);
     return id; };
 

@@ -40,6 +40,7 @@ S = {
  'media-split':  {'?kicker':'s','title':'s','?body':'s','?items':'a','image':'s','?side':'s','?fit':'s','?focal':'a'},
  'gallery':      {'?kicker':'s','?title':'s','items':'a'},
  'diagram':      {'?kicker':'s','?title':'s','svg':'s','?caption':'s'},
+ 'embed':        {'?kicker':'s','?title':'s','url':'s','?ratio':'s','?mode':'s','?poster':'s','?note':'s'},
  'metric-dash':  {'?kicker':'s','?title':'s','ring':'o','tiles':'a'},
  'leaderboard':  {'?kicker':'s','?title':'s','rows':'a'},
  'diptych':      {'left':'o','right':'o'},
@@ -63,6 +64,8 @@ AMBIENTS = {'auto','none','orbs','aurora','grid','rays','grain','contours','scan
 CHART_TYPES = {'bar','bar-h','stacked','line','area','pie','donut','scatter'}
 FIT_MODES = {'cover','contain','fill'}
 FRAME_MODES = {'none','panel','glow','shadow'}
+EMBED_MODES = {'click','live','poster'}
+EMBED_URL_RE = re.compile(r'^https?://', re.I)
 OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide','href'}
 HREF_RE = re.compile(r'^(#\d+|https?:.*|mailto:.*)$', re.I)
 # media plan §3/§3.4/§5/§6: image/svg objects (asset,fit,focal,radius,opacity,
@@ -158,6 +161,11 @@ def validate(data, assets=None):
                 errs.append('%s (chart): unknown type %r (one of %s)' % (where, ct, sorted(CHART_TYPES)))
         elif lay == 'chart' and not (c.get('data') or c.get('svg') or c.get('body')):
             warns.append('%s (chart): no data and no svg/body escape hatch - renders empty' % where)
+        if lay == 'embed':
+            if isinstance(c.get('url'), str) and c['url'] and not EMBED_URL_RE.match(c['url']):
+                errs.append('%s (embed): url %r must be http:// or https:// (media plan section 6.3)' % (where, c['url']))
+            if 'mode' in c and c['mode'] not in EMBED_MODES:
+                errs.append('%s (embed): mode %r not one of %s' % (where, c['mode'], sorted(EMBED_MODES)))
         if lay in ('image', 'media-split') or lay == 'gallery':
             items = c.get('items') if lay == 'gallery' else [c]
             for it in (items or []):
@@ -203,6 +211,11 @@ def validate(data, assets=None):
                 errs.append('%s: freeObjects[%d].frame %r not one of %s' % (where, j, fo['frame'], sorted(FRAME_MODES)))
             if fo.get('type') in ('image', 'svg') and not (fo.get('alt') or '').strip():
                 warns.append('%s: freeObjects[%d] (%s) has no alt text' % (where, j, fo['type']))
+            if fo.get('type') == 'embed':
+                if isinstance(fo.get('url'), str) and fo['url'] and not EMBED_URL_RE.match(fo['url']):
+                    errs.append('%s: freeObjects[%d].url %r must be http:// or https://' % (where, j, fo['url']))
+                if fo.get('mode') is not None and fo['mode'] not in EMBED_MODES:
+                    errs.append('%s: freeObjects[%d].mode %r not one of %s' % (where, j, fo['mode'], sorted(EMBED_MODES)))
     b = data.get('brand')
     if b is not None:
         if not isinstance(b, dict): errs.append('brand must be an object')
