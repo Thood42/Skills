@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>slide-forge — scale/zoom gesture tests (no Node required)</title>
+<style>
+  body{font-family:ui-monospace,monospace; background:#0a0e16; color:#dbe3ef; padding:24px; max-width:900px; margin:0 auto}
+  h1{font-size:18px} p.lead{color:#93a2bd; font-size:13px; line-height:1.5}
+  #results{margin-top:20px}
+  .row{padding:6px 10px; border-radius:6px; margin-bottom:4px; font-size:13px; display:flex; gap:10px}
+  .pass{background:rgba(68,243,196,.08); color:#44f3c4}
+  .fail{background:rgba(255,99,99,.12); color:#ff6363; font-weight:700}
+  #summary{margin-top:16px; font-size:14px; font-weight:700}
+  /* must stay laid out (not display:none) — getBoundingClientRect() inside a
+     display:none iframe is always 0x0, which every assertion here depends on */
+  iframe{width:1280px; height:832px; border:1px solid #222; margin-top:16px}
+  code{color:#3ce8ff}
+</style>
+</head>
+<body>
+<h1>slide-forge — scale/zoom gesture tests</h1>
+<p class="lead">
+  Runs entirely in a browser — no Node/npm required. Verifies the editor's stage-zoom
+  (<code>Forge.setZoom</code>/<code>toggleFocus</code>) and corner-drag resize math
+  (<code>startDrag</code>'s <code>scale()</code>) stay correct at multiple zoom levels, which
+  <code>tests/editor-ops.mjs</code> (jsdom) cannot check — jsdom returns zero for every
+  <code>getBoundingClientRect()</code>. See <code>tests/README.md</code>.<br><br>
+  Open this file via <code>python -m http.server</code> from the repo root (file:// blocks the
+  iframe's same-origin access to <code>window.Forge</code>) and load
+  <code>http://localhost:PORT/slide-forge/tests/scale-gestures.html</code>.
+</p>
+<div id="results">Loading editor-template.html into a hidden iframe…</div>
+<div id="summary"></div>
+<iframe id="stage"></iframe>
+<script>
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+function fireP(el,type,x,y,extra){
+  // el may be an Element OR the Document itself (dispatching on document,
+  // matching the app's own D.addEventListener('pointermove'/'pointerup',...))
+  var w = (el.ownerDocument ? el.ownerDocument.defaultView : el.defaultView);
+  el.dispatchEvent(new w.PointerEvent(type, Object.assign({bubbles:true,cancelable:true,clientX:x,clientY:y,pointerId:1},extra||{})));
+}
+function rect(el){ return el.getBoundingClientRect(); }
+
+var results = [];
+function ok(cond, msg, detail){
+  results.push({pass:!!cond, msg:msg, detail:detail});
+}
+
+function render(){
+  var el = document.getElementById('results');
+  el.innerHTML = '';
+  results.forEach(function(r){
+    var d = document.createElement('div');
+    d.className = 'row ' + (r.pass?'pass':'fail');
+    d.textContent = (r.pass?'PASS  ':'FAIL  ') + r.msg + (r.detail!=null ? ('  — '+r.detail) : '');
+    el.appendChild(d);
+  });
+  var pass = results.filter(function(r){return r.pass;}).length;
+  var fail = results.length - pass;
+  document.getElementById('summary').textContent = pass + ' passed, ' + fail + ' failed (of ' + results.length + ')';
+  document.getElementById('summary').style.color = fail ? '#ff6363' : '#44f3c4';
+}
+
+async function main(){
+  var frame = document.getElementById('stage');
+  var loaded = new Promise(function(r){ frame.addEventListener('load', r, {once:true}); });
+  // a real http(s) src (not srcdoc) — the deck's history.replaceState (hash
+  // nav) throws under srcdoc's "about:srcdoc" pseudo-origin
+  frame.src = '../editor-template.html';
+  await loaded;
+  await sleep(300);   // let boot()/DOMContentLoaded settle
+
+  var w = frame.contentWindow, d = w.document;
+  var Forge = w.Forge, SG = w.SG;
+  var deckEl = d.getElementById('deck');
+  // The app animates #deck's transform over 0.45s (body.forge-edit #deck{
+  // transition:transform .45s}) for a smooth feel when a human drives the
+  // zoom controls. That's a UX nicety this correctness test doesn't need,
+  // and backgrounded/non-visible tabs (e.g. a headless runner) may throttle
+  // rAF and never advance the transition at all, which would make every
+  // post-zoom assertion below flaky through no fault of the app. Killing
+  // the transition makes every geometry read below reflect the FINAL state
+  // synchronously, in any tab.
+  if(deckEl) deckEl.style.transition = 'none';
+
+  ok(!!Forge && !!SG, 'editor exposes window.Forge and window.SG');
+  if(!Forge || !SG){ render(); return; }
+
+  // ---- enter edit mode ----
+  Forge.toggle();
+  await sleep(50);
+  ok(d.body.classList.contains('forge-edit'), 'Edit mode toggled on');
+
+  // ---- pick a real, wide text element on slide 1 to drag ----
+  Forge.zoomFit();
+  await sleep(80);
+  var sec = d.querySelector('.slide.active');
+  var candidates = [].slice.call(sec.querySelectorAll('[data-el]')).filter(function(n){
+    return rect(n).width > 80 && (n.tagName==='H1'||n.tagName==='P'||n.tagName==='DIV');
+  });
+  candidates.sort(function(a,b){ return rect(b).width - rect(a).width; });   // widest first: more resize headroom, less rounding noise
+  var target = candidates[0];
+  ok(!!target, 'found a resizable [data-el] target on the active slide', target && target.getAttribute('data-el'));
+  if(!target){ render(); return; }
+
+  function selectTarget(){
+    var tr = rect(target);
+    fireP(target,'pointerdown', tr.left+tr.width/2, tr.top+tr.height/2);
+    fireP(d, 'pointerup', tr.left+tr.width/2, tr.top+tr.height/2);
+  }
+  function brHandle(){ return sec.querySelector('.forge-handles .forge-h.br'); }
+  function dragBR(dx, dy, extra){
+    var hr = rect(brHandle());
+    var sx = hr.left+hr.width/2, sy = hr.top+hr.height/2;
+    fireP(brHandle(),'pointerdown', sx, sy, extra);
+    fireP(d,'pointermove', sx+dx, sy+(dy||0), extra);
+    fireP(d,'pointerup', sx+dx, sy+(dy||0), extra);
+  }
+
+  selectTarget();
+  ok(target.classList.contains('forge-sel'), 'click-select adds forge-sel');
+
+  // ---- resize math is correct at the fit (baseline) scale ----
+  var s0 = rect(deckEl).width/1280;
+  var w0 = rect(target).width;
+  dragBR(140);
+  var w1 = rect(target).width;
+  var deltaScreen = w1-w0;
+  ok(Math.abs(deltaScreen - 140) < 1.5, 'baseline (100%) resize: screen-px delta matches drag distance 1:1', deltaScreen.toFixed(2)+'px for a 140px drag');
+
+  // ---- same gesture at 200% zoom must move the SAME on-screen distance
+  //      (the whole point of scale()-driven math: gesture feel stays 1:1
+  //      with the pointer regardless of zoom, because it reads the deck's
+  //      live rendered size back off getBoundingClientRect) ----
+  Forge.setZoom(2);
+  await sleep(80);
+  var s2 = rect(deckEl).width/1280;
+  ok(Math.abs(s2 - s0*2) < 0.02, 'Forge.setZoom(2) actually doubles the rendered deck scale', 'fit='+s0.toFixed(4)+' zoomed='+s2.toFixed(4));
+  selectTarget();
+  var w2before = rect(target).width;
+  dragBR(140);
+  var w2after = rect(target).width;
+  var deltaScreen2 = w2after-w2before;
+  ok(Math.abs(deltaScreen2 - 140) < 1.5, 'resize at 200% zoom: screen-px delta STILL matches drag distance 1:1 (no zoom-scaling bug)', deltaScreen2.toFixed(2)+'px for a 140px drag');
+
+  // slide-space delta should be ~half of what it was at 100%, since the
+  // same 140 screen px now represents half the slide distance
+  var slideDelta200 = deltaScreen2/s2, slideDelta100 = deltaScreen/s0;
+  ok(Math.abs(slideDelta200 - slideDelta100/2) < 3, 'slide-space resize delta at 200% zoom is ~half the 100% delta', slideDelta200.toFixed(1)+' vs '+(slideDelta100/2).toFixed(1));
+
+  // ---- Alt+corner = proportional scale (both axes move together) ----
+  Forge.zoomFit();
+  await sleep(80);
+  selectTarget();
+  var b0 = rect(target);
+  dragBR(90, 90, {altKey:true});
+  var b1 = rect(target);
+  var wRatio = b1.width/b0.width, hRatio = b1.height/b0.height;
+  ok(Math.abs(wRatio-hRatio) < 0.03, 'Alt+corner drag scales width & height together (proportional)', 'wRatio='+wRatio.toFixed(3)+' hRatio='+hRatio.toFixed(3));
+
+  // ---- Focus centers the selected element in the stage ----
+  Forge.zoomFit();
+  await sleep(80);
+  selectTarget();
+  Forge.toggleFocus();
+  await sleep(80);
+  var navEl = d.getElementById('forge-nav'), inspEl = d.getElementById('forge-inspect'), barEl = d.getElementById('forge-bar');
+  var stageCX = (rect(navEl).right + rect(inspEl).left)/2;
+  var stageCY = (rect(barEl).bottom + w.innerHeight)/2;
+  var tr = rect(target), tCX = tr.left+tr.width/2, tCY = tr.top+tr.height/2;
+  var dist = Math.hypot(tCX-stageCX, tCY-stageCY);
+  ok(dist < 4, '⌖ Focus centers the selected element between the side panels', dist.toFixed(2)+'px off-center');
+  Forge.toggleFocus();
+
+  // ---- zoom clamps to [0.25, 3] ----
+  Forge.setZoom(50);
+  ok(Forge.zoom===3, 'Forge.setZoom clamps to ZMAX=3', 'zoom='+Forge.zoom);
+  Forge.setZoom(0.001);
+  ok(Forge.zoom===0.25, 'Forge.setZoom clamps to ZMIN=0.25', 'zoom='+Forge.zoom);
+  Forge.zoomFit();
+  await sleep(80);
+
+  // ---- undo restores pre-resize geometry ----
+  selectTarget();
+  var wPre = rect(target).width;
+  dragBR(200);
+  var wDragged = rect(target).width;
+  Forge.undoOp();
+  await sleep(50);
+  var secAfterUndo = d.querySelector('.slide.active');
+  var targetAfterUndo = secAfterUndo.querySelector('[data-el="'+target.getAttribute('data-el')+'"]');
+  var wUndone = rect(targetAfterUndo).width;
+  ok(Math.abs(wDragged-wPre) > 5, 'sanity: the drag actually changed width before undo', (wDragged-wPre).toFixed(1)+'px');
+  ok(Math.abs(wUndone-wPre) < 1.5, 'Ctrl+Z undoes a resize back to the original width', wUndone.toFixed(1)+' vs original '+wPre.toFixed(1));
+
+  render();
+}
+main().catch(function(e){ ok(false, 'test run threw', e.message); render(); throw e; });
+</script>
+</body>
+</html>
