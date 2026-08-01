@@ -398,6 +398,20 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
 /* ---- stage: while editing, the deck is fitted BETWEEN the panels ---- */
 body.forge-edit{ overflow:hidden; }
 body.forge-edit #deck{ transition:transform .45s cubic-bezier(.22,1,.3,1); }
+/* Printing/PDF-export while still in edit mode (native Ctrl+P — the deck-ui
+   Save PDF button is hidden by .forge-chrome, but the OS/browser print
+   shortcut isn't blocked) must not stay clipped to the on-screen viewport.
+   engine.css's print stylesheet resets html,body to overflow:visible so the
+   deck can paginate past one screen's worth of content, but body.forge-edit
+   (0,1,1) outranks that plain `body` rule (0,0,1) with neither side using
+   !important, so it silently won every print job started mid-edit and the
+   exported PDF only ever captured whatever fit in the current viewport.
+   #deck's transition is reset too so a print triggered right after a zoom
+   change can't be captured mid-animation. */
+@media print{
+  body.forge-edit{ overflow:visible !important; }
+  body.forge-edit #deck{ transition:none !important; }
+}
 /* hidden elements stay findable while editing, and really vanish elsewhere */
 .forge-hidden{ pointer-events:none; }
 body.forge-edit .forge-hidden{ pointer-events:auto; outline:1px dashed rgba(255,150,113,.5); outline-offset:3px; }

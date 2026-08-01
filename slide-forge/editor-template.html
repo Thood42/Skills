@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 15e0302ad6 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build b8ce99f790 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -1936,8 +1936,14 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       if(Array.isArray(x)){ x.forEach(add); return; }
       sec.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
     var bm=brandMark(brand,lay); if(bm) sec.appendChild(bm);
-    if(s.doc) sec.appendChild(N('div.doc-panel',null,[
-      N('div.doc-h',null,'JSON · layout "'+(s.layout||'')+'"'), N('pre',{text:s.doc}) ]));
+    /* Docs (D) toggles this panel; s.doc is normally absent (nothing authors
+       it — only the internal reference deck curates hand-annotated doc text),
+       so without a fallback the button did nothing on every generated deck.
+       Fall back to the slide's own {layout,content} JSON — still exactly
+       "JSON docs" per the button's tooltip, just uncurated. */
+    var docText=s.doc||JSON.stringify({layout:lay,content:s.content||{}},null,2);
+    sec.appendChild(N('div.doc-panel',null,[
+      N('div.doc-h',null,'JSON · layout "'+(s.layout||'')+'"'), N('pre',{text:docText}) ]));
     sec.appendChild(N('div.pager',null,pad(i+1)+' / '+pad(total)));
     sec.appendChild(N('div.progress',{style:'width:'+pctw(i+1,total)+'%'}));
     return sec; }
@@ -2571,6 +2577,20 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
 /* ---- stage: while editing, the deck is fitted BETWEEN the panels ---- */
 body.forge-edit{ overflow:hidden; }
 body.forge-edit #deck{ transition:transform .45s cubic-bezier(.22,1,.3,1); }
+/* Printing/PDF-export while still in edit mode (native Ctrl+P — the deck-ui
+   Save PDF button is hidden by .forge-chrome, but the OS/browser print
+   shortcut isn't blocked) must not stay clipped to the on-screen viewport.
+   engine.css's print stylesheet resets html,body to overflow:visible so the
+   deck can paginate past one screen's worth of content, but body.forge-edit
+   (0,1,1) outranks that plain `body` rule (0,0,1) with neither side using
+   !important, so it silently won every print job started mid-edit and the
+   exported PDF only ever captured whatever fit in the current viewport.
+   #deck's transition is reset too so a print triggered right after a zoom
+   change can't be captured mid-animation. */
+@media print{
+  body.forge-edit{ overflow:visible !important; }
+  body.forge-edit #deck{ transition:none !important; }
+}
 /* hidden elements stay findable while editing, and really vanish elsewhere */
 .forge-hidden{ pointer-events:none; }
 body.forge-edit .forge-hidden{ pointer-events:auto; outline:1px dashed rgba(255,150,113,.5); outline-offset:3px; }
@@ -2694,7 +2714,7 @@ body.forge-edit #forge-zoom{ display:flex; }
 .forge-gal-from{ font-size:10px; color:#6f7c92; }
 </style>
 </head>
-<body>
+<body class="hide-docs">
 <div class="deck" id="deck"></div>
 
 <!-- ===== DECK CONTENT (edit this; it is the single source of truth) ===== -->
