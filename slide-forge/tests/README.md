@@ -24,5 +24,18 @@ skill-authoring sandbox (no Node there) — run wherever Node exists.
   commits); a future session with a real browser test runner could promote
   those into automated coverage.
 
+  (2026-07-31, v4 editor UX) it also asserts the items-panel row set and
+  label derivation, the hide override in both edit and present states, the
+  breadcrumb path (`F.crumbPath`), theme-token swatch + whole-element marker
+  writes, the `fs` text-size override, item reorder with style AND selection
+  following, manage-items modal edits landing in `content`, the insert
+  gallery's freeObject shape, and the zoom/viewport hook staying inert
+  outside edit mode. **Not covered here**: anything needing real layout —
+  focus centring on the stage, drag deltas at zoom, and the gallery's live
+  scaled previews all measure `getBoundingClientRect`, which jsdom returns
+  as zeros. Those were verified in a real browser (`python -m http.server`
+  at the repo root, `slide-forge/editor-template.html`), where all of the
+  assertions above were mirrored and passed.
+
 Run:  `node tests/parity.mjs && node tests/editor-ops.mjs`
 (with jsdom resolvable, e.g. `NODE_PATH=/path/to/node_modules`)

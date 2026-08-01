@@ -254,3 +254,132 @@ clipboard paste deferred; generation-time assets always embed with no size ceili
   and get their own quota-safe localStorage key, separate from deck-JSON autosave, so an oversized
   asset registry can never cost the user their text edits.
 
+## v4 (2026-07-31) — editing for people who don't read markup
+
+Implements `slide-forge-editor-ux-plan.md` (design handoff + prototype). The goal of this pass was
+narrow and specific: **an editor a non-programmer can use**. Everything below is still additive —
+present mode, the engine, the layouts and the data model are untouched, and a deck with no
+`overrides`/`freeObjects` renders byte-for-byte as before.
+
+### The sidebar is now a list of things, not a tree of nodes
+
+**"On this slide"** replaces the v2.1 Elements tree as the right panel's home view, and it *stays
+visible while something is selected* (the Selected panel appears below it, so the list you picked
+from never vanishes under you).
+
+- One row per element, named in plain language: `stats` → **"Stat cards"**, `stats.2` → **"Stat 3 —
+  12×"**. Names come from three small maps (`FIELD_LABEL`, `ITEM_LABEL`, `ARRAY_LABEL`) with a
+  `pretty()`/naive-singular fallback, so a new layout still reads sensibly. **A dotted key is never a
+  primary label** — it survives only as a small mono chip in the Selected card, for debugging.
+- An item's row reads from **content, not the DOM**: the DOM text of a stat is mid-count-up ("0",
+  "3" for 3.2) and runs its fields together. The headline field goes after the item number, the
+  descriptive field underneath.
+- **What earns a row:** top-level blocks, list containers, and the items in a list. Not the leaves
+  inside an item — real layouts nest four or five deep and listing every leaf turns a 4-stat slide
+  into 20 rows; those fields are already labelled inputs in the Selected panel. Purely decorative
+  keyed nodes (cover orbs, rails, timeline dots — no text, no binding, no children) are filtered out
+  of the list but stay selectable on canvas.
+- **Hover a row → the element outlines on the canvas**, and vice-versa. Click selects.
+- **The eye** writes `overrides[key].hide` (or `freeObjects[].hide`). Hidden elements render at 12%
+  opacity **while editing** — so they can be found and brought back — and are genuinely `display:none`
+  when presenting, printing, or in a downloaded copy. Undoable like any other edit.
+- Below the list: **＋ Add \<item\>** (derived from the `data-arr` the selection sits in, else the
+  slide's first list) and **⤢ Manage items…**.
+
+### Selection: a breadcrumb up, a second click down
+
+- **Breadcrumb** (floats top-centre over the stage): `Slide ▸ Stat cards ▸ Stat 3 ▸ Label`. Each chip
+  selects that key prefix; "Slide" clears the selection. Derived by `F.crumbPath(sel)` — exported so
+  the path logic is assertable without a viewport.
+- **Click again to go deeper.** The first click on a group selects the group (so dragging still moves
+  the whole thing); clicking inside the current selection steps down **one** level of the key
+  hierarchy. Alt-click still jumps straight to the deepest element. This is the discoverable
+  counterpart to the breadcrumb — Alt-click alone was not something this audience finds.
+
+### The inspector is contextual
+
+The **Selected** panel shows only what applies to the selection kind (text leaf / list container /
+list item / free object):
+
+- **Identity card** — icon, plain name, and the mono key chip.
+- **That element's own content fields**, rendered with the *same* widget renderer (`fieldFor` /
+  `contentForm`) the sidebar Content panel and the Manage-items modal use, so the three can't drift.
+  A bound leaf shows one field; a list item shows its fields; a container shows a count and an Add.
+- **Text size** — a direct px stepper writing a new override prop **`fs`** (10–200px), applied in
+  `applyStyle` next to `color`/`font`. Additive, no migration.
+- **Style & formatting** (collapsible, open by default) — five **theme-token** swatches (`--ink`,
+  `--cyan`, `--indigo`, `--mint`, `--muted`) that write `var(--cyan)`, **not hex**, so re-theming and
+  brand kits keep working; a Reset chip; and **B / ✦ / `<>`** chips that toggle `**bold**` /
+  `[[glow]]` / `` `mono` `` around the **whole element's** bound content value. The old literal colour
+  picker survives as "Exact color", folded away with Font/Accent/Surface.
+  Range-level formatting is unchanged and still lives on the canvas (double-click, highlight, the
+  floating toolbar) — the panel copy says so explicitly.
+- **List verbs** for an item — ↑ ↓ ⧉ ✕, landing in `content` through the existing `data-arr`
+  machinery. **Selection follows the item** when it moves or is duplicated (repeated ↑ walks a card
+  up a list), and its overrides follow it, as they already did.
+- Geometry, Link and Animation fold away (`F._open` remembers per-title open state).
+
+### Stage: zoom and ⌖ Focus
+
+While editing, the deck is fitted **to the stage between the panels** rather than to the whole window
+— previously the side panels overlapped the slide. This is an optional engine hook: `fit()` calls
+`SG.viewTransform()` if something installed one, else keeps the v3 `scale(min(w/1280,h/720))`. Present
+mode and plain decks are unaffected (the hook returns `null` when `body` isn't `.forge-edit`).
+
+- One combined `translate(...) scale(...)` on `#deck`, transitioned 450ms `cubic-bezier(.22,1,.3,1)`.
+- Controls bottom-right: **⌖ Focus** toggle + **− / % / ＋ / Fit** pill. `Ctrl/Cmd + scroll`,
+  `Ctrl +`, `Ctrl -` and `Ctrl 0` (fit) also work. 100% = fitted; zoom clamps to 0.25–3×.
+- **Focus** centres the selected element at ~1.7× (capped so a large element still fits) and
+  **follows the selection** while on; Fit resets zoom and turns it off.
+- **Gesture math is unchanged and stays correct**, because `scale()` already reads the *rendered*
+  width of `#deck` back off `getBoundingClientRect()` — it sees the combined scale for free. Verified
+  in a browser: at 200% zoom a 100px pointer move produces exactly `round(100/1.588) = 63` slide px.
+
+### "Manage items" replaces the structure modal
+
+`#forge-struct` is now titled **Manage items — "\<slide title\>"** with two tabs:
+
+- **Items** (default) — every field on the slide, side by side, using the shared content renderer:
+  scalars in a 2-column grid, then one section per content array (**"Stat cards · 4"** with a green
+  **＋ Add stat**) and one card per item (**↑ ↓ ⧉ ✕**) in a 2-column grid. Everything routes through
+  `F.do()` and applies to the slide instantly. The modal re-renders itself when a structural edit
+  re-runs `buildInspect`, so it can't go stale behind you.
+- **Advanced (JSON)** — the v2.2 direct JSON editor, unchanged (Copy / Apply round-trip). Demoted to
+  a tab, deliberately **not removed**: it is the power-user escape hatch and the only way to re-shape
+  a slide wholesale.
+
+`arrayEditor` gained a **⧉ Duplicate** verb and plain-language headers, which the sidebar gets too.
+
+### ⊞ Insert an element, and a fuller top bar
+
+- **Insert gallery** — a searchable 4-column grid of every insertable element type across the
+  layouts. Each card's preview is a **live, scaled miniature of the real element**: the layout is
+  rendered with its `DEFAULTS` content into an off-screen slide-sized `.forge-ghost` section (so the
+  deck's CSS cascade and theme apply), the element is measured, and the copy is scaled to the card.
+  Ghosts are always removed before anything commits — they must never be in `#deck` during a render,
+  or `.slide` indices would shift. A catalog entry whose key no longer resolves is skipped silently,
+  so a layout change degrades to a missing card rather than a crash.
+- Clicking inserts it as a themed `freeObjects` `{type:'html'}` entry (the faithful-duplicate path),
+  centred and selected, at a clamped starting size — a grid cell measures as tall as the grid
+  stretched it, which is not a sane object size. Free objects may now carry a `name`, shown in the
+  items panel and inspector instead of "Copied group".
+- **Top bar**: ＋ Slide · ⧉ Duplicate · T Text · ▭ Box · ▣ Image · ⊞ Insert · 🖼 Assets · ◲ Embed ‖
+  ▦ Sorter · ◐ Theme · ⚙ Deck ‖ ⟲ ⟳ ‖ ？ · { } JSON · ▶ Present · **Save .html**. Every button has a
+  tooltip. ◐ Theme and ⚙ Deck open the *same* renderers the sidebar uses (`themeSection`,
+  `brandPanel`, `deckSettings`) in a modal, so they're reachable without deselecting first; ▣ Image
+  is the file-picker twin of drag-and-drop import.
+
+### New data keys (all optional, no migration)
+
+`overrides[key].hide` · `overrides[key].fs` · `freeObjects[].hide` · `freeObjects[].name`.
+`meta.schemaVersion` stays **3** — nothing about identity or write-back changed.
+
+### Verification
+
+`tests/editor-ops.mjs` gained ~45 data-layer assertions (label derivation, hide semantics in both
+modes, breadcrumb path, token-swatch and marker writes, `fs`, item-verb reorder with style+selection
+following, modal edits landing in content, gallery insert shape, viewport-hook inertness, zoom
+clamps). **These were not run in this workspace — it has no Node.** Every one of them was instead
+mirrored and passed in a real browser (Chrome, served over `python -m http.server`), which also
+covered what jsdom can't: focus centring to the stage centre, gesture math at zoom, live preview
+miniatures, and the downloaded copy carrying no editor chrome.

@@ -287,17 +287,6 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
 /* ============================================================
    V2.1 — elements tree, animation overview rows
    ============================================================ */
-.forge-tree{ margin:4px 0; max-height:300px; overflow:auto; }
-.forge-tree-row{ display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px;
-  cursor:pointer; font-size:12px; color:#b7c2d4; }
-.forge-tree-row:hover{ background:#1a212d; }
-.forge-tree-row.cur{ background:#16233d; outline:1px solid #2a6df4; color:#eaf1fb; }
-.forge-tree-tg{ width:14px; flex:none; text-align:center; color:#7e8aa0; font-size:10px; cursor:pointer; }
-.forge-tree-lb{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.forge-tree-row .tools{ display:none; gap:2px; }
-.forge-tree-row:hover .tools{ display:flex; }
-.forge-tree-row .forge-chip{ min-width:18px; height:18px; padding:0 4px; font-size:10px; }
-
 .forge-anim-row{ display:flex; align-items:center; gap:6px; padding:5px 7px; margin:3px 0;
   border-radius:6px; background:#10151e; border:1px solid rgba(255,255,255,.08); font-size:11px; color:#b7c2d4; }
 .forge-anim-row .lb{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -326,10 +315,6 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
   background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:14px;
   padding:20px 24px; color:#dbe3ef; box-shadow:0 24px 80px rgba(0,0,0,.6); }
 .forge-struct-card h3{ margin:0 0 12px; font-size:15px; }
-.forge-struct-grid{ display:grid; grid-template-columns:1fr 1.4fr; gap:16px; min-height:0; flex:1; }
-.forge-struct-tree{ overflow:auto; min-height:0; }
-.forge-struct-tree .forge-tree{ max-height:none; }
-.forge-struct-src{ display:flex; flex-direction:column; min-height:0; }
 .forge-struct-json{ flex:1; min-height:320px; resize:none; padding:10px 12px; border-radius:8px;
   background:#10151e; color:#eaf1fb; border:1px solid rgba(255,255,255,.12);
   font:12px/1.55 var(--font-mono,monospace); white-space:pre; overflow:auto; }
@@ -401,3 +386,136 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   width:16px; height:16px; border-radius:50%; background:#2a6df4; color:#fff; font-size:10px;
   line-height:16px; text-align:center; pointer-events:none; }
 .forge-field-error{ color:#f0a0a0; font-size:11px; margin-top:3px; }
+
+/* ============================================================
+   V4 — EDITOR UX OVERHAUL
+   "On this slide" items panel, selection breadcrumb, contextual
+   inspector, stage zoom/focus, manage-items modal, insert gallery.
+   Chrome values (colors, radii, type) are the same tokens the rest of
+   this file uses — nothing new is introduced.
+   ============================================================ */
+
+/* ---- stage: while editing, the deck is fitted BETWEEN the panels ---- */
+body.forge-edit{ overflow:hidden; }
+body.forge-edit #deck{ transition:transform .45s cubic-bezier(.22,1,.3,1); }
+/* hidden elements stay findable while editing, and really vanish elsewhere */
+.forge-hidden{ pointer-events:none; }
+body.forge-edit .forge-hidden{ pointer-events:auto; outline:1px dashed rgba(255,150,113,.5); outline-offset:3px; }
+/* hover sync from the items panel back onto the canvas */
+body.forge-edit .forge-hi{ outline:1.5px dashed rgba(120,170,255,.55); outline-offset:3px; }
+/* inside the current selection, hovering a child hints that clicking again
+   steps down into it (grid -> card -> label) */
+body.forge-edit .forge-sel [data-el]:hover{ outline:1.5px dashed rgba(120,170,255,.45); outline-offset:2px; }
+/* off-screen scratch section used to build insert-gallery miniatures. It must
+   be exactly slide-sized: .slide sets inset:0, which against an oversized
+   offset parent would stretch it to ~100k px and squash every measurement. */
+.forge-ghost{ position:absolute !important; left:-99999px !important; top:0 !important;
+  right:auto !important; bottom:auto !important; width:1280px !important; height:720px !important;
+  opacity:1 !important; visibility:visible !important; pointer-events:none; }
+
+/* ---- "on this slide" item rows ---- */
+.forge-items{ padding-top:10px; }
+.forge-item{ display:flex; align-items:center; gap:8px; padding:7px 8px; margin:3px 0;
+  border-radius:8px; cursor:pointer; background:#141923; border:1px solid transparent; }
+.forge-item:hover{ background:#1a212d; }
+.forge-item.cur{ background:#16233d; border-color:#2a6df4; }
+.forge-item-ico{ width:22px; height:22px; flex:none; display:flex; align-items:center; justify-content:center;
+  border-radius:6px; background:#1a212d; font-size:11px; color:#9aa6ba; }
+.forge-item-txt{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.forge-item-nm{ font-weight:600; font-size:12.5px; color:#dbe3ef;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-item-sub{ font-size:10.5px; color:#6f7c92; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-item.off .forge-item-nm{ color:#6f7c92; }
+.forge-item-eye{ min-width:22px; height:22px; border:none; border-radius:5px; cursor:pointer;
+  background:none; color:#5a6a86; font-size:12px; padding:0; }
+.forge-item-eye:hover{ background:#26303f; color:#dbe3ef; }
+.forge-item.off .forge-item-eye{ color:#ff9671; }
+.forge-item-btns{ display:flex; gap:6px; margin:10px 0 2px; }
+.forge-item-btns .forge-btn{ flex:1; justify-content:center; }
+.forge-btn.add{ background:#173a2a; border-color:#1f6d4a; color:#9af0c4; }
+.forge-btn.add:hover{ background:#1c4834; }
+
+/* ---- selection breadcrumb (floats over the stage) ---- */
+#forge-crumbs{ position:fixed; top:52px; left:calc(248px + (100vw - 528px) / 2); transform:translateX(-50%);
+  z-index:9100; display:none; align-items:center; gap:4px; padding:5px 8px;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:9px;
+  box-shadow:0 10px 30px rgba(0,0,0,.5); max-width:min(70vw,720px); overflow:hidden; }
+#forge-crumbs.on{ display:flex; }
+#forge-crumbs button{ display:flex; align-items:center; padding:3px 8px; border-radius:6px; cursor:pointer;
+  border:1px solid transparent; background:none; color:#9aa6ba;
+  font:600 11.5px var(--font-body,system-ui,sans-serif); white-space:nowrap; }
+#forge-crumbs button:hover{ background:#26303f; color:#dbe3ef; }
+#forge-crumbs button.cur{ background:#2a6df4; border-color:#2a6df4; color:#fff; }
+.forge-crumb-sep{ color:#5a6a86; font-size:10px; }
+
+/* ---- stage zoom + focus cluster ---- */
+#forge-zoom{ position:fixed; right:296px; bottom:14px; z-index:9100; display:none; align-items:center; gap:6px; }
+body.forge-edit #forge-zoom{ display:flex; }
+#forge-zoom .forge-btn.on{ background:#2a6df4; border-color:#2a6df4; color:#fff; }
+.forge-zoom-pill{ display:flex; align-items:center; gap:2px; padding:3px;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:8px; }
+.forge-zoom-pill button{ min-width:26px; height:24px; border-radius:6px; cursor:pointer;
+  background:#1a212d; color:#cdd6e6; border:1px solid rgba(255,255,255,.12); font-weight:700; font-size:12px; }
+.forge-zoom-pill button:hover{ background:#26303f; }
+.forge-zoom-pill button.wide{ padding:0 8px; font-size:11px; }
+.forge-zoom-pct{ font:600 11px var(--font-mono,monospace); min-width:44px; text-align:center; color:#9aa6ba; }
+
+/* ---- contextual inspector: identity card, steppers, swatches, folds ---- */
+.forge-ident{ display:flex; align-items:center; gap:8px; background:#16233d; border:1px solid #2a6df4;
+  border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+.forge-ident-ico{ font-size:13px; }
+.forge-ident-nm{ flex:1; font-weight:700; font-size:12.5px; color:#eaf1fb;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-ident-key{ font:500 10px var(--font-mono,monospace); color:#7e8aa0; flex:none; }
+.forge-step{ display:flex; align-items:center; gap:4px; flex:none; }
+.forge-step-v{ font:600 12px var(--font-mono,monospace); min-width:34px; text-align:center; color:#eaf1fb; }
+.forge-swatches{ display:flex; gap:6px; align-items:center; margin:7px 0 10px; }
+.forge-swatch{ width:22px; height:22px; flex:none; border-radius:50%; cursor:pointer; padding:0;
+  border:1px solid rgba(255,255,255,.2); }
+.forge-swatch.on{ border:2px solid #fff; }
+.forge-fmtchips{ display:flex; gap:5px; margin:7px 0 4px; }
+.forge-fmtchip{ min-width:32px; height:26px; padding:0 8px; border-radius:6px; cursor:pointer;
+  background:#1a212d; color:#dbe3ef; border:1px solid rgba(255,255,255,.12);
+  font:600 12px var(--font-mono,monospace); }
+.forge-fmtchip:hover{ background:#26303f; }
+.forge-fmtchip.on{ background:#2a6df4; border-color:#2a6df4; }
+.forge-verbs{ display:flex; gap:5px; flex-wrap:wrap; margin:12px 0 4px; }
+.forge-verbs .forge-chip{ height:26px; padding:0 9px; font-size:11.5px; }
+.forge-fold-h{ display:flex; align-items:center; gap:6px; margin:14px 0 4px; cursor:pointer; user-select:none; }
+.forge-fold-tg{ color:#7e8aa0; font-size:10px; width:10px; }
+.forge-fold-lb{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#aeb9cd; font-weight:700; }
+.forge-fold-h:hover .forge-fold-lb{ color:#eaf1fb; }
+.forge-sec label{ color:#9aa6ba; font-size:11px; font-weight:600; display:block; }
+
+/* ---- manage-items modal: tabs + wide 2-column field grid ---- */
+.forge-struct-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.forge-struct-head h3{ margin:0; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-tabs{ margin-left:auto; display:flex; gap:4px; flex:none;
+  background:#10151e; border:1px solid rgba(255,255,255,.10); border-radius:8px; padding:3px; }
+.forge-tabs button{ padding:5px 12px; border-radius:6px; cursor:pointer; border:none;
+  font:700 12px var(--font-body,system-ui,sans-serif); background:none; color:#9aa6ba; }
+.forge-tabs button.cur{ background:#2a6df4; color:#fff; }
+.forge-struct-pane{ overflow:auto; min-height:0; flex:1; padding-right:4px; }
+.forge-struct-src{ display:flex; flex-direction:column; }
+.forge-manage .forge-field{ margin:9px 0; }
+.forge-manage>.forge-field{ display:inline-flex; width:calc(50% - 6px); vertical-align:top; margin-right:8px; }
+.forge-arr-cards{ display:grid; grid-template-columns:1fr; gap:8px; }
+.forge-manage .forge-arr-cards{ grid-template-columns:1fr 1fr; }
+.forge-manage .forge-card{ margin:0; }
+.forge-arr-h .forge-chip.add{ padding:0 11px; }
+
+/* ---- insert-element gallery ---- */
+#forge-gallery{ position:fixed; inset:0; z-index:9460; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+#forge-deckmodal{ position:fixed; inset:0; z-index:9450; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+.forge-gal-search{ margin-left:auto; width:280px; padding:7px 10px; border-radius:8px; background:#10151e;
+  color:#eaf1fb; border:1px solid rgba(255,255,255,.12); font-size:12.5px; }
+.forge-gal-search:focus{ outline:none; border-color:#2a6df4; }
+.forge-gal-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; overflow:auto; min-height:0; flex:1; padding-right:4px; }
+.forge-gal-card{ background:#10151e; border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px; cursor:pointer; }
+.forge-gal-card:hover{ border-color:#2a6df4; background:#131a26; }
+.forge-gal-prev{ position:relative; height:58px; background:#070b12; border-radius:6px; overflow:hidden; margin-bottom:7px; }
+.forge-gal-inner{ position:absolute; left:50%; top:50%; transform-origin:center center; pointer-events:none; }
+.forge-gal-nm{ font-size:11.5px; font-weight:700; color:#dbe3ef; }
+.forge-gal-from{ font-size:10px; color:#6f7c92; }

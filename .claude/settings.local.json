@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx --yes serve --version)"
+      "Bash(npx --yes serve --version)",
+      "Read(//c/Sandbox/Development/Claude/Skills/**)",
+      "Read(//c/Users/boeji/Downloads/**)",
+      "Bash(mkdir -p uizip)",
+      "Bash(python -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -)",
+      "Bash(python scripts/build.py)",
+      "Bash(python slide-forge/scripts/build.py)",
+      "Bash(python scripts/build.py --check)",
+      "Bash(echo \"build --check exit=$?\")",
+      "Bash(python scripts/validate.py editor-template.html)",
+      "Bash(git add *)"
     ]
   }
 }

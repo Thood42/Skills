@@ -11,6 +11,7 @@ slide-forge/            advanced variant — same engine + an in-deck EDITOR (pr
 slides-editor-plan.md   architecture & decision record — READ §1.2, §3.2, §8, §10, §11 before editor work
 slide-forge-design-critique.md  2026-07-06 design review that led to the v3 engine (§10 ADR)
 slide-forge-media-plan.md  images/diagrams/links/sandboxed embeds — READ before touching media (§11 ADR)
+slide-forge-editor-ux-plan.md  2026-07-31 design handoff behind the v4 editor UX — READ before editor-UI work
 README.md               short index (both skills + plan doc); this file is the source of truth
 *.skill                 gitignored build artifacts (zips); rebuilt separately, not tracked
 ```
@@ -54,13 +55,22 @@ Editor model (load-bearing facts):
   `overrides{}` (geometry incl. `w`/`h` reflow-resize, style, anim, fallback `html`; keyed by
   `data-el`) and `freeObjects[]`. Item add/dup/remove/reorder REMAP sibling override keys; a GC
   pass in `F.commit` drops orphaned overrides (logged, undoable).
-- **Inspector (right panel):** Object section = geometry/scale/rotate, color/accent/font/surface,
-  animation+delay; Content section = `content` fields + nested arrays (add/remove/reorder).
+- **Inspector (right panel), v4:** home view is **"On this slide"** — one plain-language row per
+  element (`stats.2` → "Stat 3 — 12×"), hover-syncs with the canvas, eye toggles
+  `overrides[key].hide`. Selecting shows a **contextual** "Selected" panel: identity card, that
+  element's own content fields (shared `fieldFor`/`contentForm` renderer), `fs` text-size stepper,
+  theme-token swatches + whole-element B/✦/mono, list verbs; geometry/link/animation fold away.
+  A **breadcrumb** over the stage walks up the key path; **clicking again** inside the selection
+  walks down one level (Alt-click still jumps to the deepest).
 - **Text editing = DOUBLE-CLICK** a leaf text element (right-click → **✎ Edit text** also works) →
   `contenteditable`; the floating toolbar (B / ✦ / `<>`) toggles bold/glow/mono on the selection.
   Enter commits, **Esc cancels**. Commit writes to the `data-bind` content path when present;
   unbound leaves (raw slides, derived text) store `overrides[key].html`. (Markers `**bold**` /
   `[[glow]]` / `` `mono` `` still render if typed in content — `rich()` is the renderer.)
+- **Stage viewport (v4):** while editing, `fit()` calls the optional `SG.viewTransform()` hook so the
+  deck is fitted BETWEEN the panels, times `F.zoom`, panned to centre the selection when ⌖ Focus is
+  on. Present mode is untouched (the hook returns null). `scale()` reads the combined transform back
+  off `getBoundingClientRect`, so all drag/resize math stays correct at any zoom — don't "fix" it.
 - All editor chrome carries `.forge-chrome` (stripped on download, hidden in print/static capture).
 
 ## Conventions & environment
@@ -81,6 +91,28 @@ Editor model (load-bearing facts):
   reflects local.
 - **`gh` CLI is not installed and there's no GitHub token** → PRs can't be opened/merged
   programmatically here. Integrate via local merge, or push + open the PR in the browser.
+
+## Recent work (2026-07-31) — v4 editor UX overhaul (design handoff)
+
+Full design + the three deliberate deltas: `slide-forge-editor-ux-plan.md`. What shipped is in
+`slide-forge/references/editor.md` ("v4"). Additive as always — present mode, engine, layouts and the
+data model are untouched; new data keys are all optional (`overrides[].hide`, `overrides[].fs`,
+`freeObjects[].hide`, `freeObjects[].name`) and `meta.schemaVersion` stays **3**.
+
+- Items panel replaces the Elements tree (`elementsTree` is gone; `keyedTree` stayed). Rows = blocks,
+  list containers, list items — deliberately NOT the leaves inside an item, and decorative keyed
+  nodes (orbs/rails/dots) are filtered out. Names come from `FIELD_LABEL`/`ITEM_LABEL`/`ARRAY_LABEL`.
+- Contextual inspector, selection breadcrumb (`F.crumbPath`), click-again-to-drill, `fs` text size,
+  theme-token colour swatches (they write `var(--cyan)`, never hex — pitfall #2), whole-element
+  marker formatting; manage-items modal (Items | Advanced JSON tabs) over the shared content
+  renderer; stage zoom + ⌖ Focus; ⊞ Insert gallery with live scaled miniatures; fuller top bar.
+- Gallery miniatures render into an off-screen `.forge-ghost` **slide-sized** section inside `#deck`
+  — it must keep `width/height/right/bottom` overridden (`.slide` sets `inset:0`, which stretched it
+  to ~100k px and squashed every measurement), and it must never survive into a render or `.slide`
+  indices shift.
+- ~45 new assertions in `tests/editor-ops.mjs`. **Not run here (no Node)** — every one was mirrored
+  and passed in a real browser, which also covered focus centring, gesture math at 200% zoom, live
+  previews and the chrome-free downloaded copy.
 
 ## Recent work (2026-07-31) — UI import: images, diagrams, links, sandboxed embeds (plan §11)
 

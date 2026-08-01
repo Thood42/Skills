@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 8598022247 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 15e0302ad6 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -1999,8 +1999,12 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       slides.forEach(function(s,k){ s.classList.toggle('active',k===cur); });
       if(location.hash!=='#'+(cur+1)) history.replaceState(null,'','#'+(cur+1)); }
     function fromHash(){ var h=parseInt((location.hash||'').slice(1),10); show(isNaN(h)?0:h-1); }
-    function fit(){ var s=Math.min(W.innerWidth/1280,W.innerHeight/720); deck.style.transform='scale('+s+')'; }
-    SG.show=show; SG.refresh=function(){ refresh(); fit(); };
+    /* SG.viewTransform is an optional hook: the editor installs one so the deck
+       can be fitted to the stage BETWEEN its panels and zoomed/panned. Absent
+       (present mode, plain decks) this is exactly the v3 behavior. */
+    function fit(){ var t=SG.viewTransform&&SG.viewTransform();
+      deck.style.transform=t||('scale('+Math.min(W.innerWidth/1280,W.innerHeight/720)+')'); }
+    SG.show=show; SG.fit=fit; SG.refresh=function(){ refresh(); fit(); };
     if(!SG._bound){ SG._bound=true;
       updateOfflineFlag(); W.addEventListener('online',updateOfflineFlag); W.addEventListener('offline',updateOfflineFlag);
       W.addEventListener('keydown',function(e){
@@ -2456,17 +2460,6 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
 /* ============================================================
    V2.1 — elements tree, animation overview rows
    ============================================================ */
-.forge-tree{ margin:4px 0; max-height:300px; overflow:auto; }
-.forge-tree-row{ display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px;
-  cursor:pointer; font-size:12px; color:#b7c2d4; }
-.forge-tree-row:hover{ background:#1a212d; }
-.forge-tree-row.cur{ background:#16233d; outline:1px solid #2a6df4; color:#eaf1fb; }
-.forge-tree-tg{ width:14px; flex:none; text-align:center; color:#7e8aa0; font-size:10px; cursor:pointer; }
-.forge-tree-lb{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.forge-tree-row .tools{ display:none; gap:2px; }
-.forge-tree-row:hover .tools{ display:flex; }
-.forge-tree-row .forge-chip{ min-width:18px; height:18px; padding:0 4px; font-size:10px; }
-
 .forge-anim-row{ display:flex; align-items:center; gap:6px; padding:5px 7px; margin:3px 0;
   border-radius:6px; background:#10151e; border:1px solid rgba(255,255,255,.08); font-size:11px; color:#b7c2d4; }
 .forge-anim-row .lb{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -2495,10 +2488,6 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
   background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:14px;
   padding:20px 24px; color:#dbe3ef; box-shadow:0 24px 80px rgba(0,0,0,.6); }
 .forge-struct-card h3{ margin:0 0 12px; font-size:15px; }
-.forge-struct-grid{ display:grid; grid-template-columns:1fr 1.4fr; gap:16px; min-height:0; flex:1; }
-.forge-struct-tree{ overflow:auto; min-height:0; }
-.forge-struct-tree .forge-tree{ max-height:none; }
-.forge-struct-src{ display:flex; flex-direction:column; min-height:0; }
 .forge-struct-json{ flex:1; min-height:320px; resize:none; padding:10px 12px; border-radius:8px;
   background:#10151e; color:#eaf1fb; border:1px solid rgba(255,255,255,.12);
   font:12px/1.55 var(--font-mono,monospace); white-space:pre; overflow:auto; }
@@ -2570,6 +2559,139 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   width:16px; height:16px; border-radius:50%; background:#2a6df4; color:#fff; font-size:10px;
   line-height:16px; text-align:center; pointer-events:none; }
 .forge-field-error{ color:#f0a0a0; font-size:11px; margin-top:3px; }
+
+/* ============================================================
+   V4 — EDITOR UX OVERHAUL
+   "On this slide" items panel, selection breadcrumb, contextual
+   inspector, stage zoom/focus, manage-items modal, insert gallery.
+   Chrome values (colors, radii, type) are the same tokens the rest of
+   this file uses — nothing new is introduced.
+   ============================================================ */
+
+/* ---- stage: while editing, the deck is fitted BETWEEN the panels ---- */
+body.forge-edit{ overflow:hidden; }
+body.forge-edit #deck{ transition:transform .45s cubic-bezier(.22,1,.3,1); }
+/* hidden elements stay findable while editing, and really vanish elsewhere */
+.forge-hidden{ pointer-events:none; }
+body.forge-edit .forge-hidden{ pointer-events:auto; outline:1px dashed rgba(255,150,113,.5); outline-offset:3px; }
+/* hover sync from the items panel back onto the canvas */
+body.forge-edit .forge-hi{ outline:1.5px dashed rgba(120,170,255,.55); outline-offset:3px; }
+/* inside the current selection, hovering a child hints that clicking again
+   steps down into it (grid -> card -> label) */
+body.forge-edit .forge-sel [data-el]:hover{ outline:1.5px dashed rgba(120,170,255,.45); outline-offset:2px; }
+/* off-screen scratch section used to build insert-gallery miniatures. It must
+   be exactly slide-sized: .slide sets inset:0, which against an oversized
+   offset parent would stretch it to ~100k px and squash every measurement. */
+.forge-ghost{ position:absolute !important; left:-99999px !important; top:0 !important;
+  right:auto !important; bottom:auto !important; width:1280px !important; height:720px !important;
+  opacity:1 !important; visibility:visible !important; pointer-events:none; }
+
+/* ---- "on this slide" item rows ---- */
+.forge-items{ padding-top:10px; }
+.forge-item{ display:flex; align-items:center; gap:8px; padding:7px 8px; margin:3px 0;
+  border-radius:8px; cursor:pointer; background:#141923; border:1px solid transparent; }
+.forge-item:hover{ background:#1a212d; }
+.forge-item.cur{ background:#16233d; border-color:#2a6df4; }
+.forge-item-ico{ width:22px; height:22px; flex:none; display:flex; align-items:center; justify-content:center;
+  border-radius:6px; background:#1a212d; font-size:11px; color:#9aa6ba; }
+.forge-item-txt{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.forge-item-nm{ font-weight:600; font-size:12.5px; color:#dbe3ef;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-item-sub{ font-size:10.5px; color:#6f7c92; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-item.off .forge-item-nm{ color:#6f7c92; }
+.forge-item-eye{ min-width:22px; height:22px; border:none; border-radius:5px; cursor:pointer;
+  background:none; color:#5a6a86; font-size:12px; padding:0; }
+.forge-item-eye:hover{ background:#26303f; color:#dbe3ef; }
+.forge-item.off .forge-item-eye{ color:#ff9671; }
+.forge-item-btns{ display:flex; gap:6px; margin:10px 0 2px; }
+.forge-item-btns .forge-btn{ flex:1; justify-content:center; }
+.forge-btn.add{ background:#173a2a; border-color:#1f6d4a; color:#9af0c4; }
+.forge-btn.add:hover{ background:#1c4834; }
+
+/* ---- selection breadcrumb (floats over the stage) ---- */
+#forge-crumbs{ position:fixed; top:52px; left:calc(248px + (100vw - 528px) / 2); transform:translateX(-50%);
+  z-index:9100; display:none; align-items:center; gap:4px; padding:5px 8px;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:9px;
+  box-shadow:0 10px 30px rgba(0,0,0,.5); max-width:min(70vw,720px); overflow:hidden; }
+#forge-crumbs.on{ display:flex; }
+#forge-crumbs button{ display:flex; align-items:center; padding:3px 8px; border-radius:6px; cursor:pointer;
+  border:1px solid transparent; background:none; color:#9aa6ba;
+  font:600 11.5px var(--font-body,system-ui,sans-serif); white-space:nowrap; }
+#forge-crumbs button:hover{ background:#26303f; color:#dbe3ef; }
+#forge-crumbs button.cur{ background:#2a6df4; border-color:#2a6df4; color:#fff; }
+.forge-crumb-sep{ color:#5a6a86; font-size:10px; }
+
+/* ---- stage zoom + focus cluster ---- */
+#forge-zoom{ position:fixed; right:296px; bottom:14px; z-index:9100; display:none; align-items:center; gap:6px; }
+body.forge-edit #forge-zoom{ display:flex; }
+#forge-zoom .forge-btn.on{ background:#2a6df4; border-color:#2a6df4; color:#fff; }
+.forge-zoom-pill{ display:flex; align-items:center; gap:2px; padding:3px;
+  background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:8px; }
+.forge-zoom-pill button{ min-width:26px; height:24px; border-radius:6px; cursor:pointer;
+  background:#1a212d; color:#cdd6e6; border:1px solid rgba(255,255,255,.12); font-weight:700; font-size:12px; }
+.forge-zoom-pill button:hover{ background:#26303f; }
+.forge-zoom-pill button.wide{ padding:0 8px; font-size:11px; }
+.forge-zoom-pct{ font:600 11px var(--font-mono,monospace); min-width:44px; text-align:center; color:#9aa6ba; }
+
+/* ---- contextual inspector: identity card, steppers, swatches, folds ---- */
+.forge-ident{ display:flex; align-items:center; gap:8px; background:#16233d; border:1px solid #2a6df4;
+  border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+.forge-ident-ico{ font-size:13px; }
+.forge-ident-nm{ flex:1; font-weight:700; font-size:12.5px; color:#eaf1fb;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-ident-key{ font:500 10px var(--font-mono,monospace); color:#7e8aa0; flex:none; }
+.forge-step{ display:flex; align-items:center; gap:4px; flex:none; }
+.forge-step-v{ font:600 12px var(--font-mono,monospace); min-width:34px; text-align:center; color:#eaf1fb; }
+.forge-swatches{ display:flex; gap:6px; align-items:center; margin:7px 0 10px; }
+.forge-swatch{ width:22px; height:22px; flex:none; border-radius:50%; cursor:pointer; padding:0;
+  border:1px solid rgba(255,255,255,.2); }
+.forge-swatch.on{ border:2px solid #fff; }
+.forge-fmtchips{ display:flex; gap:5px; margin:7px 0 4px; }
+.forge-fmtchip{ min-width:32px; height:26px; padding:0 8px; border-radius:6px; cursor:pointer;
+  background:#1a212d; color:#dbe3ef; border:1px solid rgba(255,255,255,.12);
+  font:600 12px var(--font-mono,monospace); }
+.forge-fmtchip:hover{ background:#26303f; }
+.forge-fmtchip.on{ background:#2a6df4; border-color:#2a6df4; }
+.forge-verbs{ display:flex; gap:5px; flex-wrap:wrap; margin:12px 0 4px; }
+.forge-verbs .forge-chip{ height:26px; padding:0 9px; font-size:11.5px; }
+.forge-fold-h{ display:flex; align-items:center; gap:6px; margin:14px 0 4px; cursor:pointer; user-select:none; }
+.forge-fold-tg{ color:#7e8aa0; font-size:10px; width:10px; }
+.forge-fold-lb{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#aeb9cd; font-weight:700; }
+.forge-fold-h:hover .forge-fold-lb{ color:#eaf1fb; }
+.forge-sec label{ color:#9aa6ba; font-size:11px; font-weight:600; display:block; }
+
+/* ---- manage-items modal: tabs + wide 2-column field grid ---- */
+.forge-struct-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.forge-struct-head h3{ margin:0; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forge-tabs{ margin-left:auto; display:flex; gap:4px; flex:none;
+  background:#10151e; border:1px solid rgba(255,255,255,.10); border-radius:8px; padding:3px; }
+.forge-tabs button{ padding:5px 12px; border-radius:6px; cursor:pointer; border:none;
+  font:700 12px var(--font-body,system-ui,sans-serif); background:none; color:#9aa6ba; }
+.forge-tabs button.cur{ background:#2a6df4; color:#fff; }
+.forge-struct-pane{ overflow:auto; min-height:0; flex:1; padding-right:4px; }
+.forge-struct-src{ display:flex; flex-direction:column; }
+.forge-manage .forge-field{ margin:9px 0; }
+.forge-manage>.forge-field{ display:inline-flex; width:calc(50% - 6px); vertical-align:top; margin-right:8px; }
+.forge-arr-cards{ display:grid; grid-template-columns:1fr; gap:8px; }
+.forge-manage .forge-arr-cards{ grid-template-columns:1fr 1fr; }
+.forge-manage .forge-card{ margin:0; }
+.forge-arr-h .forge-chip.add{ padding:0 11px; }
+
+/* ---- insert-element gallery ---- */
+#forge-gallery{ position:fixed; inset:0; z-index:9460; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+#forge-deckmodal{ position:fixed; inset:0; z-index:9450; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+.forge-gal-search{ margin-left:auto; width:280px; padding:7px 10px; border-radius:8px; background:#10151e;
+  color:#eaf1fb; border:1px solid rgba(255,255,255,.12); font-size:12.5px; }
+.forge-gal-search:focus{ outline:none; border-color:#2a6df4; }
+.forge-gal-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; overflow:auto; min-height:0; flex:1; padding-right:4px; }
+.forge-gal-card{ background:#10151e; border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px; cursor:pointer; }
+.forge-gal-card:hover{ border-color:#2a6df4; background:#131a26; }
+.forge-gal-prev{ position:relative; height:58px; background:#070b12; border-radius:6px; overflow:hidden; margin-bottom:7px; }
+.forge-gal-inner{ position:absolute; left:50%; top:50%; transform-origin:center center; pointer-events:none; }
+.forge-gal-nm{ font-size:11.5px; font-weight:700; color:#dbe3ef; }
+.forge-gal-from{ font-size:10px; color:#6f7c92; }
 </style>
 </head>
 <body>
@@ -3031,6 +3153,41 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   function curSlide(){ var i=(parseInt((location.hash||'').slice(1),10)||1)-1; return clamp(i,0,(SG.data.slides||[]).length-1); }
   function pretty(k){ var m={k:"Key",v:"Value",desc:"Description",by:"Source",sub:"Subtitle",xlabel:"X label",ylabel:"Y label",fmt:"Format"};
     return m[k]||String(k).replace(/([A-Z])/g,' $1').replace(/[-_]/g,' ').replace(/^./,function(c){return c.toUpperCase();}); }
+  /* ---- plain-language vocabulary (v4) ------------------------------------
+     Non-programmers never see a dotted key as a primary label. Three small
+     maps turn a content path into words: the field name, the name of one item
+     in an array, and the name of the array as a whole. Anything not listed
+     falls back to pretty()/a naive singular, so new layouts still read fine. */
+  var FIELD_LABEL={kicker:"Kicker",title:"Title",subtitle:"Subtitle",accent:"Accent word",statement:"Statement",
+    lead:"Lead paragraph",quote:"Quote",by:"Attribution",code:"Code",filename:"Filename",caption:"Caption",
+    note:"Note",index:"Section number",badge:"Badge",num:"Big number",count:"Number",unit:"Unit",label:"Label",
+    body:"Body copy",head:"Heading",name:"Name",value:"Value",year:"Year",tag:"Tag",image:"Image",svg:"Diagram",
+    url:"Link",poster:"Poster image",left:"Left side",right:"Right side",before:"Before side",after:"After side",
+    ring:"Metric ring",mark:"Quote mark",rail:"Rail",text:"Text",desc:"Description"};
+  var ITEM_LABEL={stats:"Stat",items:"Item",nodes:"Step",takeaways:"Takeaway",columns:"Column",rows:"Row",
+    cells:"Cell",bands:"Band",quotes:"Quote",tiles:"Tile",meta:"Detail",series:"Series"};
+  var ARRAY_LABEL={stats:"Stat cards",items:"Items",nodes:"Pipeline steps",takeaways:"Takeaways",
+    columns:"Columns",rows:"Rows",cells:"Cells",bands:"Bands",quotes:"Quotes",tiles:"Tiles",meta:"Details"};
+  function singular(k){ return ITEM_LABEL[k]||pretty(String(k).replace(/ies$/,'y').replace(/s$/,'')); }
+  function arrayName(path){ var last=String(path).split('.').pop(); return ARRAY_LABEL[last]||pretty(last); }
+  function fieldName(k){ return FIELD_LABEL[k]||pretty(k); }
+  function excerpt(node,n){ var t=(node&&node.textContent||'').trim().replace(/\s+/g,' ');
+    return t.length>(n||40)?t.slice(0,(n||40)-1)+'…':t; }
+  /* {icon,name} for any keyed element — the one place a key becomes English */
+  function elName(node,key){
+    if(node&&node.hasAttribute&&node.hasAttribute('data-free')){
+      if(node.getAttribute('data-name')) return {icon:'★',name:node.getAttribute('data-name')};
+      var t=node.classList.contains('box')?'Box':node.classList.contains('html')?'Copied group'
+        :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram'
+        :node.classList.contains('embed')?'Embed':'Text';
+      return {icon:'★',name:t}; }
+    var seg=String(key||'').split('.'), last=seg[seg.length-1];
+    if(/^\d+$/.test(last)) return {icon:'№',name:singular(seg[seg.length-2])+' '+(+last+1)};
+    if(node&&node.getAttribute&&node.getAttribute('data-arr'))
+      return {icon:'▦',name:arrayName(node.getAttribute('data-arr'))};
+    var icon=key==='kicker'||key==='kicker.text'?'K':(key==='title'||/\.title$/.test(key))?'T'
+      :(node&&node.hasAttribute&&node.hasAttribute('data-bind'))?'T':'◻';
+    return {icon:icon,name:fieldName(last)}; }
   function deckEl(){ return D.getElementById('deck'); }
   function editing(){ return D.body.classList.contains('forge-edit'); }
   function uid(){ return 'f'+Math.random().toString(36).slice(2,9); }
@@ -3132,6 +3289,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       var n=sec.querySelector('[data-el="'+k+'"]'); if(n) applyOverride(n,ov[k]); });
     (slide.freeObjects||[]).forEach(function(fo){
       var n=el('div','forge-block forge-free '+(fo.type||'txt')); n.setAttribute('data-free',fo.id);
+      if(fo.name) n.setAttribute('data-name',fo.name);
       if(fo.type==='html') n.innerHTML=fo.html||'';
       else if(fo.type==='image') mountImageFree(n,fo);
       else if(fo.type==='svg') mountSvgFree(n,fo);
@@ -3191,6 +3349,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       node.classList.remove('sf-linked'); } }
   function applyStyle(node,o){ if(!o){ applyHref(node,o); return; }
     if(o.color) node.style.color=o.color; if(o.font) node.style.fontFamily=o.font;
+    if(o.fs) node.style.fontSize=o.fs+'px';                 /* v4: direct text size, in px */
     if(o.z!=null) node.style.zIndex=o.z;
     if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); applyHref(node,o); }
   function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')||node.children.length) return;
@@ -3208,10 +3367,18 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     if(want==='kinetic') ensureKineticSpans(node);
     node.style.animationDelay=(o.animDelay?o.animDelay+'s':''); }
   function replayAnim(node){ if(!node) return; node.classList.remove('run'); void node.offsetWidth; node.classList.add('run'); }
+  /* HIDDEN (v4 eye toggle): a hidden element stays visible-but-ghosted WHILE
+     EDITING so it can be found and un-hidden again; it is really gone when
+     presenting, printing and in a downloaded copy (which boots without
+     .forge-edit). Used by the items panel and by detach-to-freeform. */
+  function applyHidden(n,hide){
+    if(hide&&editing()){ n.style.display=''; n.style.opacity='.12'; n.classList.add('forge-hidden'); }
+    else if(hide){ n.style.display='none'; n.classList.remove('forge-hidden'); }
+    else { n.style.display=''; n.style.opacity=''; n.classList.remove('forge-hidden'); } }
   function applyOverride(b,o){ b.style.transform=o?transformStr(o):''; applyAnim(b,o); if(!o) return; b.style.transformOrigin='center center'; applyStyle(b,o);
     if(o.w!=null&&o.w>0){ b.style.width=o.w+'px'; b.style.boxSizing='border-box'; }
     if(o.h!=null&&o.h>0) b.style.height=o.h+'px';
-    if(o.hide) b.style.display='none';
+    applyHidden(b,o.hide);
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   var MEDIA_FREE={image:1,svg:1};
   var SIZED_FREE={box:1,image:1,svg:1,embed:1};
@@ -3237,7 +3404,8 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       var svgEl=n.querySelector(':scope > svg');
       if(svgEl){ svgEl.style.width='100%'; svgEl.style.height='100%'; svgEl.style.display='block';
         svgEl.setAttribute('preserveAspectRatio', fit==='contain'?'xMidYMid meet':'xMidYMid slice'); }
-    } }
+    }
+    if(fo.hide) applyHidden(n,1); }
 
   var _render=SG.render; SG.render=function(deck,data){ _render(deck,data); F.decorate(deck,data); };
   var _renderSlide=SG.renderSlide; SG.renderSlide=function(deck,i){
@@ -3746,6 +3914,19 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   /* =====================================================================
      CANVAS WIRING
      ===================================================================== */
+  /* CLICK AGAIN TO GO DEEPER (v4): the first click on a group selects the
+     group (so dragging still moves the whole thing); clicking inside the
+     current selection steps down ONE level of the key hierarchy — grid ->
+     stat card -> its label. Alt-click still jumps straight to the deepest
+     element, and the breadcrumb walks back up. */
+  function drillTarget(blk,hit){
+    if(!hit||hit===blk||!F.sel||F.sels.length!==1) return blk;
+    var cur=F.sel.node;
+    if(cur===hit||!cur.contains(hit)) return blk;
+    var n=hit, parent;
+    while(n){ parent=n.parentNode&&n.parentNode.closest('[data-el]');
+      if(parent===cur) return n; if(!parent) break; n=parent; }
+    return blk; }
   function wireDeck(){ var deck=deckEl();
     deck.addEventListener('pointerdown',function(e){ if(!editing()) return;
       if(e.button!==0) return;
@@ -3755,6 +3936,8 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       if(e.altKey){ var deep=e.target.closest('[data-el]'); if(deep){ e.preventDefault(); selectNode(deep,e.shiftKey); return; } }
       var blk=e.target.closest('.forge-block');
       if(blk){ if(e.shiftKey){ selectNode(blk,true); return; }
+        var want=drillTarget(blk,e.target.closest('[data-el]'));
+        if(want!==blk&&want!==(F.sel&&F.sel.node)){ selectNode(want,false); startDrag(e,'move'); return; }
         if(!isSelected(blk)) selectNode(blk,false); startDrag(e,'move'); return; }
       var sec=e.target.closest('.slide'); if(sec){ startMarquee(e,sec); return; }
       clearSel(); F.buildInspect(); },true);
@@ -3770,7 +3953,11 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     deck.addEventListener('click',function(e){ if(editing()){ e.stopImmediatePropagation(); e.stopPropagation(); } },true);
     D.addEventListener('pointerdown',function(e){ if(ctxMenu && ctxMenu.classList.contains('on') && !ctxMenu.contains(e.target)) hideCtxMenu(); },true);
     W.addEventListener('scroll',function(){ hideCtxMenu(); if(F.editing) positionFmtBar(); positionFloat(); },true);
-    W.addEventListener('resize',function(){ refreshHandles(); positionFloat(); });
+    W.addEventListener('resize',function(){ if(editing()) F.applyView(); refreshHandles(); positionFloat(); });
+    /* Ctrl/Cmd + wheel zooms the stage (the browser's own page zoom would
+       fight the fitted transform), plain wheel is left alone. */
+    deck.addEventListener('wheel',function(e){ if(!editing()||!(e.ctrlKey||e.metaKey)) return;
+      e.preventDefault(); F.setZoom(F.zoom*(e.deltaY<0?1.12:1/1.12)); },{passive:false});
     /* drop-on-canvas image/svg import (media plan §3.3): converts the drop
        point to deck-local px through the same scale() the drag code uses,
        lands each dropped file centred there with a small cascade offset for
@@ -3808,6 +3995,9 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     if(mod&&(e.key==='v'||e.key==='V')){ if(F.clipboard){ e.preventDefault(); e.stopPropagation(); F.paste(); } return; }
     if(mod&&(e.key==='d'||e.key==='D')){ if(F.sels.length){ e.preventDefault(); e.stopPropagation(); F.dupSel(); } return; }
     if(mod&&(e.key==='g'||e.key==='G')){ e.preventDefault(); e.stopPropagation(); e.shiftKey?F.ungroupSel():F.groupSel(); return; }
+    if(mod&&(e.key==='0')){ e.preventDefault(); e.stopPropagation(); F.zoomFit(); return; }
+    if(mod&&(e.key==='='||e.key==='+')){ e.preventDefault(); e.stopPropagation(); F.setZoom(F.zoom*1.25); return; }
+    if(mod&&e.key==='-'){ e.preventDefault(); e.stopPropagation(); F.setZoom(F.zoom/1.25); return; }
     if(e.key==='?'){ e.preventDefault(); e.stopPropagation(); F.showKeys(); return; }
     if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); hideCtxMenu(); clearSel(); F.buildInspect(); return; }
     if((e.key==='Delete'||e.key==='Backspace')&&F.sels.length){ e.preventDefault(); e.stopPropagation(); F.deleteSel(); return; }
@@ -3823,22 +4013,98 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   },true); }
 
   /* =====================================================================
+     STAGE VIEWPORT — zoom + ⌖ Focus (v4).
+     In present mode the engine scales the deck to the window. While EDITING
+     the deck is instead fitted to the stage BETWEEN the panels (so nothing
+     hides under them), times a zoom factor, optionally panned to centre the
+     selection ("Focus"). One combined translate()+scale() on #deck, which is
+     also what scale() reads back — so every drag/resize/marquee/guide
+     calculation divides by the *combined* scale automatically and gestures
+     stay 1:1 with the pointer at any zoom.
+     ===================================================================== */
+  F.zoom=1; F.focus=false;
+  var ZMIN=0.25, ZMAX=3;
+  function stageRect(){
+    var bar=D.getElementById('forge-bar');
+    var top=(bar&&editing())?bar.getBoundingClientRect().height:0;
+    var l=editing()?248:0, r=editing()?280:0;
+    return {l:l,t:top,r:W.innerWidth-r,b:W.innerHeight}; }
+  function baseScale(){ var s=stageRect();
+    if(!editing()) return Math.min(W.innerWidth/1280,W.innerHeight/720);
+    return Math.max(0.05,Math.min((s.r-s.l-56)/1280,(s.b-s.t-56)/720)); }
+  /* the point (slide-space) the stage should centre on */
+  function focusPoint(){
+    if(!F.focus||!F.sels.length) return null;
+    var b=boxOf(F.sels[0].node); if(!b) return null;
+    return {x:b.x+b.w/2, y:b.y+b.h/2, w:b.w, h:b.h}; }
+  SG.viewTransform=function(){
+    if(!editing()) return null;                       /* present mode: engine default */
+    var st=stageRect(), b=baseScale(), fp=focusPoint(), z=F.zoom, s;
+    if(fp){ /* ~1.7x, but never so far in that the element stops fitting */
+      var fit=Math.min((st.r-st.l-120)/(fp.w*b), (st.b-st.t-120)/(fp.h*b));
+      z=F.zoom*Math.max(1,Math.min(1.7,fit)); }
+    s=clamp(b*z,b*ZMIN,b*ZMAX*2);
+    var cx=(st.l+st.r)/2, cy=(st.t+st.b)/2;
+    var px=fp?fp.x:640, py=fp?fp.y:360;
+    var tx=cx-W.innerWidth/2-s*(px-640), ty=cy-W.innerHeight/2-s*(py-360);
+    F._viewScale=s;
+    return 'translate('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px) scale('+s.toFixed(4)+')'; };
+  F.applyView=function(){ if(SG.fit) SG.fit(); refreshHandles(); positionFloat(); syncZoomBar(); };
+  F.setZoom=function(z){ F.zoom=clamp(z,ZMIN,ZMAX); F.applyView(); };
+  F.zoomFit=function(){ F.zoom=1; F.focus=false; F.applyView(); };
+  F.toggleFocus=function(){ F.focus=!F.focus; F.applyView(); };
+  var zoomBar=null, zoomPct=null, focusBtn=null;
+  function syncZoomBar(){ if(!zoomPct) return;
+    zoomPct.textContent=Math.round((F._viewScale||baseScale())/baseScale()*100)+'%';
+    if(focusBtn) focusBtn.classList.toggle('on',F.focus); }
+  function buildZoomBar(){
+    zoomBar=el('div','forge-chrome'); zoomBar.id='forge-zoom';
+    focusBtn=el('button','forge-btn','⌖ Focus');
+    focusBtn.title='Zoom to the selected element and follow the selection while on';
+    focusBtn.onclick=function(){ F.toggleFocus(); };
+    zoomBar.appendChild(focusBtn);
+    var pill=el('div','forge-zoom-pill');
+    function zb(lab,title,fn,cls){ var b=el('button',cls||null,lab); b.title=title; b.onclick=fn; pill.appendChild(b); return b; }
+    zb('−','Zoom out',function(){ F.setZoom(F.zoom/1.25); });
+    zoomPct=el('span','forge-zoom-pct','100%'); pill.appendChild(zoomPct);
+    zb('＋','Zoom in',function(){ F.setZoom(F.zoom*1.25); });
+    zb('Fit','Fit the slide and turn Focus off',function(){ F.zoomFit(); },'wide');
+    zoomBar.appendChild(pill); D.body.appendChild(zoomBar); syncZoomBar(); }
+
+  /* =====================================================================
      UI SCAFFOLDING — launcher, toolbar, panels, restore bar.
      ===================================================================== */
   F.buildChrome=function(){
     var launch=el('button','forge-chrome','✎ Edit'); launch.id='forge-launch'; launch.onclick=F.toggle; D.body.appendChild(launch);
     F._launch=launch;
     var bar=el('div','forge-chrome'); bar.id='forge-bar'; bar.innerHTML='<span class="forge-title"></span>';
-    function btn(label,fn,cls){ var b=el('button','forge-btn '+(cls||''),label); b.onclick=fn; bar.appendChild(b); return b; }
-    F._undoBtn=btn('↶ Undo',F.undoOp); F._redoBtn=btn('↷ Redo',F.redoOp); bar.appendChild(el('span','forge-sep'));
-    F._addBtn=btn('＋ Slide',function(e){ F.insertMenu(F._addBtn); }); btn('⧉ Duplicate',function(){ F.dupSlide(); });
-    btn('＋ Text',function(){ F.addFree('txt'); }); btn('＋ Box',function(){ F.addFree('box'); });
-    btn('🖼 Assets',function(){ F.assetsPanel(); }); btn('◲ Embed',function(){ F.embedPrompt(); }); bar.appendChild(el('span','forge-sep'));
-    btn('▷ Present',function(){ F.toggle(); SG.present&&SG.present(); });
-    F._saveBtn=btn('⤓ Save .html',function(){ F.download(); },'primary'); btn('{ } JSON',function(){ SG.exportJSON&&SG.exportJSON(); });
+    function btn(label,fn,cls,title){ var b=el('button','forge-btn '+(cls||''),label); b.onclick=fn;
+      if(title){ b.title=title; b.setAttribute('aria-label',title); } bar.appendChild(b); return b; }
+    /* v4 order: add things -> view things -> undo -> help/present/save.
+       Every button carries a title so the glyphs are never a guessing game. */
+    F._addBtn=btn('＋ Slide',function(e){ F.insertMenu(F._addBtn); },'','Add a slide (pick a layout)');
+    btn('⧉ Duplicate',function(){ F.dupSlide(); },'','Duplicate this slide');
+    btn('T Text',function(){ F.addFree('txt'); },'','Add a free text object');
+    btn('▭ Box',function(){ F.addFree('box'); },'','Add a box');
+    btn('▣ Image',function(){ F.imagePrompt(); },'','Insert an image or SVG diagram');
+    btn('⊞ Insert',function(){ F.insertGallery(); },'','Insert any element from any layout');
+    btn('🖼 Assets',function(){ F.assetsPanel(); },'','Asset library (import, rename, link)');
+    btn('◲ Embed',function(){ F.embedPrompt(); },'','Embed a live web page (sandboxed)');
+    bar.appendChild(el('span','forge-sep'));
+    F._sorterBtn=btn('▦ Sorter',function(){ F.toggleSorter(); },'','Slide sorter (drag-to-reorder thumbnails)');
+    btn('◐ Theme',function(){ F.deckModal('theme'); },'','Deck theme, tokens & brand kit');
+    btn('⚙ Deck',function(){ F.deckModal('deck'); },'','Deck settings (title, build steps)');
+    bar.appendChild(el('span','forge-sep'));
+    F._undoBtn=btn('⟲',F.undoOp,'','Undo (Ctrl+Z)'); F._redoBtn=btn('⟳',F.redoOp,'','Redo (Ctrl+Shift+Z)');
+    bar.appendChild(el('span','forge-sep'));
+    btn('？',function(){ F.showKeys(); },'','Keyboard shortcuts (?)');
+    btn('{ } JSON',function(){ SG.exportJSON&&SG.exportJSON(); },'','Export the deck JSON');
+    btn('▶ Present',function(){ F.toggle(); SG.present&&SG.present(); },'','Present (F for fullscreen)');
+    F._saveBtn=btn('Save .html',function(){ F.download(); },'primary','Save your copy (Ctrl+S)');
     D.body.appendChild(bar);
+    buildZoomBar();
     var nav=el('div','forge-chrome forge-panel'); nav.id='forge-nav'; nav.setAttribute('role','region'); nav.setAttribute('aria-label','Slides'); nav.innerHTML='<h4>Slides <button id="forge-sorter-toggle" class="forge-chip" title="Toggle sorter (thumbnails)">\u25a6</button></h4><div id="forge-navlist"></div>'; D.body.appendChild(nav);
-    nav.querySelector('#forge-sorter-toggle').onclick=function(){ F._sorter=!F._sorter; this.classList.toggle('add',F._sorter); F.buildNav(); };
+    nav.querySelector('#forge-sorter-toggle').onclick=function(){ F.toggleSorter(); };
     var insp=el('div','forge-chrome forge-panel'); insp.id='forge-inspect'; insp.setAttribute('role','region'); insp.setAttribute('aria-label','Inspector'); insp.innerHTML='<h4>Inspector</h4><div id="forge-inspbody"></div>'; D.body.appendChild(insp);
     var rb=el('div','forge-chrome'); rb.id='forge-restore'; D.body.appendChild(rb);
     /* quota warning (media plan section 2.3): shown/hidden by F.assets._onSaveState
@@ -3937,18 +4203,21 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     return wrap; }
 
   /* generic content form: reflects slides[i].content — plain fields, nested
-     objects, and arrays as reorderable cards with add/remove. */
+     objects, and arrays as reorderable cards with add/duplicate/remove. ONE
+     renderer, used by the sidebar Content panel, the contextual inspector's
+     Content section, and the Manage-items modal (v4), so those can never
+     drift apart. */
+  function fieldFor(host,obj,k,slideIdx,path){ var v=obj[k];
+    if(Array.isArray(v)){ arrayEditor(host,obj,k,slideIdx,(path||'')+k); return; }
+    if(v!==null&&typeof v==='object'){ var grp=el('div','forge-card');
+      grp.appendChild(el('div','forge-card-h','<span>'+fieldName(k)+'</span>'));
+      contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); return; }
+    if(typeof v==='boolean'){ host.appendChild(fieldRow(fieldName(k),boundCheck(obj,k))); return; }
+    if(typeof v==='number'){ host.appendChild(field(fieldName(k),boundNum(obj,k))); return; }
+    if(ASSET_FIELDS[k]&&F.assets){ host.appendChild(field(fieldName(k),assetPickerField(obj,k,ASSET_FIELDS[k]))); return; }
+    host.appendChild(field(fieldName(k),boundText(obj,k, k==='code'||k==='html'||k==='body'&&String(v).length>80||String(v).length>70||/\n/.test(String(v)) ))); }
   function contentForm(host,obj,slideIdx,path){
-    Object.keys(obj).forEach(function(k){ var v=obj[k];
-      if(Array.isArray(v)) arrayEditor(host,obj,k,slideIdx,(path||'')+k);
-      else if(v!==null&&typeof v==='object'){ var grp=el('div','forge-card');
-        grp.appendChild(el('div','forge-card-h','<span>'+pretty(k)+'</span>'));
-        contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); }
-      else if(typeof v==='boolean') host.appendChild(fieldRow(pretty(k),boundCheck(obj,k)));
-      else if(typeof v==='number') host.appendChild(field(pretty(k),boundNum(obj,k)));
-      else if(ASSET_FIELDS[k]&&F.assets) host.appendChild(field(pretty(k),assetPickerField(obj,k,ASSET_FIELDS[k])));
-      else host.appendChild(field(pretty(k),boundText(obj,k, k==='code'||k==='html'||k==='body'&&String(v).length>80||String(v).length>70||/\n/.test(String(v)) )));
-    }); }
+    Object.keys(obj).forEach(function(k){ fieldFor(host,obj,k,slideIdx,path); }); }
   function newItemLike(item){ if(typeof item==='string') return '';
     if(typeof item==='number') return 0;
     if(item&&typeof item==='object'){ var o={}; Object.keys(item).forEach(function(k){
@@ -3956,20 +4225,26 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     return ''; }
   function arrayEditor(host,obj,k,slideIdx,apath){ var wrap=el('div','forge-arr');
     function slideOf(data){ return data.slides[slideIdx]; }
-    var head=el('div','forge-arr-h','<span>'+pretty(k)+'</span>'); var addB=el('button','forge-chip add','＋');
-    addB.title='Add item'; addB.onclick=function(){ F.do('add item',function(){ var arr=obj[k];
+    var one=singular(k);
+    var head=el('div','forge-arr-h','<span>'+arrayName(k)+' · '+obj[k].length+'</span>');
+    var addB=el('button','forge-chip add','＋ Add '+one.toLowerCase());
+    addB.title='Add one more '+one.toLowerCase()+' (matches this list’s shape)';
+    addB.onclick=function(){ F.do('add item',function(){ var arr=obj[k];
       arr.push(arr.length?newItemLike(arr[arr.length-1]):{title:''}); }); };
     head.appendChild(addB); wrap.appendChild(head);
+    var cards=el('div','forge-arr-cards');
     obj[k].forEach(function(item,i){ var card=el('div','forge-card');
-      var h=el('div','forge-card-h','<span>'+pretty(k).replace(/s$/,'')+' '+(i+1)+'</span>');
+      var h=el('div','forge-card-h','<span>'+one+' '+(i+1)+'</span>');
       var tools=el('span','forge-card-tools');
       function chip(lab,title,fn,cls,dis){ var b=el('button','forge-chip '+(cls||''),lab); b.title=title; if(dis)b.disabled=true;
         b.onclick=fn; tools.appendChild(b); }
-      /* reorder/remove keep sibling override keys attached to their items */
-      chip('↑','Move up',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i-1]; a[i-1]=a[i]; a[i]=t;
+      /* reorder/duplicate/remove keep sibling override keys attached to their items */
+      chip('↑','Move earlier',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i-1]; a[i-1]=a[i]; a[i]=t;
         if(apath) swapItemOverrides(slideOf(data),apath,i-1,i); }); },null,i===0);
-      chip('↓','Move down',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i+1]; a[i+1]=a[i]; a[i]=t;
+      chip('↓','Move later',function(){ F.do('reorder',function(data){ var a=obj[k]; var t=a[i+1]; a[i+1]=a[i]; a[i]=t;
         if(apath) swapItemOverrides(slideOf(data),apath,i,i+1); }); },null,i===obj[k].length-1);
+      chip('⧉','Duplicate',function(){ F.do('duplicate item',function(data){ obj[k].splice(i+1,0,clone(obj[k][i]));
+        if(apath){ var s=slideOf(data); remapItemOverrides(s,apath,i+1,+1); copyItemOverrides(s,apath,i,i+1); } }); });
       chip('✕','Remove',function(){ F.do('remove item',function(data){ obj[k].splice(i,1);
         if(apath) remapItemOverrides(slideOf(data),apath,i,-1); }); },'warn');
       h.appendChild(tools); card.appendChild(h);
@@ -3977,8 +4252,8 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       else { var t=el('textarea'); t.rows=2; t.value=item==null?'':item;
         t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ obj[k][i]=t.value; F.renderLiveSlide(); };
         var f=el('div','forge-field'); f.appendChild(t); card.appendChild(f); }
-      wrap.appendChild(card); });
-    host.appendChild(wrap); }
+      cards.appendChild(card); });
+    wrap.appendChild(cards); host.appendChild(wrap); }
 
   /* =====================================================================
      CHART & TABLE DATA GRIDS (v2 phase 3) — a mini spreadsheet in the
@@ -4060,26 +4335,17 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     host.appendChild(fieldRow('Highlight column #',hc)); }
 
   /* =====================================================================
-     ELEMENTS TREE — hierarchical view of the slide's elements (template
-     blocks, nested items, free objects). Click selects; disclosure arrows
-     collapse; hover tools add/duplicate/remove layout items in place.
+     "ON THIS SLIDE" ITEMS PANEL (v4) — the sidebar's home view. One row per
+     authored element, named in plain language ("Stat 3"), indented by key
+     depth, with a show/hide eye. Hovering a row outlines the element on the
+     canvas and vice-versa; clicking selects. Replaces the v2.1 Elements tree:
+     same walk over authored data-el keys, but no dotted keys as labels and no
+     disclosure arrows to get lost in.
      ===================================================================== */
-  F._treeOpen={};
   function treeChip(host,lab,title,fn,warn){ var b=el('button','forge-chip'+(warn?' warn':''),lab);
     b.title=title; b.setAttribute('aria-label',title); b.onclick=function(e){ e.stopPropagation(); fn(); }; host.appendChild(b); return b; }
-  function treeLabel(node){
-    if(node.hasAttribute('data-free')){
-      var isMediaNode=node.classList.contains('image')||node.classList.contains('svg');
-      var fo=node.classList.contains('box')?'Box':node.classList.contains('html')?'Copied group'
-        :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram':'Text';
-      var extra=isMediaNode?'':node.textContent;
-      return '★ '+fo+(extra?' · '+extra.trim().slice(0,20):''); }
-    var c=(typeof node.className==='string'?node.className:'').split(' ')[0];
-    var name=c&&!/^sg-/.test(c)?c.replace(/-/g,' '):node.tagName.toLowerCase();
-    var txt=(node.textContent||'').trim().replace(/\s+/g,' ').slice(0,26);
-    return name+(txt?' · '+txt:''); }
   /* build the hierarchy from the authored keys themselves ("stats.2" is a
-     child of "stats"), so the tree matches the CONTENT structure even when the
+     child of "stats"), so the list matches the CONTENT structure even when the
      DOM interleaves (pipeline connectors) or nests differently. */
   function keyedTree(sec){ var map={}, roots=[];
     [].slice.call(sec.querySelectorAll('[data-el]')).forEach(function(n){
@@ -4088,36 +4354,136 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       var par=p>0?map[k.slice(0,p)]:null;
       if(par) par.kids.push(map[k]); else roots.push(map[k]); });
     return roots; }
-  function elementsTree(host,slideIdx){
+  /* purely decorative keyed nodes (cover orbs, rails, timeline dots) carry no
+     text, no binding and no children — they would be noise in a list meant for
+     people who don't read markup. They stay selectable on the canvas. */
+  function decorative(node){ return !node.hasAttribute('data-bind') && !node.getAttribute('data-arr')
+    && !node.querySelector('[data-el]') && !(node.textContent||'').trim(); }
+  /* Which nodes earn a row: the slide's top-level blocks, every list
+     container, and every item in one. NOT the leaves inside an item — the
+     Selected panel already shows those as labelled inputs, and listing them
+     turns a 4-stat slide into 20 rows of "Number / Label / Description". */
+  function listed(n,key){
+    if(decorative(n)) return false;
+    if(key.indexOf('.')<0) return true;                    /* top-level block */
+    if(n.getAttribute('data-arr')) return true;            /* a list */
+    return /(^|\.)\d+$/.test(key); }                       /* an item in a list */
+  /* flat, depth-annotated row list: containers first, then their items */
+  function itemRows(sec){ var out=[];
+    function walk(entry){ var n=entry.node, key=n.getAttribute('data-el');
+      if(listed(n,key)) out.push({node:n,key:key,depth:Math.min(2,key.split('.').length-1)});
+      entry.kids.sort(function(a,b){ return a.node.getAttribute('data-el')
+        .localeCompare(b.node.getAttribute('data-el'),undefined,{numeric:true}); });
+      entry.kids.forEach(walk); }
+    keyedTree(sec).forEach(walk);
+    [].slice.call(sec.querySelectorAll('.forge-free')).forEach(function(n){
+      out.push({node:n,key:n.getAttribute('data-free'),free:true,depth:0}); });
+    return out; }
+  F.itemRows=itemRows;
+  /* the array a slide's "＋ Add …" button appends to: the one the selection
+     sits in, else the first array the layout renders. */
+  function primaryArray(sec,slideIdx){
+    var sel=F.sel&&F.sel.slideIdx===slideIdx?F.sel.key:null;
+    if(sel){ var it=itemOf(sel); if(it&&contentArr(slideIdx,it.path)) return it.path;
+      var n=sec.querySelector('[data-el="'+sel+'"]');
+      if(n&&n.getAttribute('data-arr')) return n.getAttribute('data-arr'); }
+    var c=sec.querySelector('[data-arr]'); return c?c.getAttribute('data-arr'):null; }
+  F.addItemPath=function(slideIdx,path){ if(!contentArr(slideIdx,path)) return false;
+    F.do('add item',function(data){ var a=SG.getPath(data.slides[slideIdx].content,path);
+      a.push(a.length?newItemLike(a[a.length-1]):{title:''}); }); return true; };
+  /* eye toggle -> overrides[key].hide (or freeObject.hide) */
+  F.toggleHide=function(slideIdx,key,isFree){
+    F.do('show/hide',function(data){ var s=data.slides[slideIdx];
+      if(isFree){ var fo=(s.freeObjects||[]).filter(function(f){ return f.id===key; })[0];
+        if(fo){ if(fo.hide) delete fo.hide; else fo.hide=1; } return; }
+      s.overrides=s.overrides||{}; var o=s.overrides[key]=s.overrides[key]||{};
+      if(o.hide){ delete o.hide; if(!Object.keys(o).length) delete s.overrides[key]; } else o.hide=1; }); };
+  /* An item's row reads from CONTENT, not the DOM: the DOM text of a stat is
+     mid-count-up ("0", "3" for 3.2) and runs its fields together. Headline
+     goes after the item number ("Stat 3 — 12×"), the descriptive field below. */
+  var HEAD_FIELDS=['count','value','title','name','head','quote','year','k','tag','label'];
+  var SUB_FIELDS=['label','desc','body','by','sub','v','caption','name','title'];
+  function itemSummary(slideIdx,key){
+    var s=SG.data.slides[slideIdx]; if(!s) return null;
+    var v=SG.getPath(s.content||{},key);
+    if(typeof v==='string'||typeof v==='number') return {head:'',sub:String(v)};
+    if(!v||typeof v!=='object') return null;
+    var head='',subv='',i;
+    for(i=0;i<HEAD_FIELDS.length&&!head;i++) if(v[HEAD_FIELDS[i]]!=null&&v[HEAD_FIELDS[i]]!=='') head=String(v[HEAD_FIELDS[i]]);
+    if(head&&v.unit) head+=String(v.unit);
+    for(i=0;i<SUB_FIELDS.length&&!subv;i++){ var f=SUB_FIELDS[i];
+      if(String(v[f]||'')!==''&&String(v[f])!==head) subv=String(v[f]); }
+    return {head:head.slice(0,18),sub:subv}; }
+  function isHidden(slideIdx,key,isFree){ var s=SG.data.slides[slideIdx]; if(!s) return false;
+    if(isFree){ var fo=(s.freeObjects||[]).filter(function(f){ return f.id===key; })[0]; return !!(fo&&fo.hide); }
+    return !!((s.overrides||{})[key]||{}).hide; }
+  function itemsPanel(host,slideIdx){
     var sec0=deckEl().querySelectorAll('.slide')[slideIdx]; if(!sec0) return;
-    var wrap=el('div','forge-tree');
+    var s=el('div','forge-sec forge-items'); s.appendChild(el('div','forge-subh','On this slide'));
     var selKey=(F.sel&&F.sel.slideIdx===slideIdx)?(F.sel.key||F.sel.id):null;
-    function row(entry,depth){
-      var node=entry.node, kids=entry.kids;
-      var key=node.getAttribute('data-el')||node.getAttribute('data-free');
-      var openKey=slideIdx+':'+key, isOpen=F._treeOpen[openKey]!==false;
-      var r=el('div','forge-tree-row'+(selKey===key?' cur':''));
-      r.style.paddingLeft=(6+depth*14)+'px';
-      var tg=el('span','forge-tree-tg',kids.length?(isOpen?'▾':'▸'):'·');
-      if(kids.length) tg.onclick=function(e){ e.stopPropagation(); F._treeOpen[openKey]=!isOpen; F.buildInspect(); };
-      r.appendChild(tg);
-      var lb=el('span','forge-tree-lb'); lb.textContent=treeLabel(node); r.appendChild(lb);
-      var tools=el('span','tools');
-      if(!node.hasAttribute('data-free')){
-        if(node.getAttribute('data-arr'))
-          treeChip(tools,'＋','Add item (matches this list\u2019s shape)',function(){ F.addItem(slideIdx,node); });
-        var it=itemOf(key);
-        if(it&&key===it.path+'.'+it.idx&&contentArr(slideIdx,it.path)){
-          treeChip(tools,'⧉','Duplicate item',function(){ F.dupItem(slideIdx,node); });
-          treeChip(tools,'✕','Remove item',function(){ F.removeItem(slideIdx,node); },true); } }
-      else treeChip(tools,'✕','Delete object',function(){ selectNode(node,false); F.deleteSel(); },true);
-      r.appendChild(tools);
-      r.onclick=function(){ selectNode(node,false); };
-      wrap.appendChild(r);
-      if(isOpen) kids.forEach(function(ch){ row(ch,depth+1); }); }
-    keyedTree(sec0).forEach(function(entry){ row(entry,0); });
-    [].slice.call(sec0.querySelectorAll('.forge-free')).forEach(function(fn){ row({node:fn,kids:[]},0); });
-    host.appendChild(wrap); }
+    itemRows(sec0).forEach(function(r){
+      var nm=elName(r.node,r.key), hidden=isHidden(slideIdx,r.key,r.free);
+      var arrPath=r.node.getAttribute&&r.node.getAttribute('data-arr');
+      var row=el('div','forge-item'+(selKey===r.key?' cur':'')+(hidden?' off':''));
+      row.style.paddingLeft=(8+r.depth*18)+'px';
+      row.appendChild(el('span','forge-item-ico',nm.icon));
+      var txt=el('span','forge-item-txt'), name=nm.name, sub;
+      if(arrPath) sub=(contentArr(slideIdx,arrPath)||[]).length+' items';
+      else { var sm=(!r.free&&/(^|\.)\d+$/.test(r.key))?itemSummary(slideIdx,r.key):null;
+        if(sm){ if(sm.head) name+=' — '+sm.head; sub=sm.sub||excerpt(r.node,40); }
+        else sub=excerpt(r.node,40); }
+      var nmEl=el('span','forge-item-nm'); nmEl.textContent=name;
+      var subEl=el('span','forge-item-sub'); subEl.textContent=sub;
+      txt.appendChild(nmEl); txt.appendChild(subEl); row.appendChild(txt);
+      var eye=el('button','forge-item-eye',hidden?'◌':'👁');
+      eye.title=hidden?'Show this element':'Hide this element';
+      eye.setAttribute('aria-label',eye.title);
+      eye.onclick=function(e){ e.stopPropagation(); F.toggleHide(slideIdx,r.key,r.free); };
+      row.appendChild(eye);
+      /* two-way hover sync with the canvas */
+      row.onmouseenter=function(){ r.node.classList.add('forge-hi'); };
+      row.onmouseleave=function(){ r.node.classList.remove('forge-hi'); };
+      row.onclick=function(){ selectNode(r.node,false); };
+      s.appendChild(row); });
+    var btns=el('div','forge-item-btns');
+    var path=primaryArray(sec0,slideIdx);
+    if(path){ var last=String(path).split('.').pop();
+      var add=el('button','forge-btn add','＋ Add '+singular(last).toLowerCase());
+      add.title='Append an item to "'+arrayName(path)+'"';
+      add.onclick=function(){ F.addItemPath(slideIdx,path); }; btns.appendChild(add); }
+    var mg=el('button','forge-btn','⤢ Manage items…');
+    mg.title='Edit every field on this slide side by side (and the raw JSON)';
+    mg.onclick=function(){ F.structModal(slideIdx); }; btns.appendChild(mg);
+    s.appendChild(btns); host.appendChild(s); }
+
+  /* ---- selection breadcrumb: Slide ▸ Stat cards ▸ Stat 3 ----------------
+     Floats top-center over the stage. Each chip selects that key prefix, so
+     walking UP the hierarchy is discoverable (it used to need Alt-click). */
+  var crumbBar=null;
+  /* pure path derivation, exported so it can be asserted without a viewport */
+  F.crumbPath=function(x){ var parts=[{label:'Slide',key:null}];
+    if(!x||!x.section) return parts;
+    var sec=x.section;
+    if(x.kind==='free'){ parts.push({label:elName(x.node,x.id).name,key:x.id,free:true}); return parts; }
+    var seg=String(x.key).split('.');
+    for(var i=1;i<=seg.length;i++){ var k=seg.slice(0,i).join('.');
+      var n=sec.querySelector('[data-el="'+k+'"]'); if(!n) continue;
+      parts.push({label:elName(n,k).name,key:k}); }
+    return parts; };
+  function buildCrumbs(){
+    if(!crumbBar){ crumbBar=el('div','forge-chrome'); crumbBar.id='forge-crumbs'; D.body.appendChild(crumbBar); }
+    crumbBar.innerHTML='';
+    var x=F.sel;
+    if(!x||F.sels.length>1||!editing()||!x.section){ crumbBar.classList.remove('on'); return; }
+    var sec=x.section, parts=F.crumbPath(x);
+    parts.forEach(function(p,i){
+      var b=el('button',i===parts.length-1?'cur':null); b.textContent=p.label;
+      b.onclick=function(){ if(!p.key){ clearSel(); F.buildInspect(); return; }
+        var n=p.free?sec.querySelector('[data-free="'+p.key+'"]'):sec.querySelector('[data-el="'+p.key+'"]');
+        if(n) selectNode(n,false); };
+      crumbBar.appendChild(b);
+      if(i<parts.length-1) crumbBar.appendChild(el('span','forge-crumb-sep','▸')); });
+    crumbBar.classList.add('on'); }
 
   /* =====================================================================
      ASSET LIBRARY (media plan §2.5) — grid of every imported image/svg
@@ -4249,29 +4615,59 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     inp.focus(); };
 
   /* =====================================================================
-     STRUCTURE EDITOR (expand from the Elements panel) — big modal with the
-     elements tree beside a DIRECT JSON editor for the slide. Copy the
-     structure out, edit or paste JSON back in, Apply re-renders from data.
+     MANAGE ITEMS (v4) — the "⤢" popout from the items panel. Two tabs:
+       Items    — every field on the slide, side by side, in plain language:
+                  the SAME widgets the sidebar content panel builds (one
+                  shared renderer), just laid out wide. All edits route
+                  through F.do()/renderLiveSlide exactly as in the sidebar.
+       Advanced — the v2.2 direct JSON editor, unchanged (copy out / paste
+                  back / Apply). Demoted to a tab, never removed: it is the
+                  power-user escape hatch and the only way to re-shape a
+                  slide wholesale.
      ===================================================================== */
   F.structModal=function(slideIdx){ var old=D.getElementById('forge-struct'); if(old) old.remove();
+    var slide=SG.data.slides[slideIdx]; if(!slide) return;
     var o=el('div','forge-chrome'); o.id='forge-struct';
     var card=el('div','forge-struct-card');
-    card.appendChild(el('h3',null,'Slide '+(slideIdx+1)+' — structure'));
-    var grid=el('div','forge-struct-grid');
-    var left=el('div','forge-struct-tree'); left.appendChild(el('div','forge-subh','Elements'));
-    elementsTree(left,slideIdx); grid.appendChild(left);
-    var right=el('div','forge-struct-src'); right.appendChild(el('div','forge-subh','Slide JSON (edit or paste, then Apply)'));
+    var head=el('div','forge-struct-head');
+    var title=(slide.content&&(slide.content.title||slide.content.statement||slide.content.quote))||slide.layout;
+    head.appendChild(el('h3',null,'Manage items — “'+SG.esc(String(title).slice(0,44))+'”'));
+    var tabs=el('div','forge-tabs');
+    var tItems=el('button','cur','Items'), tJson=el('button',null,'Advanced (JSON)');
+    tabs.appendChild(tItems); tabs.appendChild(tJson); head.appendChild(tabs);
+    card.appendChild(head);
+
+    var itemsPane=el('div','forge-struct-pane forge-manage');
+    var jsonPane=el('div','forge-struct-pane forge-struct-src'); jsonPane.style.display='none';
+    function paintItems(){ itemsPane.innerHTML='';
+      var s=SG.data.slides[slideIdx]; s.content=s.content||{};
+      if(s.layout==='chart'&&s.content.data) chartPanel(itemsPane,s.content,slideIdx);
+      else if(s.layout==='table') tablePanel(itemsPane,s.content,slideIdx);
+      else contentForm(itemsPane,s.content,slideIdx);
+      itemsPane.appendChild(el('div','forge-hint','Changes apply to the slide instantly. Reordering here reorders the elements on the slide — any styling you gave one follows it automatically.')); }
+    paintItems();
+    /* structural edits (add/remove/reorder item) re-run buildInspect; keep the
+       open modal in step with the data instead of leaving it stale */
+    var _bi=F.buildInspect;
+    function rewrap(){ F.buildInspect=function(){ _bi.apply(F,arguments);
+      if(D.getElementById('forge-struct')===o && jsonPane.style.display==='none') paintItems(); }; }
+    rewrap();
+    function unwrap(){ F.buildInspect=_bi; }
+
+    jsonPane.appendChild(el('div','forge-subh','Slide JSON (edit or paste, then Apply)'));
     var ta=el('textarea','forge-struct-json'); ta.spellcheck=false;
-    ta.value=JSON.stringify(SG.data.slides[slideIdx],null,2);
-    right.appendChild(ta); grid.appendChild(right); card.appendChild(grid);
-    var msg=el('div','forge-hint'); msg.id='forge-struct-msg';
+    ta.value=JSON.stringify(slide,null,2);
+    jsonPane.appendChild(ta);
+    var msg=el('div','forge-hint'); msg.id='forge-struct-msg'; jsonPane.appendChild(msg);
+    card.appendChild(itemsPane); card.appendChild(jsonPane);
+
     var btns=el('div','forge-struct-btns');
     function sbtn(lab,fn,cls){ var b=el('button','forge-btn '+(cls||''),lab); b.onclick=fn; btns.appendChild(b); return b; }
     var cp=sbtn('⿻ Copy JSON',function(){
       var done=function(){ cp.textContent='✓ Copied'; setTimeout(function(){ cp.textContent='⿻ Copy JSON'; },1200); };
       if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done,function(){ ta.select(); try{ D.execCommand('copy'); }catch(e){} done(); });
       else { ta.select(); try{ D.execCommand('copy'); }catch(e){} done(); } });
-    sbtn('✓ Apply',function(){ var parsed;
+    var ap=sbtn('✓ Apply',function(){ var parsed;
       try{ parsed=JSON.parse(ta.value); }
       catch(e){ msg.textContent='✗ Not valid JSON: '+e.message; msg.style.color='#f0a0a0'; return; }
       if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||typeof parsed.layout!=='string'){
@@ -4279,12 +4675,18 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       if(!SG.layouts[parsed.layout]){ msg.textContent='✗ Unknown layout "'+parsed.layout+'"'; msg.style.color='#f0a0a0'; return; }
       F.do('edit structure',function(data){ data.slides[slideIdx]=parsed; });
       msg.textContent='✓ Applied.'; msg.style.color='#9af0c4';
-      ta.value=JSON.stringify(SG.data.slides[slideIdx],null,2);
-      var lt=o.querySelector('.forge-struct-tree'); lt.innerHTML='';
-      lt.appendChild(el('div','forge-subh','Elements')); elementsTree(lt,slideIdx); },'primary');
-    sbtn('Close',function(){ o.remove(); });
-    card.appendChild(msg); card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
-    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
+      ta.value=JSON.stringify(SG.data.slides[slideIdx],null,2); paintItems(); },'primary');
+    function close(){ unwrap(); o.remove(); }
+    var done=el('button','forge-btn primary','Done'); done.onclick=close;
+    done.style.marginLeft='auto'; btns.appendChild(done);
+    function tab(json){ jsonPane.style.display=json?'flex':'none'; itemsPane.style.display=json?'none':'block';
+      tItems.className=json?'':'cur'; tJson.className=json?'cur':'';
+      cp.style.display=ap.style.display=json?'':'none';
+      if(json) ta.value=JSON.stringify(SG.data.slides[slideIdx],null,2); else paintItems(); }
+    tItems.onclick=function(){ tab(false); }; tJson.onclick=function(){ tab(true); };
+    tab(false);
+    card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) close(); }); };
 
   /* geometry inputs kept in sync during drags */
   var geomInputs=null;
@@ -4295,17 +4697,28 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   /* ---- the Inspector ---- */
   F.buildInspect=function(){ var body=D.getElementById('forge-inspbody'); if(!body) return; body.innerHTML=''; geomInputs=null;
     var i=curSlide(), slide=(SG.data.slides||[])[i]; if(!slide) return;
+    /* v4: the items panel is the sidebar's home view and stays put while
+       something is selected — the "Selected" panel appears BELOW it, so the
+       list you picked from never disappears under you. */
+    itemsPanel(body,i);
     if(F.sels.length>1){ objectPanelMulti(body); return; }
     if(F.sel){ objectPanel(body,F.sel); return; }
     contentPanel(body,slide,i);
-    var et=sec(body,'Elements'); addExpandChip(et,i); elementsTree(et,i);
     slidePanel(body,slide,i); deckPanel(body); };
 
   function sec(body,title){ var s=el('div','forge-sec'); s.appendChild(el('div','forge-subh',title)); body.appendChild(s); return s; }
-  function addExpandChip(s,slideIdx){ var h=s.querySelector('.forge-subh'); if(!h) return;
-    var b=el('button','forge-chip','⤢'); b.title='Expand: structure editor (tree + JSON, copy out / paste back)';
-    b.setAttribute('aria-label',b.title); b.style.marginLeft='auto';
-    b.onclick=function(){ F.structModal(slideIdx); }; h.appendChild(b); }
+  /* collapsible sub-section: the contextual inspector shows a lot, so the
+     advanced groups fold away. Open/closed is remembered per title. */
+  F._open={'Style & formatting':true};
+  function fold(host,title,defOpen){
+    var open=F._open[title]!=null?F._open[title]:!!defOpen;
+    var h=el('div','forge-fold-h'+(open?' on':''));
+    h.appendChild(el('span','forge-fold-tg',open?'▾':'▸'));
+    h.appendChild(el('span','forge-fold-lb',title));
+    var b=el('div','forge-fold-b'); b.style.display=open?'block':'none';
+    h.onclick=function(){ F._open[title]=!open; b.style.display=open?'none':'block';
+      h.classList.toggle('on',!open); h.querySelector('.forge-fold-tg').textContent=open?'▸':'▾'; open=!open; };
+    host.appendChild(h); host.appendChild(b); return b; }
 
   function contentPanel(body,slide,i){ var s=sec(body,'Content — '+slide.layout);
     slide.content=slide.content||{};
@@ -4363,9 +4776,19 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
         Object.keys(data.masters[name]).forEach(function(k){ if(data.masters[name][k]==null) delete data.masters[name][k]; }); }); };
     s.appendChild(sv); }
 
-  function deckPanel(body){ var s=sec(body,'Deck');
+  function deckPanel(body){ deckSettings(body); themeSection(body); brandPanel(body); }
+  /* deck-wide settings — rendered into the sidebar AND into the ⚙ Deck modal */
+  function deckSettings(body){ var s=sec(body,'Deck');
     var meta=SG.data.meta=SG.data.meta||{};
     s.appendChild(field('Title',boundText(meta,'title')));
+    /* build steps: click-to-reveal is opt-in so browsing/editing always shows everything */
+    var bs=el('input'); bs.type='checkbox'; bs.checked=!!(SG.data.defaults&&SG.data.defaults.buildSteps);
+    bs.onchange=function(){ F.do('build steps',function(data){ data.defaults=data.defaults||{};
+      if(bs.checked) data.defaults.buildSteps=true; else delete data.defaults.buildSteps; }); };
+    s.appendChild(fieldRow('Build steps (click-to-reveal)',bs));
+    s.appendChild(el('div','forge-hint','Off (default): everything is visible everywhere. On: while presenting, elements with an On-click trigger wait for → / Space / click.')); }
+  /* theme picker + token grid — sidebar AND the ◐ Theme modal */
+  function themeSection(body){ var s=sec(body,'Theme');
     var names=Object.keys(F.themes);
     var curName=typeof SG.data.theme==='string'?SG.data.theme:'';
     s.appendChild(field('Theme',selectInput(['— pick —'].concat(names),curName,function(v){
@@ -4382,14 +4805,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
         SG.data.theme[tk]=v; F.renderLive(); }));
       lab.appendChild(el('span',null,tk)); grid.appendChild(lab); });
     s.appendChild(grid);
-    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.'));
-    /* build steps: click-to-reveal is opt-in so browsing/editing always shows everything */
-    var bs=el('input'); bs.type='checkbox'; bs.checked=!!(SG.data.defaults&&SG.data.defaults.buildSteps);
-    bs.onchange=function(){ F.do('build steps',function(data){ data.defaults=data.defaults||{};
-      if(bs.checked) data.defaults.buildSteps=true; else delete data.defaults.buildSteps; }); };
-    s.appendChild(fieldRow('Build steps (click-to-reveal)',bs));
-    s.appendChild(el('div','forge-hint','Off (default): everything is visible everywhere. On: while presenting, elements with an On-click trigger wait for → / Space / click.'));
-    brandPanel(body); }
+    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.')); }
 
   /* ---- Brand kit (v2 phase 4): colors -> accent slots, fonts, inlined logo ---- */
   var BRAND_FONTS=['','Sora','Unbounded','Exo 2','Archivo','Syne','Epilogue','Bricolage Grotesque',
@@ -4440,12 +4856,152 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       s.appendChild(row2); }
     var db=el('button','forge-btn warn','✕ Delete / reset all'); db.onclick=F.deleteSel; s.appendChild(db); }
 
+  /* =====================================================================
+     CONTEXTUAL INSPECTOR (v4) — "SELECTED". Shows only what applies to the
+     current selection kind (text leaf / list container / list item / free
+     object): a friendly identity card, that element's own content fields,
+     a text-size stepper, theme-token colors + whole-element formatting, and
+     the list verbs for an item. Geometry, link and animation fold away.
+     ===================================================================== */
+  /* which content this selection edits: one bound field, or a whole item /
+     object's fields. Containers and unbound composites return null. */
+  function contentTargetOf(sel){
+    if(sel.kind==='free') return null;
+    var s=SG.data.slides[sel.slideIdx]; if(!s) return null; var c=s.content||{};
+    function single(path){ var p=path.lastIndexOf('.');
+      var parent=p>0?SG.getPath(c,path.slice(0,p)):c, k=p>0?path.slice(p+1):path;
+      return (parent&&typeof parent==='object')?{single:true,obj:parent,key:k,path:p>0?path.slice(0,p)+'.':''}:null; }
+    var bind=sel.node.getAttribute&&sel.node.getAttribute('data-bind');
+    if(bind) return single(bind);
+    if(sel.node.getAttribute&&sel.node.getAttribute('data-arr')) return null;   /* container: count + Add instead */
+    var val=SG.getPath(c,sel.key);
+    if(Array.isArray(val)) return null;
+    if(val&&typeof val==='object') return {obj:val,path:sel.key+'.'};
+    if(typeof val==='string'||typeof val==='number') return single(sel.key);
+    return null; }
+  /* whole-element formatting: wrap/unwrap the bound content value in the
+     same markers rich() renders (**bold**, [[glow]], `mono`). Range-level
+     formatting stays on the canvas toolbar — see the hint copy. */
+  var MARKS={b:['**','**'],g:['[[',']]'],m:['`','`']};
+  function hasMark(v,k){ var m=MARKS[k]; v=String(v==null?'':v).trim();
+    return v.length>m[0].length+m[1].length&&v.slice(0,m[0].length)===m[0]&&v.slice(-m[1].length)===m[1]; }
+  function toggleMark(v,k){ var m=MARKS[k], t=String(v==null?'':v).trim();
+    return hasMark(t,k)?t.slice(m[0].length,t.length-m[1].length):m[0]+t+m[1]; }
+
+  /* reorder one list item and KEEP IT SELECTED (design decision: the
+     selection follows the item, so repeated ↑ presses walk it up a list). */
+  function moveItem(sel,dir){ var it=itemOf(sel.key); if(!it) return;
+    var a=contentArr(sel.slideIdx,it.path); if(!a) return;
+    var j=it.idx+dir; if(j<0||j>=a.length) return;
+    F.do('reorder',function(data){ var s=data.slides[sel.slideIdx];
+      var arr2=SG.getPath(s.content,it.path), t=arr2[j]; arr2[j]=arr2[it.idx]; arr2[it.idx]=t;
+      swapItemOverrides(s,it.path,it.idx,j); });
+    reselectKey(sel.slideIdx,it.path+'.'+j); }
+  function reselectKey(slideIdx,key){ var sc=deckEl().querySelectorAll('.slide')[slideIdx];
+    var n=sc&&sc.querySelector('[data-el="'+key+'"]'); if(n) selectNode(n,false); }
+  function dupItemSel(sel){ var it=itemOf(sel.key); if(!it) return;
+    if(F.dupItem(sel.slideIdx,sel.node)) reselectKey(sel.slideIdx,it.path+'.'+(it.idx+1)); }
+  function secPlain(body){ var s=el('div','forge-sec'); body.appendChild(s); return s; }
+
   function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free'; var isMedia=isFree&&MEDIA_FREE[d.type];
     var isEmbed=isFree&&d.type==='embed';
-    var s=sec(body,(isFree?('Free '+(d.type==='box'?'box':d.type==='svg'?'diagram':d.type==='image'?'image':isEmbed?'embed':'text')):('Element '+sel.key)));
+    var isText=!isFree&&isLeafText(sel.node);
+    var arrPath=!isFree&&sel.node.getAttribute?sel.node.getAttribute('data-arr'):null;
+    var it=!isFree?itemOf(sel.key):null;
+    var isItem=!!(it&&sel.key===it.path+'.'+it.idx&&contentArr(sel.slideIdx,it.path));
+    var nm=elName(sel.node,isFree?sel.id:sel.key);
+    var s=sec(body,'Selected');
+
+    /* identity: plain name up front, dotted key demoted to a debug chip */
+    var id=el('div','forge-ident');
+    id.appendChild(el('span','forge-ident-ico',nm.icon));
+    var idn=el('span','forge-ident-nm'); idn.textContent=nm.name; id.appendChild(idn);
+    var idk=el('span','forge-ident-key'); idk.textContent=isFree?'free object':sel.key;
+    idk.title='The key this element’s styling is stored under'; id.appendChild(idk);
+    s.appendChild(id);
+
+    /* ---- content of the selection itself ---- */
     if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
       t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
+    var tgt=contentTargetOf(sel);
+    if(tgt){ if(tgt.single) fieldFor(s,tgt.obj,tgt.key,sel.slideIdx,tgt.path);
+      else contentForm(s,tgt.obj,sel.slideIdx,tgt.path); }
+    if(arrPath){ var n=(contentArr(sel.slideIdx,arrPath)||[]).length;
+      var one=singular(String(arrPath).split('.').pop());
+      s.appendChild(el('div','forge-hint','This is the whole list ('+n+' '+(n===1?one.toLowerCase():one.toLowerCase()+'s')+'). Pick one inside it — on the slide or in the list above — to edit it.'));
+      var ab=el('button','forge-btn add','＋ Add '+one.toLowerCase());
+      ab.onclick=function(){ F.addItemPath(sel.slideIdx,arrPath); }; s.appendChild(ab); }
+
+    /* ---- text size: a direct px stepper, not an abstract scale ---- */
+    if(isText||(isFree&&d.type==='txt')){
+      var prop=isFree?'size':'fs';
+      var cur=d[prop]||Math.round(parseFloat(W.getComputedStyle(sel.node).fontSize)||34);
+      var row=el('div','forge-field row'); row.appendChild(el('label',null,'Text size'));
+      var step=el('div','forge-step');
+      var dn=el('button','forge-chip','−'), val=el('span','forge-step-v',cur+''), up=el('button','forge-chip','＋');
+      function bump(delta){ F.pushUndoCoalesced('obj-fs'); cur=clamp(cur+delta,10,200); d[prop]=cur; val.textContent=cur+'';
+        isFree?applyFree(sel.node,d):applyOverride(sel.node,d); refreshHandles(); positionFloat(); F.saveDebounced(); }
+      dn.title='Smaller'; up.title='Bigger';
+      dn.onclick=function(){ bump(-2); }; up.onclick=function(){ bump(2); };
+      step.appendChild(dn); step.appendChild(val); step.appendChild(up);
+      row.appendChild(step); s.appendChild(row); }
+
+    /* ---- style & formatting (theme tokens, never hex) ---- */
+    var canFmt=!!(tgt&&tgt.single&&typeof tgt.obj[tgt.key]==='string')||(isFree&&d.type==='txt');
+    if(!isMedia&&!isEmbed){
+      var sf=fold(s,'Style & formatting',true);
+      sf.appendChild(el('label',null,'Text color'));
+      var sw=el('div','forge-swatches');
+      ['--ink','--cyan','--indigo','--mint','--muted'].forEach(function(tk){
+        var ref='var('+tk+')';
+        var b=el('button','forge-swatch'+(d.color===ref?' on':''));
+        b.style.background=W.getComputedStyle(D.documentElement).getPropertyValue(tk).trim()||'#888';
+        b.title=tk+' (follows the theme)';
+        b.onclick=function(){ F.pushUndo(); d.color=ref;
+          isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.save(); F.buildInspect(); };
+        sw.appendChild(b); });
+      var rst=el('button','forge-chip','Reset');
+      rst.onclick=function(){ F.pushUndo(); delete d.color; sel.node.style.color='';
+        isFree?applyFree(sel.node,d):applyOverride(sel.node,d); F.save(); F.buildInspect(); };
+      sw.appendChild(rst); sf.appendChild(sw);
+      if(canFmt){
+        sf.appendChild(el('label',null,'Formatting'));
+        var chips=el('div','forge-fmtchips');
+        [['B','b'],['✦','g'],['<>','m']].forEach(function(p){
+          var read=function(){ return isFree?d.text:tgt.obj[tgt.key]; };
+          var b=el('button','forge-fmtchip'+(hasMark(read(),p[1])?' on':''),p[0]);
+          b.title=({b:'Bold',g:'Glow (accent color)',m:'Monospace'})[p[1]]+' the whole element';
+          b.onclick=function(){ F.do('format',function(data){
+            if(isFree){ var fo=freeFor(sel.slideIdx,sel.id); fo.text=toggleMark(fo.text,p[1]); }
+            else { var c=data.slides[sel.slideIdx].content, path=tgt.path+tgt.key;
+              SG.setPath(c,path,toggleMark(SG.getPath(c,path),p[1])); } }); };
+          chips.appendChild(b); });
+        sf.appendChild(chips);
+        sf.appendChild(el('div','forge-hint','These apply to the <b>whole element</b>. To format <b>part of the text</b>, double-click it on the slide and highlight a range — a floating B / ✦ / <code>&lt;&gt;</code> toolbar appears over the selection.')); }
+      sf.appendChild(field('Font',selectInput(F.fontChoices,d.font||'',function(v){ F.pushUndo(); d.font=v;
+        isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.save(); })));
+      sf.appendChild(fieldRow('Exact color',colorInput(d.color,function(v){ F.pushUndoCoalesced('obj-color'); d.color=v;
+        isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
+      sf.appendChild(fieldRow('Accent',colorInput((d.theme&&d.theme['--cyan'])||'',function(v){ F.pushUndoCoalesced('obj-accent');
+        d.theme=d.theme||{}; d.theme['--cyan']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
+      sf.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
+        d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
+      sf.appendChild(el('div','forge-hint','Swatches write theme tokens (var(--cyan)), so re-theming and brand kits keep working. "Exact color" pins one literal color.')); }
+
+    /* ---- list verbs for an item ---- */
+    if(isItem){ var verbs=el('div','forge-verbs');
+      function verb(lab,title,fn,cls){ var b=el('button','forge-chip '+(cls||''),lab); b.title=title;
+        b.onclick=fn; verbs.appendChild(b); }
+      verb('↑','Move earlier',function(){ moveItem(sel,-1); });
+      verb('↓','Move later',function(){ moveItem(sel,1); });
+      verb('⧉ Duplicate','Duplicate this item',function(){ dupItemSel(sel); });
+      verb('✕ Remove','Remove this item',function(){ F.removeItem(sel.slideIdx,sel.node); },'warn');
+      s.appendChild(verbs);
+      s.appendChild(el('div','forge-hint','Drag the item on the slide to move it; the corner handle resizes it and the text rewraps.')); }
+
+    /* ---- geometry ---- */
+    var sg=fold(secPlain(body),'Position & size',false);
     geomInputs={};
     function num(label,key,step){ var n=el('input'); n.type='number'; if(step)n.step=step; n.value=d[key]||(key==='scale'?1:0);
       n.onfocus=function(){ F.pushUndo(); };
@@ -4453,11 +5009,10 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
         if((key==='w'||key==='h')&&(isNaN(v)||v<=0)) delete d[key];   /* 0/blank = back to natural size */
         else d[key]=isNaN(v)?0:v;
         isFree?applyFree(sel.node,d):applyOverride(sel.node,d); refreshHandles(); positionFloat(); pulse(sel.node); F.saveDebounced(); };
-      geomInputs[key]=n; s.appendChild(fieldRow(label,n)); }
+      geomInputs[key]=n; sg.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
     num('Width','w');                                       /* width reflows text (0 = natural) */
     if(isFree&&(d.type==='box'||d.type==='html'||isMedia||isEmbed)) num('Height','h');
-    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed) num('Font size','size');
     if(isEmbed){
       var se=sec(body,'Embed');
       function reapplyEmbed(){ var n=sel.node; var host=n; /* remount: URL/mode/sandbox changes need a fresh iframe */
@@ -4517,16 +5072,8 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       sm.appendChild(field('Frame',selectInput([['None','none'],['Panel','panel'],['Glow','glow'],['Shadow','shadow']],
         d.frame||'none',function(v){ F.pushUndo(); d.frame=v; applyFree(sel.node,d); pulse(sel.node); F.save(); })));
     }
-    var s2=sec(body,'Style');
-    s2.appendChild(fieldRow('Text color',colorInput(d.color,function(v){ F.pushUndoCoalesced('obj-color'); d.color=v;
-      isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
-    s2.appendChild(field('Font',selectInput(F.fontChoices,d.font||'',function(v){ F.pushUndo(); d.font=v;
-      isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.save(); })));
-    s2.appendChild(fieldRow('Accent',colorInput((d.theme&&d.theme['--cyan'])||'',function(v){ F.pushUndoCoalesced('obj-accent');
-      d.theme=d.theme||{}; d.theme['--cyan']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
-    s2.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
-      d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
-    var s6=sec(body,'Link');
+    var adv=secPlain(body);
+    var s6=fold(adv,'Link',false);
     var hrefInp=el('input'); hrefInp.type='text'; hrefInp.placeholder='https://… · mailto:… · #3'; hrefInp.value=d.href||'';
     var hrefErr=el('div','forge-field-error'); hrefErr.style.display='none';
     hrefInp.onfocus=function(){ F.pushUndo(); };
@@ -4537,7 +5084,7 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
       isFree?applyFree(sel.node,d):applyOverride(sel.node,d); F.save(); };
     s6.appendChild(field('URL',hrefInp)); s6.appendChild(hrefErr);
     s6.appendChild(el('div','forge-hint','Jump to a slide with #3, or link out with a full https:// URL. Shows a small ↗ badge here in the editor only.'));
-    var s3=sec(body,'Animation');
+    var s3=fold(adv,'Animation',!!d.anim);
     function reapply(){ isFree?applyFree(sel.node,d):applyOverride(sel.node,d); }
     s3.appendChild(field('Effect',selectInput(F.animChoices,d.anim||'',function(v){ F.pushUndo(); d.anim=v;
       if(!v){ delete d.animTrigger; delete d.animStep; }
@@ -4560,8 +5107,6 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
         reapply(); F.saveDebounced(); };
       s3.appendChild(fieldRow('Delay (s)',dl));
       if(ANIM_ENTRANCE[d.anim]){ var rp=el('button','forge-btn','▶ Replay'); rp.onclick=function(){ replayAnim(sel.node); }; s3.appendChild(rp); } }
-    /* hierarchical elements tree (selection highlighted, item tools inline) */
-    var s4=sec(body,'Elements'); addExpandChip(s4,sel.slideIdx); elementsTree(s4,sel.slideIdx);
     var s5=sec(body,'');
     var back=el('button','forge-btn','← Slide content'); back.onclick=function(){ clearSel(); F.buildInspect(); }; s5.appendChild(back);
     var del=el('button','forge-btn warn',isFree?'🗑 Delete object':'↺ Reset element'); del.style.marginLeft='6px';
@@ -4635,6 +5180,139 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     return id; };
 
   /* =====================================================================
+     TOP-BAR VERBS (v4) — sorter toggle, image import, theme/deck modals and
+     the ⊞ Insert element gallery. Everything here is a thin shell over verbs
+     that already exist (F.addImage, deckPanel, freeObjects), surfaced where
+     someone who has never opened the sidebar will find them.
+     ===================================================================== */
+  F.toggleSorter=function(){ F._sorter=!F._sorter;
+    var chip=D.getElementById('forge-sorter-toggle'); if(chip) chip.classList.toggle('add',F._sorter);
+    if(F._sorterBtn) F._sorterBtn.classList.toggle('primary',F._sorter);
+    F.buildNav(); };
+  /* ▣ Image: pick a file, import it into the registry, drop it on the slide.
+     Same path as drag-and-drop onto the canvas — just discoverable. */
+  F.imagePrompt=function(){ if(!F.assets){ F.assetsPanel(); return; }
+    var inp=el('input'); inp.type='file'; inp.accept='image/*,.svg'; inp.multiple=true; inp.hidden=true;
+    inp.onchange=function(){ var files=[].slice.call(inp.files||[]); inp.value=''; if(!files.length) return;
+      files.reduce(function(chain,f,i){ return chain.then(function(){
+        return F.assets.importFile(f).then(function(res){ F.addImage(res.name,res.kind,{x:640+i*24,y:360+i*24}); F.save(); })
+          .catch(function(err){ try{ console.warn('slide-forge: import failed for '+f.name,err); }catch(e){} }); }); },Promise.resolve()); };
+    D.body.appendChild(inp); inp.click(); setTimeout(function(){ inp.remove(); },4000); };
+  /* ◐ Theme / ⚙ Deck: the deck-wide sections, in a modal, so they are not
+     buried behind "deselect everything first". Same renderers as the sidebar. */
+  F.deckModal=function(which){ var old=D.getElementById('forge-deckmodal'); if(old) old.remove();
+    var o=el('div','forge-chrome'); o.id='forge-deckmodal';
+    var card=el('div','forge-struct-card'); card.style.width='min(560px,94vw)';
+    var head=el('div','forge-struct-head');
+    head.appendChild(el('h3',null,which==='theme'?'Theme & brand':'Deck settings'));
+    card.appendChild(head);
+    var pane=el('div','forge-struct-pane');
+    if(which==='theme'){ themeSection(pane); brandPanel(pane); } else deckSettings(pane);
+    card.appendChild(pane);
+    var btns=el('div','forge-struct-btns');
+    var done=el('button','forge-btn primary','Done'); done.style.marginLeft='auto';
+    done.onclick=function(){ o.remove(); }; btns.appendChild(done);
+    card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
+
+  /* ---- ⊞ Insert an element ---------------------------------------------
+     One catalog entry per insertable element type across the layouts. The
+     CONTENT comes from the DEFAULTS map (so an entry can never drift from
+     what a fresh slide of that layout contains) and the preview is a live,
+     scaled miniature of the real element — not a hand-drawn shape. Insert
+     lands it as a themed free object ({type:'html'}), the same faithful-copy
+     path Ctrl+D uses, centred on the current slide and selected.
+     Entries whose key is missing (a layout changed) are skipped silently. */
+  var GALLERY=[
+    ['Stat card','stat-grid','stats.0'], ['Agenda item','agenda','items.0'],
+    ['Timeline event','timeline','items.0'], ['Pipeline step','pipeline','nodes.0'],
+    ['Quote','quote','quote'], ['Big number','bignum','num'],
+    ['Comparison column','comparison','left'], ['Metric ring','metric-dash','ring'],
+    ['Metric tile','metric-dash','tiles.0'], ['Leaderboard row','leaderboard','rows.0'],
+    ['Matrix cell','matrix','cells.0'], ['Stack band','stack','bands.0'],
+    ['Takeaway card','closing','takeaways.0'], ['Code block','code','panel'],
+    ['Editorial column','editorial','columns.0'], ['Index card','index-mosaic','items.0'],
+    ['Quote card','quote-mosaic','quotes.0'], ['Hero row','hero-asym','rows.0'],
+    ['Section number','divider','index'], ['Statement','manifesto','statement'],
+    ['Kicker','stat-grid','kicker',{kicker:'Section label'}], ['Title','stat-grid','title']
+  ];
+  /* render one layout's DEFAULTS into a detached, styled section and hand back
+     the element carrying `key`. The section is attached to the deck (hidden)
+     so the deck's CSS cascade applies and the node has real measured size. */
+  function galleryNode(layout,key,extra){
+    var fn=SG.layouts[layout]; if(!fn) return null;
+    var host=el('section','slide active lyt-'+layout+' forge-ghost');
+    var c=clone(DEFAULTS[layout]||{});
+    if(extra) Object.keys(extra).forEach(function(k){ c[k]=extra[k]; });   /* fill fields DEFAULTS leaves blank */
+    var out; try{ out=fn(c,{index:0,total:1}); }catch(e){ return null; }
+    if(!out||out.raw!=null) return null;
+    (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      host.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
+    deckEl().appendChild(host);
+    var node=host.querySelector('[data-el="'+key+'"]');
+    return node?{host:host,node:node}:(host.remove(),null); }
+  function cleanCopy(node){ var cl=node.cloneNode(true);
+    [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-free,.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
+    [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){
+      n.removeAttribute('data-el'); n.removeAttribute('data-bind'); n.removeAttribute('data-arr');
+      n.classList.remove('forge-block','forge-sel','forge-sel-multi'); });
+    cl.removeAttribute('data-el'); cl.removeAttribute('data-bind'); cl.removeAttribute('data-arr');
+    cl.classList.remove('forge-block','forge-sel','forge-sel-multi');
+    cl.style.transform=''; cl.style.zIndex=''; return cl; }
+  F.insertElement=function(layout,key,extra,name){ var g=galleryNode(layout,key,extra); if(!g) return null;
+    /* a grid cell measures as tall as the grid stretched it; land the copy at a
+       sane starting size instead — it is freely resizable afterwards */
+    var w=clamp(Math.round(g.node.offsetWidth||360),80,900);
+    var h=clamp(Math.round(g.node.offsetHeight||120),50,360);
+    var html=cleanCopy(g.node).outerHTML; g.host.remove();
+    var i=curSlide(), id=uid();
+    F.do('insert element',function(data){ var s=data.slides[i]; s.freeObjects=s.freeObjects||[];
+      s.freeObjects.push({id:id,type:'html',name:name||'',html:html,
+        x:Math.round(640-w/2),y:Math.round(360-h/2),w:w,h:h,rot:0}); });
+    var sc=deckEl().querySelectorAll('.slide')[i], n=sc&&sc.querySelector('[data-free="'+id+'"]');
+    if(n) selectNode(n,false);
+    return id; };
+  F.insertGallery=function(){ var old=D.getElementById('forge-gallery'); if(old){ old.remove(); return; }
+    var o=el('div','forge-chrome'); o.id='forge-gallery';
+    var card=el('div','forge-struct-card'); card.style.width='min(680px,94vw)';
+    var head=el('div','forge-struct-head');
+    head.appendChild(el('h3',null,'Insert an element'));
+    var q=el('input'); q.type='text'; q.className='forge-gal-search';
+    q.placeholder='Search elements… (e.g. quote, timeline, stat)';
+    head.appendChild(q); card.appendChild(head);
+    var grid=el('div','forge-gal-grid'); card.appendChild(grid);
+    var made=[];
+    GALLERY.forEach(function(g){ var got=galleryNode(g[1],g[2],g[3]); if(!got) return;
+      var c=el('div','forge-gal-card'); c.dataset.q=(g[0]+' '+g[1]).toLowerCase();
+      var prev=el('div','forge-gal-prev');
+      var inner=el('div','forge-gal-inner'); inner.appendChild(cleanCopy(got.node));
+      prev.appendChild(inner); c.appendChild(prev);
+      var nm=el('div','forge-gal-nm'); nm.textContent=g[0]; c.appendChild(nm);
+      var fr=el('div','forge-gal-from'); fr.textContent='from '+g[1]; c.appendChild(fr);
+      c.onclick=function(){ o.remove(); F.insertElement(g[1],g[2],g[3],g[0]); };
+      grid.appendChild(c);
+      made.push({node:got.node,host:got.host,inner:inner,prev:prev}); });
+    card.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. It arrives themed and fully editable as a free object — drag, resize, restyle or edit its text like anything else.'));
+    var btns=el('div','forge-struct-btns');
+    var close=el('button','forge-btn','Close'); close.style.marginLeft='auto';
+    close.onclick=function(){ o.remove(); }; btns.appendChild(close);
+    card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
+    /* scale each miniature to its card AFTER layout, then drop the ghosts */
+    made.forEach(function(m){
+      var w=m.node.offsetWidth||360, h=m.node.offsetHeight||120;
+      var pw=m.prev.clientWidth||130, ph=m.prev.clientHeight||58;
+      var s=Math.min(pw/Math.max(w,1),ph/Math.max(h,1),1);
+      m.inner.style.width=w+'px'; m.inner.style.height=h+'px';
+      m.inner.style.transform='translate(-50%,-50%) scale('+s.toFixed(3)+')';
+      m.host.remove(); });
+    q.oninput=function(){ var v=q.value.trim().toLowerCase();
+      [].slice.call(grid.children).forEach(function(c){
+        c.style.display=(!v||c.dataset.q.indexOf(v)>=0)?'':'none'; }); };
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
+    q.focus(); };
+
+  /* =====================================================================
      SAVE — download a fresh self-contained .html with edits baked in.
      ===================================================================== */
   function currentHTML(){ if(F.editing) endEdit();
@@ -4690,12 +5368,15 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   F.showKeys=function(){ var o=D.getElementById('forge-keys');
     if(o){ o.style.display=o.style.display==='none'?'flex':'none'; return; }
     o=el('div','forge-chrome'); o.id='forge-keys';
-    var rows=[['Drag / Alt','Move with snap guides / snap off'],
+    var rows=[['Click / click again','Select a group / step inside it'],
+      ['Drag / Alt','Move with snap guides / snap off'],
       ['Drag corner / Alt+corner','Resize width \u2014 text reflows / scale'],['Double-click','Edit text in place'],
       ['Shift-click / marquee','Multi-select'],['Ctrl+C · V · D','Copy / paste / duplicate (deep)'],
       ['Ctrl+G / Ctrl+Shift+G','Group / ungroup'],['Arrows / Shift+arrows','Nudge 1px / 10px'],
       ['Delete','Delete / reset selection'],['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],
       ['Ctrl+S','Save (in place on Chrome/Edge)'],['Esc','Clear selection / close'],
+      ['Ctrl + / Ctrl -','Zoom the stage in / out'],['Ctrl+0','Fit the slide (and Focus off)'],
+      ['Ctrl+scroll','Zoom the stage'],
       ['— presenting —',''],['\u2192 / Space / click','Next build step, then next slide'],
       ['F / S / P','Fullscreen / speaker view / PDF'],['?','This overlay']];
     var body='<div class="forge-hints-card"><h3>Keyboard shortcuts</h3><table class="forge-keys-tbl">';
@@ -4710,7 +5391,9 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
     if(!o){ o=el('div','forge-chrome'); o.id='forge-hints';
       o.innerHTML='<div class="forge-hints-card"><h3>Editing basics</h3><ul>'
         +'<li><b>Drag</b> any element \u2014 pink guides snap it to centers and edges (hold <b>Alt</b> for free placement)</li>'
-        +'<li><b>Double-click</b> text to rewrite it in place</li>'
+        +'<li><b>Double-click</b> text to rewrite it in place — click a group, then <b>click again</b> to step inside it</li>'
+        +'<li>The <b>On this slide</b> list names every element in plain English — hover to find it, click to select, the eye to hide it</li>'
+        +'<li><b>⌖ Focus</b> (bottom-right) zooms to whatever is selected and follows it; <b>Fit</b> returns</li>'
         +'<li><b>Shift-click</b> or drag a box to select several \u2014 align from the floating toolbar, <b>Ctrl+G</b> groups them</li>'
         +'<li>The <b>right panel</b> edits text and structure; the <b>left panel</b> reorders slides (\u25a6 = sorter view)</li>'
         +'<li><b>Ctrl+S</b> saves your copy \u00b7 add notes per slide and press <b>S</b> while presenting for the speaker view</li>'
@@ -4722,8 +5405,10 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   F.toggle=function(){ var on=D.body.classList.toggle('forge-edit');
     if(F._launch) F._launch.textContent=on?'\u2713 Done':'\u270e Edit';
     if(F.editing) endEdit(); clearSel(); hideCtxMenu();
-    if(on){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); F.buildNav(); F.buildInspect(); F.showHints(); }
-    else { SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); if(floatBar) floatBar.classList.remove('on'); }
+    buildCrumbs();
+    if(on){ SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh(); F.buildNav(); F.buildInspect(); F.showHints(); F.applyView(); }
+    else { F.zoom=1; F.focus=false; SG.render(deckEl(),SG.data); SG.refresh&&SG.refresh();
+      if(floatBar) floatBar.classList.remove('on'); }
   };
 
   function boot(){ SG.boot();
@@ -4739,8 +5424,10 @@ body.forge-edit .sf-linked::before{ content:"\2197"; position:absolute; top:-9px
   if(document.readyState!=='loading') boot();
   else document.addEventListener('DOMContentLoaded',boot);
 
-  /* observe selection changes to keep the floating toolbar in sync */
-  var _paint=paintSel; paintSel=function(){ _paint(); buildFloat(); };
+  /* observe selection changes to keep the floating toolbar, the breadcrumb
+     and (while ⌖ Focus is on) the stage viewport in sync */
+  var _paint=paintSel; paintSel=function(){ _paint(); buildFloat(); buildCrumbs();
+    if(F.focus&&editing()) F.applyView(); };
   /* re-wrap: selectNode/selectNodes/clearSel captured paintSel by reference at
      definition time inside this closure, so re-binding the name above is enough. */
 })();

@@ -173,5 +173,130 @@ ok(!!embedNode.querySelector('iframe'),'embed free object mounts an iframe for a
 const badId=F.addEmbed('javascript:alert(1)');
 ok(badId===null,'F.addEmbed rejects a non-http(s) url outright');
 
+// =====================================================================
+// V4 EDITOR UX OVERHAUL — items panel, breadcrumb, contextual inspector,
+// hide override, manage-items modal, zoom/focus, insert gallery.
+// jsdom has no layout engine, so anything needing real measurement (focus
+// centring, gallery preview scaling, drag deltas at zoom) is verified in a
+// real browser instead — see references/editor.md, "v4".
+// =====================================================================
+w.document.body.classList.add('forge-edit');
+w.location.hash='#3';                                   // stat-grid, slide idx 2
+SG.data.slides[2]={layout:'stat-grid',content:{kicker:'Perf',title:'By the numbers',
+  stats:[{count:94,unit:'%',label:'Accuracy'},{count:3.2,unit:'ms',label:'Latency'},{count:12,unit:'x',label:'Throughput'}]}};
+SG.render(d.getElementById('deck'),SG.data);
+const sSec=()=>d.querySelectorAll('#deck .slide')[2];
+
+// ---------- items panel: what earns a row, and what it is called ----------
+const rows=F.itemRows(sSec());
+const keys=rows.map(r=>r.key);
+ok(keys.join(',')==='kicker,title,stats,stats.0,stats.1,stats.2','items panel lists blocks, the list and its items — not the leaves inside an item');
+ok(rows.find(r=>r.key==='stats.1').depth===1,'array items are indented one level');
+ok(!keys.includes('kicker.text'),'a container and its single bound leaf collapse to one row');
+F.buildInspect();
+const names=[...d.querySelectorAll('#forge-inspbody .forge-item-nm')].map(n=>n.textContent);
+ok(names[2]==='Stat cards','array container reads as plain language, not "stats"');
+ok(names[4]==='Stat 2 — 3.2ms','item row names itself from CONTENT (not the mid-count-up DOM text)');
+const subs=[...d.querySelectorAll('#forge-inspbody .forge-item-sub')].map(n=>n.textContent);
+ok(subs[2]==='3 items'&&subs[4]==='Latency','container shows a count, item shows its descriptive field');
+ok(!names.some(n=>/^[a-z]+\.\d/.test(n)),'no dotted key ever appears as a row label');
+
+// ---------- eye toggle -> overrides[key].hide, undoably ----------
+F.toggleHide(2,'stats.0',false);
+ok(SG.data.slides[2].overrides['stats.0'].hide===1,'eye writes overrides[key].hide');
+ok(sSec().querySelector('[data-el="stats.0"]').style.opacity==='0.12','hidden element is ghosted while editing (still findable)');
+w.document.body.classList.remove('forge-edit');
+SG.render(d.getElementById('deck'),SG.data);
+ok(sSec().querySelector('[data-el="stats.0"]').style.display==='none','hidden element is really gone when not editing');
+w.document.body.classList.add('forge-edit');
+SG.render(d.getElementById('deck'),SG.data);
+F.toggleHide(2,'stats.0',false);
+ok(!SG.data.slides[2].overrides||!SG.data.slides[2].overrides['stats.0'],'un-hiding removes the now-empty override');
+
+// ---------- breadcrumb path ----------
+const lblNode=sSec().querySelector('[data-el="stats.1.label"]');
+F.clearSel();
+lblNode.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0,altKey:true}));
+d.dispatchEvent(new w.MouseEvent('pointerup',{bubbles:true}));
+ok(F.sel&&F.sel.key==='stats.1.label','alt-click selects the deepest keyed element');
+const crumbs=F.crumbPath(F.sel).map(c=>c.label);
+ok(crumbs.join(' > ')==='Slide > Stat cards > Stat 2 > Label','breadcrumb walks the key path in plain language');
+ok(F.crumbPath(F.sel)[0].key===null,'the "Slide" crumb clears the selection');
+
+// ---------- contextual inspector ----------
+F.buildInspect();
+const ins=d.getElementById('forge-inspbody');
+ok(ins.querySelector('.forge-ident-nm').textContent==='Label','inspector identifies the selection by name');
+ok(ins.querySelector('.forge-ident-key').textContent==='stats.1.label','the dotted key is kept, demoted to a chip');
+ok(ins.querySelectorAll('.forge-swatch').length===5,'five theme-token swatches');
+ins.querySelectorAll('.forge-swatch')[1].click();
+ok(SG.data.slides[2].overrides['stats.1.label'].color==='var(--cyan)','swatches write a TOKEN reference, never a hex literal');
+F.buildInspect();
+d.getElementById('forge-inspbody').querySelectorAll('.forge-fmtchip')[0].click();
+ok(SG.data.slides[2].content.stats[1].label==='**Latency**','whole-element bold wraps the bound content field in markers');
+F.buildInspect();
+d.getElementById('forge-inspbody').querySelectorAll('.forge-fmtchip')[0].click();
+ok(SG.data.slides[2].content.stats[1].label==='Latency','the same chip unwraps it again');
+F.buildInspect();
+d.getElementById('forge-inspbody').querySelectorAll('.forge-step .forge-chip')[1].click();
+ok(SG.data.slides[2].overrides['stats.1.label'].fs>0,'text-size stepper writes overrides.fs in px');
+SG.renderSlide(d.getElementById('deck'),2);
+ok(/px$/.test(sSec().querySelector('[data-el="stats.1.label"]').style.fontSize),'fs override reaches the element as font-size');
+
+// ---------- item verbs: selection follows the item, styling follows it too ----------
+SG.data.slides[2].overrides={'stats.2':{color:'var(--mint)'}};
+SG.render(d.getElementById('deck'),SG.data);
+F.clearSel();
+sSec().querySelector('[data-el="stats.2"]').dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0,altKey:true}));
+d.dispatchEvent(new w.MouseEvent('pointerup',{bubbles:true}));
+F.buildInspect();
+d.getElementById('forge-inspbody').querySelectorAll('.forge-verbs button')[0].click();   // move earlier
+ok(SG.data.slides[2].content.stats.map(s=>s.count).join(',')==='94,12,3.2','↑ reorders the content array');
+ok(SG.data.slides[2].overrides['stats.1'].color==='var(--mint)','styling follows the moved item');
+ok(F.sel&&F.sel.key==='stats.1','selection follows the moved item');
+
+// ---------- add / manage-items modal ----------
+ok(F.addItemPath(2,'stats')===true,'addItemPath appends using the list shape');
+ok(SG.data.slides[2].content.stats.length===4,'the item landed in content');
+F.structModal(2);
+const modal=d.getElementById('forge-struct');
+ok(!!modal,'manage-items modal opens');
+ok(/^Manage items/.test(modal.querySelector('h3').textContent),'modal is titled for humans, not "structure"');
+ok([...modal.querySelectorAll('.forge-tabs button')].map(b=>b.textContent).join('|')==='Items|Advanced (JSON)','the JSON editor is demoted to a tab, not removed');
+ok(modal.querySelectorAll('.forge-arr-cards .forge-card').length===4,'one card per item');
+ok(/Stat cards · 4/.test(modal.querySelector('.forge-arr-h').textContent),'array header counts its items');
+const numInput=modal.querySelector('.forge-arr-cards .forge-card input');
+numInput.dispatchEvent(new w.Event('focus')); numInput.value='555'; numInput.dispatchEvent(new w.Event('input',{bubbles:true}));
+ok(SG.data.slides[2].content.stats[0].count===555,'modal edits land in content immediately');
+modal.querySelectorAll('.forge-tabs button')[1].click();
+ok(JSON.parse(modal.querySelector('.forge-struct-json').value).layout==='stat-grid','Advanced tab still round-trips slide JSON');
+modal.remove();
+
+// ---------- insert gallery ----------
+const insId=F.insertElement('stat-grid','stats.0',null,'Stat card');
+const fo=(SG.data.slides[2].freeObjects||[]).filter(f=>f.id===insId)[0];
+ok(!!fo&&fo.type==='html','gallery insert lands as a themed freeObject {type:"html"}');
+ok(fo.name==='Stat card','the inserted object carries its catalog name');
+ok(!/data-(el|bind|arr)=/.test(fo.html),'inserted markup carries no authored identity (it is a free copy)');
+ok(fo.w>=80&&fo.h>=50&&fo.h<=360,'inserted object gets a sane starting size');
+ok(!d.querySelector('.forge-ghost'),'the off-screen scratch section is always removed');
+ok(d.querySelectorAll('#deck .slide').length===SG.data.slides.length,'scratch sections never leak into the slide list');
+ok(F.insertElement('no-such-layout','x')===null,'a missing layout/key inserts nothing rather than throwing');
+
+// ---------- viewport hook stays inert outside edit mode ----------
+ok(typeof SG.viewTransform==='function','the editor installs the viewport hook');
+w.document.body.classList.remove('forge-edit');
+ok(SG.viewTransform()===null,'present mode keeps the engine default fit (hook returns null)');
+w.document.body.classList.add('forge-edit');
+ok(typeof SG.viewTransform()==='string','edit mode returns a combined translate+scale');
+F.setZoom(99); ok(F.zoom===3,'zoom clamps at 3x');
+F.setZoom(0.01); ok(F.zoom===0.25,'zoom clamps at 0.25x');
+F.zoomFit(); ok(F.zoom===1&&F.focus===false,'Fit resets zoom and turns Focus off');
+
+// ---------- a generated deck still carries no editor state ----------
+const clean=JSON.parse(JSON.stringify(RICH_DECK));
+const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));
+ok(!dom3.window.SG.data.slides.some(s=>s.overrides||s.freeObjects),'a generated deck carries no overrides/freeObjects until the user edits');
+
 console.log(pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);

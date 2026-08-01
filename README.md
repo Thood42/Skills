@@ -19,6 +19,7 @@ Skills/
 ├── slides-editor-plan.md           architecture & decision record (§10 = v3 ADR)
 ├── slide-forge-design-critique.md  2026-07-06 design review that motivated the v3 engine
 ├── slide-forge-media-plan.md       plan: images/diagrams, links, sandboxed iframe embeds
+├── slide-forge-editor-ux-plan.md   design handoff behind the v4 editor UX overhaul
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```
 
@@ -26,3 +27,9 @@ Skills/
 `data-arr`), giving deterministic text write-back, overrides that survive list edits, true
 width/height resize with text reflow, and targeted per-slide re-render. See `CLAUDE.md` and
 `slides-editor-plan.md` §10.
+
+`slide-forge` v4 (editor UX): the sidebar is an "On this slide" list of plain-language element
+names instead of a node tree, the inspector is contextual, the stage zooms and can focus-follow
+the selection, and ⊞ Insert drops any element from any layout onto a slide. Additive — present
+mode and the data model are unchanged. See `slide-forge-editor-ux-plan.md` and
+`slide-forge/references/editor.md`.
