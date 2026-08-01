@@ -653,8 +653,14 @@
       if(Array.isArray(x)){ x.forEach(add); return; }
       sec.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
     var bm=brandMark(brand,lay); if(bm) sec.appendChild(bm);
-    if(s.doc) sec.appendChild(N('div.doc-panel',null,[
-      N('div.doc-h',null,'JSON · layout "'+(s.layout||'')+'"'), N('pre',{text:s.doc}) ]));
+    /* Docs (D) toggles this panel; s.doc is normally absent (nothing authors
+       it — only the internal reference deck curates hand-annotated doc text),
+       so without a fallback the button did nothing on every generated deck.
+       Fall back to the slide's own {layout,content} JSON — still exactly
+       "JSON docs" per the button's tooltip, just uncurated. */
+    var docText=s.doc||JSON.stringify({layout:lay,content:s.content||{}},null,2);
+    sec.appendChild(N('div.doc-panel',null,[
+      N('div.doc-h',null,'JSON · layout "'+(s.layout||'')+'"'), N('pre',{text:docText}) ]));
     sec.appendChild(N('div.pager',null,pad(i+1)+' / '+pad(total)));
     sec.appendChild(N('div.progress',{style:'width:'+pctw(i+1,total)+'%'}));
     return sec; }
