@@ -122,6 +122,13 @@
   function fieldName(k){ return FIELD_LABEL[k]||pretty(k); }
   function excerpt(node,n){ var t=(node&&node.textContent||'').trim().replace(/\s+/g,' ');
     return t.length>(n||40)?t.slice(0,(n||40)-1)+'…':t; }
+  /* strip rich()'s bold/glow/mono markers ( **x**, [[x]], `x` ) down to plain
+     text — for labels that show raw content OUTSIDE the deck's rendered CSS
+     (slide-list rows, the manage-items modal title), where the markers would
+     otherwise leak as literal asterisks/brackets/backticks instead of being
+     rendered */
+  function plainText(s){ return String(s==null?'':s)
+      .replace(/\[\[(.+?)\]\]/g,'$1').replace(/\*\*(.+?)\*\*/g,'$1').replace(/`(.+?)`/g,'$1'); }
   /* {icon,name} for any keyed element — the one place a key becomes English */
   function elName(node,key){
     if(node&&node.hasAttribute&&node.hasAttribute('data-free')){
@@ -218,16 +225,23 @@
     SG._legacyKeys=false; if(F.save) F.save(); }
 
   /* ---- orphan-override GC (runs in commit): drop overrides whose element no
-     longer exists after a structural content edit. Undoable (snapshot is taken
-     before the mutation) and logged, never silent. */
+     longer exists after a structural content edit, PLUS overrides that are
+     just an empty {} stub (ovFor() below creates one on mere selection, for
+     the read side of its get-or-create contract — if nothing ever wrote a
+     field into it, it's dead weight). Safe here specifically because commit
+     always rebuilds the inspector right after (see F.commit), so no open
+     panel is left holding a mutate-in-place reference to a key we just
+     deleted. Undoable (snapshot is taken before the mutation) and logged,
+     never silent. */
   function gcOverrides(deck){ var dropped=[];
     var secs=deck.querySelectorAll('.slide');
     (SG.data.slides||[]).forEach(function(s,i){
       if(!s.overrides||s.layout==='raw') return; var sec=secs[i]; if(!sec) return;
       Object.keys(s.overrides).forEach(function(k){
-        if(!sec.querySelector('[data-el="'+k+'"]')){ delete s.overrides[k]; dropped.push((i+1)+':'+k); } });
+        var n=sec.querySelector('[data-el="'+k+'"]');
+        if(!n||!Object.keys(s.overrides[k]||{}).length){ delete s.overrides[k]; dropped.push((i+1)+':'+k); } });
       if(!Object.keys(s.overrides).length) delete s.overrides; });
-    if(dropped.length) try{ console.info('slide-forge: removed '+dropped.length+' orphaned override(s) — '+dropped.join(', ')); }catch(e){} }
+    if(dropped.length) try{ console.info('slide-forge: removed '+dropped.length+' orphaned/empty override(s) — '+dropped.join(', ')); }catch(e){} }
 
   function decorateSection(sec,slide){
     if(!slide) return;
@@ -372,7 +386,16 @@
   F.sels=[];                                  /* array of element records */
   Object.defineProperty(F,'sel',{get:function(){ return F.sels[0]||null; }});
   function scale(){ var d=deckEl().getBoundingClientRect(); return d.width/1280||1; }
-  function ovFor(i,key){ var s=SG.data.slides[i]; s.overrides=s.overrides||{}; s.overrides[key]=s.overrides[key]||{}; return s.overrides[key]; }
+  /* the inspector reads this for EVERY selection (just to populate the panel),
+     but only some selections ever get an actual edit — eagerly storing {} here
+     used to leave a permanent empty overrides[key] stub behind for every
+     element a user so much as clicked on. Return a proxy over a detached
+     object instead; it attaches itself to the slide on its first real write,
+     so selecting-without-editing never touches SG.data at all. */
+  function ovFor(i,key){ var s=SG.data.slides[i];
+    if(s.overrides&&s.overrides[key]) return s.overrides[key];
+    var obj={};
+    return new Proxy(obj,{ set:function(t,p,v){ t[p]=v; s.overrides=s.overrides||{}; s.overrides[key]=t; return true; } }); }
   function freeFor(i,id){ var s=SG.data.slides[i]; return (s.freeObjects||[]).filter(function(f){return f.id===id;})[0]; }
   function elData(sel){ if(!sel) return null; return sel.kind==='free'?freeFor(sel.slideIdx,sel.id):ovFor(sel.slideIdx,sel.key); }
   /* non-creating accessor (elData creates an empty override on read) */
@@ -1071,7 +1094,7 @@
     list.className='';
     (SG.data.slides||[]).forEach(function(s,i){ var t=(s.content&&(s.content.title||s.content.statement||s.content.quote))||s.layout;
       var row=el('div','forge-srow'+(i===cur?' cur':''));
-      row.innerHTML='<span class="si">'+(i+1)+'</span><span class="sl">'+String(t).replace(/[<>&]/g,'').slice(0,22)+'</span><span class="st">'+s.layout+'</span>';
+      row.innerHTML='<span class="si">'+(i+1)+'</span><span class="sl">'+plainText(t).replace(/[<>&]/g,'').slice(0,22)+'</span><span class="st">'+s.layout+'</span>';
       row.appendChild(rowTools(i));
       row.onclick=function(){ location.hash='#'+(i+1); clearSel(); F.buildNav(); F.buildInspect(); }; list.appendChild(row); }); };
   function rowTools(i){ var tools=el('span','tools');
@@ -1580,7 +1603,7 @@
     var card=el('div','forge-struct-card');
     var head=el('div','forge-struct-head');
     var title=(slide.content&&(slide.content.title||slide.content.statement||slide.content.quote))||slide.layout;
-    head.appendChild(el('h3',null,'Manage items — “'+SG.esc(String(title).slice(0,44))+'”'));
+    head.appendChild(el('h3',null,'Manage items — “'+SG.esc(plainText(title).slice(0,44))+'”'));
     var tabs=el('div','forge-tabs');
     var tItems=el('button','cur','Items'), tJson=el('button',null,'Advanced (JSON)');
     tabs.appendChild(tItems); tabs.appendChild(tJson); head.appendChild(tabs);
@@ -1644,8 +1667,14 @@
     if(geomInputs.scale) geomInputs.scale.value=d.scale||1; if(geomInputs.rot) geomInputs.rot.value=d.rot||0; }
 
   /* ---- the Inspector ---- */
+  var _inspSlide=-1;
   F.buildInspect=function(){ var body=D.getElementById('forge-inspbody'); if(!body) return; body.innerHTML=''; geomInputs=null;
     var i=curSlide(), slide=(SG.data.slides||[])[i]; if(!slide) return;
+    /* the scrollable element is the ANCESTOR panel (#forge-inspect), not this
+       body div, so replacing body's content alone leaves old scroll in place —
+       reset it back to "On this slide" only when the slide actually changed,
+       not on every edit-triggered rebuild (that would fight in-place tweaking) */
+    if(i!==_inspSlide){ _inspSlide=i; var panel=body.parentNode; if(panel) panel.scrollTop=0; }
     /* v4: the items panel is the sidebar's home view and stays put while
        something is selected — the "Selected" panel appears BELOW it, so the
        list you picked from never disappears under you. */
@@ -2156,13 +2185,23 @@
     head.appendChild(el('h3',null,which==='theme'?'Theme & brand':'Deck settings'));
     card.appendChild(head);
     var pane=el('div','forge-struct-pane');
-    if(which==='theme'){ themeSection(pane); brandPanel(pane); } else deckSettings(pane);
+    function paint(){ pane.innerHTML='';
+      if(which==='theme'){ themeSection(pane); brandPanel(pane); } else deckSettings(pane); }
+    paint();
     card.appendChild(pane);
+    /* a theme-preset change (or any other data edit) runs F.commit -> F.buildInspect;
+       repaint this pane in step so it never shows stale tokens/brand state (was a
+       one-time snapshot before — matches the struct-modal rewrap pattern above) */
+    var _bi=F.buildInspect;
+    function rewrap(){ F.buildInspect=function(){ _bi.apply(F,arguments);
+      if(D.getElementById('forge-deckmodal')===o) paint(); }; }
+    rewrap();
+    function close(){ F.buildInspect=_bi; o.remove(); }
     var btns=el('div','forge-struct-btns');
     var done=el('button','forge-btn primary','Done'); done.style.marginLeft='auto';
-    done.onclick=function(){ o.remove(); }; btns.appendChild(done);
+    done.onclick=close; btns.appendChild(done);
     card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
-    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); }); };
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) close(); }); };
 
   /* ---- ⊞ Insert an element ---------------------------------------------
      One catalog entry per insertable element type across the layouts. The
@@ -2190,7 +2229,13 @@
      so the deck's CSS cascade applies and the node has real measured size. */
   function galleryNode(layout,key,extra){
     var fn=SG.layouts[layout]; if(!fn) return null;
-    var host=el('section','slide active lyt-'+layout+' forge-ghost');
+    /* mirror buildSection's classList exactly: some layouts' CSS targets the
+       bare layout name ON THE SECTION (quote, bignum, …) — without it here,
+       e.g. the quote layout's blockquote loses its font-size/quote-mark rules
+       and measures at default paragraph height, so the inserted copy lands
+       squashed at the h-clamp floor below */
+    var secCls=(SG.SECTION_LAYOUTS&&SG.SECTION_LAYOUTS[layout])?(' '+layout):'';
+    var host=el('section','slide active'+secCls+' lyt-'+layout+' forge-ghost');
     var c=clone(DEFAULTS[layout]||{});
     if(extra) Object.keys(extra).forEach(function(k){ c[k]=extra[k]; });   /* fill fields DEFAULTS leaves blank */
     var out; try{ out=fn(c,{index:0,total:1}); }catch(e){ return null; }
@@ -2368,6 +2413,8 @@
     if(F.assets) F.assets.restore();
     F.buildChrome(); wireDeck(); wireKeys();
     F.buildNav(); F.buildInspect(); checkRestore();
+    /* ?edit query auto-opens edit mode (CLAUDE.md-documented dev/verification shortcut) */
+    if(/(^|[?&])edit(=|&|$)/.test(location.search)) F.toggle();
     W.addEventListener('hashchange',function(){ clearSel(); F.buildNav(); F.buildInspect(); });
   }
   if(document.readyState!=='loading') boot();

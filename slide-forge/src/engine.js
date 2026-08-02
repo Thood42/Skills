@@ -629,6 +629,7 @@
      inner class (e.g. .matrix, .timeline, .stat-grid) restyle the slide and break
      .slide{position:absolute;inset:0}. We add a harmless lyt-<name> hook instead. */
   var SECTION_LAYOUTS={cover:1,divider:1,bignum:1,quote:1,closing:1,manifesto:1,figure:1,diptych:1,image:1};
+  SG.SECTION_LAYOUTS=SECTION_LAYOUTS;   /* exposed so the Forge editor's gallery-preview ghost host can match this classList */
 
   /* build ONE <section> — shared by full render and targeted re-render */
   function buildSection(s,i,total,defAmb,brand){

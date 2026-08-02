@@ -1,0 +1,9 @@
+{
+  "name": "slide-forge-tests",
+  "private": true,
+  "description": "jsdom harness for slide-forge's editor + engine tests. Run: npm install, then node parity.mjs / node editor-ops.mjs.",
+  "type": "module",
+  "dependencies": {
+    "jsdom": "^30.0.1"
+  }
+}
