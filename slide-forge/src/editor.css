@@ -328,6 +328,8 @@ input.forge-cell:focus{ outline:none; border-color:#2a6df4; }
    ============================================================ */
 #forge-assets{ position:fixed; inset:0; z-index:9450; display:flex; align-items:center; justify-content:center;
   background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+#forge-embed-prompt{ position:fixed; inset:0; z-index:9450; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
 .forge-assets-card{ width:min(920px,94vw); max-height:88vh; display:flex; flex-direction:column;
   background:#0d1017; border:1px solid rgba(255,255,255,.16); border-radius:14px;
   padding:20px 24px; color:#dbe3ef; box-shadow:0 24px 80px rgba(0,0,0,.6); }

@@ -5,9 +5,12 @@ skill-authoring sandbox (no Node there) — run wherever Node exists.
 
 - `parity.mjs` — renders a 26-slide deck covering every layout through the v3
   node-tree engine AND through the frozen v2 build (`fixtures/v2-template.html`),
-  then structurally diffs the DOM (ignoring `data-el`/`data-bind`/`data-arr` and
-  `forge-*` classes). Expected output: exactly the documented cosmetic deltas
-  (timeline desc span, hero-asym value span, closing whitespace split).
+  then structurally diffs the DOM (ignoring `data-el`/`data-bind`/`data-arr`,
+  `forge-*` classes, and the Docs (D) panel — deck chrome added after this
+  fixture was frozen, not layout content). Expected output: exactly the
+  documented cosmetic deltas (timeline desc span, hero-asym value span,
+  closing whitespace split, figure's `media-img` class from the media-plan
+  `<img>` upgrade).
 - `editor-ops.mjs` — data-layer assertions on the editor: authored keys,
   item add/dup/remove with override REMAP, orphan-override GC, bind write-back,
   targeted `SG.renderSlide`, w/h overrides, undo coalescing, the one-time

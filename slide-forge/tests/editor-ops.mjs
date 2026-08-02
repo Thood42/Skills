@@ -1,6 +1,7 @@
 import { boot, RICH_DECK } from './harness.mjs';
 import fs from 'fs';
-const NEW=fs.readFileSync(new URL('../editor-template.html',import.meta.url).pathname,'utf8');
+import { fileURLToPath } from 'url';
+const NEW=fs.readFileSync(fileURLToPath(new URL('../editor-template.html',import.meta.url)),'utf8');
 let pass=0, fail=0;
 function ok(cond,msg){ if(cond){pass++;} else {fail++; console.log('FAIL:',msg);} }
 

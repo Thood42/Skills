@@ -13,7 +13,19 @@
       "Bash(python scripts/build.py --check)",
       "Bash(echo \"build --check exit=$?\")",
       "Bash(python scripts/validate.py editor-template.html)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(grep -n \"editor.js\\\\|template literal\\\\|\\\\`\" scripts/build.py)",
+      "Bash(git --version)",
+      "Bash(node --check slide-forge/src/editor.js)",
+      "Bash(node -e \"require.resolve\\('jsdom'\\)\")",
+      "Bash(node --check parity.mjs)",
+      "Bash(node --check editor-ops.mjs)",
+      "Bash(npm --version)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(node editor-ops.mjs)",
+      "Bash(node parity.mjs)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }

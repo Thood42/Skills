@@ -1,7 +1,8 @@
 import { boot, RICH_DECK } from './harness.mjs';
 import fs from 'fs';
-const NEW=fs.readFileSync(new URL('../editor-template.html',import.meta.url).pathname,'utf8');
-const OLD=fs.readFileSync(new URL('./fixtures/v2-template.html',import.meta.url).pathname,'utf8'); // v2 build saved earlier
+import { fileURLToPath } from 'url';
+const NEW=fs.readFileSync(fileURLToPath(new URL('../editor-template.html',import.meta.url)),'utf8');
+const OLD=fs.readFileSync(fileURLToPath(new URL('./fixtures/v2-template.html',import.meta.url)),'utf8'); // v2 build saved earlier
 
 function snap(dom){
   const d=dom.window.document;
@@ -11,6 +12,13 @@ function snap(dom){
 function norm(n,w){
   if(n.nodeType===3) return n.textContent;
   if(n.nodeType!==1) return null;
+  /* the Docs (D) panel postdates the frozen v2 fixture below — it's deck
+     chrome (JSON docs toggle), not layout-specific content, so it's out of
+     scope for this test's actual question (did the v3 rewrite keep every
+     LAYOUT's rendering faithful to v2?). Without this, its presence in NEW
+     only shifts every slide's later children (pager, progress, …) by one
+     index and cascades into a wall of spurious diffs unrelated to layouts. */
+  if(n.classList.contains('doc-panel')) return null;
   const cls=[...n.classList].filter(c=>!/^forge-/.test(c)).sort();
   const attrs={};
   for(const a of n.attributes) if(!/^(data-el|data-bind|data-arr|class)$/.test(a.name)) attrs[a.name]=a.value;
