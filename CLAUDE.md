@@ -55,6 +55,12 @@ Editor model (load-bearing facts):
   `overrides{}` (geometry incl. `w`/`h` reflow-resize, style, anim, fallback `html`; keyed by
   `data-el`) and `freeObjects[]`. Item add/dup/remove/reorder REMAP sibling override keys; a GC
   pass in `F.commit` drops orphaned overrides (logged, undoable).
+- **Free objects can be CONTENT-BACKED (v5, `type:'node'`):** `{layout,pick,content,overrides}` —
+  the editor re-renders the source layout each render and mounts the subtree at `pick` with its
+  authored keys intact, namespaced `<id>/<key>`. So a duplicated/inserted element keeps its fields,
+  list verbs and text binding. `partOf()`/`scopeOf()` route every content + override access to the
+  owning host (slide or node object) — **use them, never `slides[i].overrides[key]` directly**.
+  Legacy `type:'html'` (frozen markup) still renders for old decks.
 - **Inspector (right panel), v4:** home view is **"On this slide"** — one plain-language row per
   element (`stats.2` → "Stat 3 — 12×"), hover-syncs with the canvas, eye toggles
   `overrides[key].hide`. Selecting shows a **contextual** "Selected" panel: identity card, that
@@ -91,6 +97,29 @@ Editor model (load-bearing facts):
   reflects local.
 - **`gh` CLI is not installed and there's no GitHub token** → PRs can't be opened/merged
   programmatically here. Integrate via local merge, or push + open the PR in the browser.
+
+## Recent work (2026-08-02) — v5: content-backed copies (`freeObjects[].type:'node'`)
+
+Fixes the reported gap: a duplicated or inserted object "misses the same editable features and
+source structure". `cleanCopy`/`specFromSel` used to strip `data-el`/`data-bind`/`data-arr` from the
+clone — the exact attributes that make an element editable — so every copy froze into
+`{type:'html'}` with no fields, no text editing and no list verbs. Full write-up in
+`slide-forge/references/editor.md` ("v5").
+
+- New free-object shape `{type:'node', layout, pick, content, overrides}`. `mountNodeFree` re-renders
+  the layout and lifts the subtree at `pick`; `namespaceKeys` rewrites its keys to `<id>/<key>`.
+- `partOf()`/`scopeOf()` are the routing layer — every content/override accessor (`ovFor`,
+  `peekData`, `contentArr`, `endEdit`, item ops, `toggleHide`, `itemSummary`, `deleteSel`,
+  `gcOverrides`, `contentTargetOf`) now asks scopeOf which host owns a key.
+- `Ctrl+D`/`Ctrl+C` on a **composite** → node copy; a lone text leaf still → `txt`; `raw` markup
+  still → `html`. ⊞ Insert now emits node objects.
+- Honesty fixes: the dead "Text" field on html/node objects is gone (it wrote `fo.text`, which those
+  types never render); the gallery hint and the "duplicate as free copy (deep)" label no longer
+  promise editability the old path didn't deliver; legacy html objects now say they're static copies.
+- `validate.py`: node-object schema + `fs`/`name`/`hide` added to the key sets (v4 gaps).
+- **Verified in a real browser** (insert → fields → live re-render → text editing → list verbs →
+  override remap → GC → undo/redo → present mode → download). `tests/editor-ops.mjs` gained ~30
+  assertions but **was not run here (no Node)**.
 
 ## Recent work (2026-07-31) — v4 editor UX overhaul (design handoff)
 

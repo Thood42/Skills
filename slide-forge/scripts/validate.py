@@ -66,14 +66,35 @@ FIT_MODES = {'cover','contain','fill'}
 FRAME_MODES = {'none','panel','glow','shadow'}
 EMBED_MODES = {'click','live','poster'}
 EMBED_URL_RE = re.compile(r'^https?://', re.I)
-OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','anim','animDelay','animTrigger','animStep','html','theme','group','hide','href'}
+OVERRIDE_KEYS = {'x','y','w','h','scale','rot','z','color','font','fs','anim','animDelay','animTrigger','animStep','html','theme','group','hide','href'}
 HREF_RE = re.compile(r'^(#\d+|https?:.*|mailto:.*)$', re.I)
 # media plan §3/§3.4/§5/§6: image/svg objects (asset,fit,focal,radius,opacity,
 # frame,alt), a shared "href" link on any free object (§5), and embed fields
 # (§6) — kept in one set since a deck author may hand-edit freeObjects JSON.
+# v4 added name/hide; v5 added the content-backed object (layout,pick,content
+# + its own overrides bag, keyed relative to `pick`).
 FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color','font','anim','animDelay',
  'animTrigger','animStep','html','theme','group','asset','fit','focal','radius','opacity','frame','alt','href',
- 'url','ratio','mode','poster','sandbox','chrome','title','fillPrev'}
+ 'url','ratio','mode','poster','sandbox','chrome','title','fillPrev','name','hide','fs',
+ 'layout','pick','content','overrides'}
+OVERRIDE_KEY_RE = re.compile(r'^(b\d+(\.\d+){0,2}|[A-Za-z][\w-]*(\.[\w-]+)*)$')
+
+def _check_overrides(ov, where, label, errs, warns):
+    """One override bag — a slide's, or a content-backed free object's own
+    (whose keys are relative to its `pick`, so the same rules apply)."""
+    for k, o in ov.items():
+        # v3: authored content-path keys ("title", "stats.2", "left.items.0");
+        # raw slides (and pre-v3 decks awaiting migration) use positional b0/b0.1
+        if not OVERRIDE_KEY_RE.match(k):
+            warns.append('%s: odd %s key %r' % (where, label, k))
+        if not isinstance(o, dict):
+            errs.append('%s: %s[%r] not an object' % (where, label, k)); continue
+        for f in o:
+            if f not in OVERRIDE_KEYS:
+                warns.append('%s: %s[%r] unknown field %r' % (where, label, k, f))
+        if o.get('href') and not HREF_RE.match(o['href']):
+            errs.append('%s: %s[%r].href %r is not https:/mailto:/#N (media plan section 5 allow-list)'
+                        % (where, label, k, o['href']))
 
 def typeok(v, t):
     return {'s':lambda:isinstance(v,str), 'n':lambda:isinstance(v,(int,float)) and not isinstance(v,bool),
@@ -188,16 +209,7 @@ def validate(data, assets=None):
         if ov is not None:
             if not isinstance(ov, dict): errs.append('%s: overrides is not an object' % where)
             else:
-                for k, o in ov.items():
-                    # v3: authored content-path keys ("title", "stats.2", "left.items.0");
-                    # raw slides (and pre-v3 decks awaiting migration) use positional b0/b0.1
-                    if not re.match(r'^(b\d+(\.\d+){0,2}|[A-Za-z][\w-]*(\.[\w-]+)*)$', k):
-                        warns.append('%s: odd override key %r' % (where, k))
-                    if not isinstance(o, dict): errs.append('%s: overrides[%r] not an object' % (where, k)); continue
-                    for f in o:
-                        if f not in OVERRIDE_KEYS: warns.append('%s: overrides[%r] unknown field %r' % (where, k, f))
-                    if o.get('href') and not HREF_RE.match(o['href']):
-                        errs.append('%s: overrides[%r].href %r is not https:/mailto:/#N (media plan section 5 allow-list)' % (where, k, o['href']))
+                _check_overrides(ov, where, 'overrides', errs, warns)
         for j, fo in enumerate(sl.get('freeObjects') or []):
             if not isinstance(fo, dict) or 'id' not in fo:
                 errs.append('%s: freeObjects[%d] needs an object with id' % (where, j)); continue
@@ -216,6 +228,43 @@ def validate(data, assets=None):
                     errs.append('%s: freeObjects[%d].url %r must be http:// or https://' % (where, j, fo['url']))
                 if fo.get('mode') is not None and fo['mode'] not in EMBED_MODES:
                     errs.append('%s: freeObjects[%d].mode %r not one of %s' % (where, j, fo['mode'], sorted(EMBED_MODES)))
+            # v5 content-backed object: it re-renders `layout` against its own
+            # `content` and mounts the subtree at `pick`, so all three must be
+            # present and the layout must be one this engine can render.
+            if fo.get('type') == 'node':
+                fw = '%s: freeObjects[%d]' % (where, j)
+                nlay = fo.get('layout')
+                if nlay not in S:
+                    errs.append('%s.layout %r is not a known layout' % (fw, nlay))
+                elif nlay == 'raw':
+                    errs.append('%s.layout cannot be "raw" (nothing keyed to pick from)' % fw)
+                if not isinstance(fo.get('pick'), str) or not fo['pick']:
+                    errs.append('%s.pick must be the content-path key of the element to mount' % fw)
+                elif not OVERRIDE_KEY_RE.match(fo['pick']):
+                    warns.append('%s.pick %r is not a content-path key' % (fw, fo['pick']))
+                nc = fo.get('content')
+                if not isinstance(nc, dict):
+                    errs.append('%s.content must be an object (the data it re-renders from)' % fw)
+                elif nlay in S:
+                    # the object carries the whole layout's content, so the same
+                    # required/unknown-key rules apply as to a slide of that layout
+                    nknown = {k.lstrip('?') for k in S[nlay]}
+                    for k, t in S[nlay].items():
+                        name = k.lstrip('?')
+                        if name not in nc:
+                            if not k.startswith('?'):
+                                errs.append('%s (%s): missing required field %r' % (fw, nlay, name))
+                        elif not typeok(nc[name], t):
+                            errs.append('%s (%s): field %r should be %s' % (fw, nlay, name, t))
+                    for k in nc:
+                        if k not in nknown:
+                            warns.append('%s (%s): unknown content key %r' % (fw, nlay, k))
+                fov = fo.get('overrides')
+                if fov is not None:
+                    if not isinstance(fov, dict):
+                        errs.append('%s.overrides is not an object' % fw)
+                    else:
+                        _check_overrides(fov, fw, 'overrides', errs, warns)
     b = data.get('brand')
     if b is not None:
         if not isinstance(b, dict): errs.append('brand must be an object')

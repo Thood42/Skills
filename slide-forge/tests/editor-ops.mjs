@@ -273,16 +273,82 @@ modal.querySelectorAll('.forge-tabs button')[1].click();
 ok(JSON.parse(modal.querySelector('.forge-struct-json').value).layout==='stat-grid','Advanced tab still round-trips slide JSON');
 modal.remove();
 
-// ---------- insert gallery ----------
+// ---------- insert gallery: CONTENT-BACKED objects (v5) ----------
 const insId=F.insertElement('stat-grid','stats.0',null,'Stat card');
 const fo=(SG.data.slides[2].freeObjects||[]).filter(f=>f.id===insId)[0];
-ok(!!fo&&fo.type==='html','gallery insert lands as a themed freeObject {type:"html"}');
+ok(!!fo&&fo.type==='node','gallery insert lands as a content-backed freeObject {type:"node"}');
+ok(fo.layout==='stat-grid'&&fo.pick==='stats.0','the object records the layout + branch it re-renders');
+ok(!!fo.content&&Array.isArray(fo.content.stats),'it carries the layout content it was built from');
+ok(fo.html===undefined,'no frozen markup is stored — it re-renders from data');
 ok(fo.name==='Stat card','the inserted object carries its catalog name');
-ok(!/data-(el|bind|arr)=/.test(fo.html),'inserted markup carries no authored identity (it is a free copy)');
-ok(fo.w>=80&&fo.h>=50&&fo.h<=360,'inserted object gets a sane starting size');
+ok(fo.w>=80&&fo.w<=900&&fo.h===undefined,'width is seeded and clamped; height stays automatic so text reflows');
 ok(!d.querySelector('.forge-ghost'),'the off-screen scratch section is always removed');
 ok(d.querySelectorAll('#deck .slide').length===SG.data.slides.length,'scratch sections never leak into the slide list');
 ok(F.insertElement('no-such-layout','x')===null,'a missing layout/key inserts nothing rather than throwing');
+
+// the mounted subtree keeps its authored identity, namespaced by the object id
+const insWrap=()=>statSec().querySelector('[data-free="'+insId+'"]');
+ok(!!insWrap(),'the inserted object is mounted on the slide');
+ok(!!insWrap().querySelector('[data-el="'+insId+'/stats.0"]'),'the mounted subtree keeps its authored data-el, namespaced');
+ok(!!insWrap().querySelector('[data-bind="'+insId+'/stats.0.label"]'),'…and its data-bind, so text edits have somewhere to land');
+ok(statSec().querySelector('[data-el="stats.0"]')!==insWrap().querySelector('[data-el="'+insId+'/stats.0"]'),
+   'namespacing keeps the copy from colliding with the slide’s own key');
+ok(!!insWrap().querySelector('.forge-part-shell'),'a boxless shell carries the source layout classes for descendant selectors');
+
+// its content drives its render, and never touches the slide's own content
+const slideLabel0=SG.data.slides[2].content.stats[0].label;
+SG.setPath(fo.content,'stats.0.label','Copy only');
+F.commit();
+ok(insWrap().querySelector('[data-bind="'+insId+'/stats.0.label"]').textContent==='Copy only','the copy re-renders from its OWN content');
+ok(SG.data.slides[2].content.stats[0].label===slideLabel0,'editing the copy leaves the original untouched');
+
+// list verbs work inside a copy, with overrides remapped in its own bag
+fo.overrides={'stats.0':{color:'var(--cyan)'}};
+F.dupItem(2,insWrap().querySelector('[data-el="'+insId+'/stats.0"]'));
+const fo2=()=>(SG.data.slides[2].freeObjects||[]).filter(f=>f.id===insId)[0];
+ok(fo2().content.stats.length===2,'duplicating an item inside a copy grows the COPY’s list');
+ok(SG.data.slides[2].content.stats.length===3,'…and not the slide’s');
+ok(fo2().overrides['stats.1']&&fo2().overrides['stats.1'].color==='var(--cyan)','item styling follows the duplicate, in the object’s own override bag');
+F.addItemPath(2,insId+'/stats');
+ok(fo2().content.stats.length===3,'＋ Add routes to the copy’s array via its namespaced path');
+F.removeItem(2,insWrap().querySelector('[data-el="'+insId+'/stats.0"]'));
+ok(fo2().content.stats.length===2&&fo2().overrides['stats.0'],'removal remaps the copy’s override keys down');
+
+// GC sweeps the object's own bag, not just the slide's
+fo2().overrides['stats.99']={x:5};
+fo2().overrides['stats.0.label']={};
+F.do('noop',()=>{});
+ok(!fo2().overrides['stats.99'],'GC drops an orphaned part override');
+ok(!fo2().overrides['stats.0.label'],'GC drops an empty part-override stub');
+ok(!!fo2().overrides['stats.0'],'GC keeps a live part override');
+
+// ---------- duplicate: composites go content-backed, leaves stay free text ----------
+F.clearSel();
+const statsC=statSec().querySelector('[data-el="stats"]');
+statsC.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
+F.dupSel();
+const dupd=(SG.data.slides[2].freeObjects||[]).slice(-1)[0];
+ok(dupd.type==='node'&&dupd.layout==='stat-grid'&&dupd.pick==='stats','Ctrl+D on a composite yields a content-backed copy');
+ok(!!dupd.content&&dupd.content.stats.length===3,'…carrying the content it re-renders from');
+ok(dupd.html===undefined,'…with no frozen markup');
+F.undoOp();
+F.clearSel();
+const titleEl=statSec().querySelector('[data-bind="title"]');
+titleEl.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
+F.dupSel();
+const dupT=(SG.data.slides[2].freeObjects||[]).slice(-1)[0];
+ok(dupT.type==='txt','a lone text leaf still copies as free text (it would lose descendant styling as a node)');
+F.undoOp();
+
+// ---------- a raw slide has no layout to re-render from: html fallback ----------
+F.clearSel();
+const rawBlk=secs()[25].querySelector('[data-el="b0"]');
+if(rawBlk&&rawBlk.querySelector('[data-el]')){
+  rawBlk.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
+  F.dupSel();
+  const dupR=(SG.data.slides[25].freeObjects||[]).slice(-1)[0];
+  ok(dupR.type==='html','a raw slide’s markup still freezes into an html copy');
+  F.undoOp(); }
 
 // ---------- viewport hook stays inert outside edit mode ----------
 ok(typeof SG.viewTransform==='function','the editor installs the viewport hook');
