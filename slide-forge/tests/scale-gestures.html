@@ -159,6 +159,37 @@ async function main(){
   var wRatio = b1.width/b0.width, hRatio = b1.height/b0.height;
   ok(Math.abs(wRatio-hRatio) < 0.03, 'Alt+corner drag scales width & height together (proportional)', 'wRatio='+wRatio.toFixed(3)+' hRatio='+hRatio.toFixed(3));
 
+  // ---- corner drag is TWO-AXIS: vertical movement sets a height ----
+  // (uses a SECOND, so-far-untouched element so the height-deadzone assertion
+  //  below sees a genuinely auto-height box; no re-render happens in between,
+  //  so every node reference here stays live)
+  Forge.zoomFit();
+  await sleep(80);
+  var target2 = candidates[1] || target;
+  var key2 = target2.getAttribute('data-el');
+  function select(n){ var r0 = rect(n); fireP(n,'pointerdown', r0.left+r0.width/2, r0.top+r0.height/2); fireP(d,'pointerup', r0.left+r0.width/2, r0.top+r0.height/2); }
+  function ovOf(k){ var s = SG.data.slides[[].slice.call(d.querySelectorAll('.slide')).indexOf(sec)]; return (s && s.overrides && s.overrides[k]) || {}; }
+
+  // a purely HORIZONTAL drag must NOT pin a height — auto-height elements stay
+  // free to reflow (the Y-drag deadzone)
+  select(target2);
+  dragBR(120, 0);
+  ok(ovOf(key2).w > 0, 'horizontal corner drag writes a width', 'w='+ovOf(key2).w);
+  ok(ovOf(key2).h == null, 'horizontal-only corner drag does NOT pin a height (text stays reflowable)', 'h='+ovOf(key2).h);
+
+  // dragging DOWN resizes the height, 1:1 with the pointer
+  var t0 = rect(target2);
+  dragBR(0, 110);
+  var t1 = rect(target2);
+  ok(Math.abs((t1.height-t0.height) - 110) < 2.5, 'corner drag downward resizes HEIGHT 1:1 with the pointer', (t1.height-t0.height).toFixed(1)+'px for a 110px drag');
+  ok(Math.abs(t1.width-t0.width) < 2, 'a purely vertical corner drag leaves the width alone', (t1.width-t0.width).toFixed(1)+'px');
+
+  // Shift+corner locks the aspect ratio on a non-media element
+  var a0 = rect(target2);
+  dragBR(90, 0, {shiftKey:true});
+  var a1 = rect(target2);
+  ok(Math.abs((a1.width/a0.width)-(a1.height/a0.height)) < 0.05, 'Shift+corner locks the aspect ratio (height follows width)', 'w×'+(a1.width/a0.width).toFixed(3)+' h×'+(a1.height/a0.height).toFixed(3));
+
   // ---- Focus centers the selected element in the stage ----
   Forge.zoomFit();
   await sleep(80);
