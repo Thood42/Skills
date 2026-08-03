@@ -92,6 +92,24 @@ Editor model (load-bearing facts):
 - **`gh` CLI is not installed and there's no GitHub token** → PRs can't be opened/merged
   programmatically here. Integrate via local merge, or push + open the PR in the browser.
 
+## Recent work (2026-08-02) — corner drag resizes BOTH axes
+
+Reported bug: the in-window resize handle only scaled horizontally. Three causes, all fixed in
+`src/editor.js` (present mode + the data model untouched; `overrides[].h` already existed):
+
+- `startDrag`'s `size` branch only wrote `h` for `TWO_AXIS_FREE` free objects. Now every element
+  takes a height from the Y delta, with a 5px Y **deadzone** (`HDRAG`) so a horizontal-only drag
+  still leaves auto-height text free to reflow. `Shift` = aspect lock (image/svg stay locked by
+  default, `Shift` frees them); `Alt` = proportional scale, unchanged. `TWO_AXIS_FREE` is gone.
+- Most layout blocks are **flex items**, so an explicit height was silently shrunk back by the
+  container — `applyOverride` now sets `flex-shrink:0` whenever `w`/`h` is authored. This was the
+  real "nothing happens vertically" symptom; watch for it if sizing ever looks lossy again.
+- `ovFor` handed each caller its OWN detached stub for an unedited element, so the Inspector and a
+  drag wrote to different objects and the last writer wiped the other's keys. Now one-slot cached.
+- Also: Inspector shows **Height** for every element (0/blank = natural), `syncGeomFields` keeps
+  W/H live during a drag, free text (`type:"txt"`) honours `h`, 4 new assertions in
+  `tests/scale-gestures.html` (**19/19 pass in a real browser** — this file needs no Node).
+
 ## Recent work (2026-07-31) — v4 editor UX overhaul (design handoff)
 
 Full design + the three deliberate deltas: `slide-forge-editor-ux-plan.md`. What shipped is in

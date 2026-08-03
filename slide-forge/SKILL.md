@@ -181,8 +181,9 @@ The delivered file does double duty, so close by telling them how to use both ha
   colour swatches that follow the theme, **B / ✦ / `<>`** formatting, and **↑ ↓ ⧉ ✕** to reorder,
   duplicate or remove a list item.
 - **On the slide itself:** **drag any element to move it** — smart guides snap it to centers, edges
-  and neighbours (hold **Alt** to snap freely). Drag a corner to **resize — text rewraps** to the new
-  width (hold **Alt** on a corner to scale proportionally), the green handle to rotate, and
+  and neighbours (hold **Alt** to snap freely). Drag a corner to **resize both width and height —
+  text rewraps** inside the new box (hold **Shift** to keep the proportions, **Alt** to scale the
+  whole element instead), the green handle to rotate, and
   **double-click any text to edit it in place** (highlight part of it and a floating **B / ✦ / `<>`**
   toolbar formats just that range). Click a group once to select it, **click again to step inside**
   it; the **breadcrumb** above the slide walks back out. **Shift-click or drag a box** to select

@@ -25,7 +25,7 @@ text and stored as that element's `html` override (see below), so it round-trips
 
 **2. Object (geometry, style & animation) — overrides layered on a template element or free object.**
 Click an element on the slide to select it; the **Object** panel exposes position (X/Y),
-**width/height** (width reflows text; 0 = natural size), scale, rotation, **text color**,
+**width/height** (width reflows text; 0/blank = natural size), scale, rotation, **text color**,
 **accent**, **font** (from the theme fonts), a **surface** color, and an **Animation** effect
 (+ delay). These write to a per-slide `overrides` map (for template elements, keyed by the
 element's **authored `data-el` key** — a content path like `title` or `stats.2`) or to a free
@@ -176,10 +176,12 @@ What that enables:
   override keys (a style on `stats.2` follows its stat when `stats.0` is deleted). Duplicating an
   item copies its overrides to the new slot. A GC pass in every structural commit drops overrides
   whose element no longer exists — logged to the console, reversible with Undo.
-- **Resize means resize.** Dragging a corner handle changes the element's **width** — text rewraps
-  like PowerPoint (template blocks keep auto height; free boxes/copied groups resize both axes).
-  **Alt+corner** is the old proportional scale. `overrides[key].w/h`, editable in the Inspector
-  (0 clears back to natural size).
+- **Resize means resize.** Dragging a corner handle changes the element's **width and height** —
+  text rewraps inside the new box, like PowerPoint. Auto-height elements (text blocks, list
+  containers, free text) only take a fixed height once the pointer moves ~5px on the Y axis, so a
+  horizontal-only drag still leaves them free to grow. **Shift+corner** locks the aspect ratio
+  (image/svg are locked by default — there Shift frees it); **Alt+corner** is the old proportional
+  scale. `overrides[key].w/h`, editable in the Inspector (0/blank clears back to natural size).
 - **Targeted re-render.** Typing in the sidebar re-renders only the current slide
   (`SG.renderSlide`), so large decks stay snappy; structural and theme changes still re-render all.
 - **One undo per gesture.** Color-picker drags, token tweaks and arrow-nudge runs coalesce into a
