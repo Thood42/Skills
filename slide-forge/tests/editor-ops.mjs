@@ -550,6 +550,90 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
   dd.body.classList.remove('forge-edit');
 }
 
+// =====================================================================
+// INTEGRATED INSERT + SECTION VERBS (composer plan capability 2).
+// The founding complaint: a component added to a slide floats on top instead
+// of joining it. These assert the joining, and that a section's styling
+// travels with the section through every reorder.
+// =====================================================================
+{
+  const ID={meta:{title:'Insert',seed:7},slides:[
+    {layout:'composed',content:{sections:[
+      {type:'titleband',content:{title:'T'}},
+      {type:'quote',content:{quote:'Q'}} ]},
+     overrides:{'sections.1.content.quote':{color:'#abc'}}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'cover',content:{title:'C'}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dI=boot(NEW,ID); await new Promise(r=>setTimeout(r,400));
+  const wI=dI.window, di=wI.document, SGI=wI.SG, FI=wI.Forge;
+  const sl=n=>SGI.data.slides[n], sec=n=>di.querySelectorAll('#deck .slide')[n];
+  di.body.classList.add('forge-edit');
+
+  // --- insert into a composed slide: it joins the flow ---
+  ok(FI.insertIntoFlow(0,'stats'),'insertIntoFlow succeeds on a composed slide');
+  ok(sl(0).content.sections.length===3&&sl(0).content.sections[2].type==='stats','section appended to the flow');
+  ok(sl(0).content.sections[2].content.stats.length>0,'the new section arrives with real placeholder content');
+  ok(!!sec(0).querySelector('[data-el="sections.2"] .stat-grid'),'…and renders inside the slide, not as a free object');
+  ok(!(sl(0).freeObjects||[]).length,'nothing was added as a floating object');
+
+  // inserting BEFORE an existing section shifts that section's overrides with it
+  ok(FI.insertIntoFlow(0,'titleband',null,0),'insert at an explicit index');
+  ok(sl(0).content.sections[0].type==='titleband'&&sl(0).content.sections.length===4,'spliced at 0');
+  ok(!!(sl(0).overrides||{})['sections.2.content.quote'],'the quote override shifted 1 -> 2 with its section');
+  ok(sec(0).querySelector('[data-el="sections.2.content.quote"]').style.color==='rgb(170, 187, 204)',
+     '…and still paints the right node');
+
+  // --- insert into a decomposable classic: promotes first, in ONE undo step ---
+  const depth=FI.undo.length;
+  ok(FI.insertIntoFlow(1,'quote'),'insertIntoFlow succeeds on a decomposable classic');
+  ok(sl(1).layout==='composed','the slide was promoted');
+  ok(sl(1).content.sections.some(s=>s.type==='quote'),'…and the new section is in it');
+  ok(FI.undo.length===depth+1,'promote + insert is ONE undo step');
+  FI.undoOp();
+  ok(sl(1).layout==='stat-grid','…which one undo fully reverses');
+
+  // --- a bespoke layout declines; the caller falls back to floating ---
+  ok(FI.insertIntoFlow(2,'stats')===false,'a cover slide declines a section');
+  ok(FI.insertIntoFlow(3,'stats')===false,'a divider slide declines a section');
+  ok(FI.insertIntoFlow(0,'nope')===false,'an unknown section type is refused');
+  ok(!FI.canPromote(2)&&!FI.canPromote(3),'…and neither offers promotion, so the fallback is honest');
+
+  // --- move / remove / resize, with overrides following ---
+  const before=sl(0).content.sections.map(s=>s.type);
+  ok(FI.moveSection(0,2,0),'moveSection reports success');
+  const after=sl(0).content.sections.map(s=>s.type);
+  ok(after[0]===before[2]&&after[1]===before[0]&&after[2]===before[1],'the section actually moved');
+  ok(!!(sl(0).overrides||{})['sections.0.content.quote'],'the moved section took its override with it (2 -> 0)');
+  ok(sec(0).querySelector('[data-el="sections.0.content.quote"]').style.color==='rgb(170, 187, 204)',
+     '…and the style still lands after the move');
+  FI.undoOp();
+  ok(sl(0).content.sections.map(s=>s.type).join()===before.join()&&!!(sl(0).overrides||{})['sections.2.content.quote'],
+     'undo restores both the order and the keys');
+
+  ok(FI.moveSection(0,0,-5)===false,'a no-op move is refused rather than silently reshuffling');
+  ok(FI.moveSection(1,0,1)===false,'section verbs decline on a non-composed slide');
+
+  const n0=sl(0).content.sections.length;
+  ok(FI.removeSection(0,2),'removeSection reports success');
+  ok(sl(0).content.sections.length===n0-1,'the section is gone');
+  ok(!(sl(0).overrides||{})['sections.2.content.quote'],'its overrides went with it');
+  FI.undoOp();
+  ok(sl(0).content.sections.length===n0&&!!(sl(0).overrides||{})['sections.2.content.quote'],'undo restores both');
+
+  ok(FI.resizeSection(0,1,3),'resizeSection reports success');
+  ok(sl(0).content.sections[1].size===3,'size stored as a weight');
+  ok(sec(0).querySelector('[data-el="sections.1"]').style.flexGrow==='3','…and reaches the DOM as flex-grow');
+  FI.resizeSection(0,1,0);
+  ok(!('size' in sl(0).content.sections[1]),'0 clears the weight rather than storing 0');
+
+  // --- naming: sections read as what they are, not as "Section 3" ---
+  const rows=FI.itemRows(sec(0)).filter(r=>/^sections\.\d+$/.test(r.key));
+  ok(rows.length===sl(0).content.sections.length,'every section gets an Items-panel row');
+  ok(rows.some(r=>r.node.classList.contains('sec-quote')),'…including the quote section');
+  di.body.classList.remove('forge-edit');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

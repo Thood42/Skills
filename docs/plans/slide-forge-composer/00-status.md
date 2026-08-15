@@ -9,7 +9,7 @@
 - [x] Slice 1 — tracer: `composed` renders (3 section types incl. a CSS refugee; parity canary)
 - [x] Slice 2 — full 12-type vocabulary + ~10 classics re-expressed + validator
 - [x] Slice 3 — promotion (`TO_SECTIONS`, override remap, single-undo restore)
-- [ ] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
+- [x] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
 - [ ] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
 - [ ] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
 - [ ] Slice 7 — generation surface docs + the Gate-1 rack test (≥8/10)
@@ -51,6 +51,20 @@
   - Browser proof: styled a classic stat-grid (mint rotated title, 280px stat, 24px label), hit
     convert — all three overrides re-key and still apply, and the stat-grid's rendered box is
     **identical at 1104×427 before and after**; one undo returns the classic keys.
+
+- **Slice 4 done 2026-08-15.** `F.insertIntoFlow` / `moveSection` / `removeSection` / `resizeSection`
+  + `sectionIndexOf` / `take`+`putSectionOverrides`; `promoteMutate` factored out so promote+insert is
+  ONE undo. GALLERY entries gained a 5th field = section type (13 of 26 tagged "joins the layout");
+  4 new cards (Chart, Table, Bullets, Picture). New chrome: `F.toast` + `F.confirmDo` (two NAMED
+  buttons — "Add to the layout" / "Add floating on top" — neither is "cancel"). Inspector grows a
+  "Section N of M" block (▲ ▼ ✕ + space-weight) whenever the selection is inside a section at any
+  depth; `elName` names sections by TYPE ("Stat row") off the `.sec-<type>` class. editor-ops
+  222/222; parity 7.
+  - Browser proof, all four paths: (1) stat row inserted into the media+bullets slide — the row
+    shrank 580→375 to make space, stats took 205px, **0 free objects, 0 overflow**, card themed by
+    deck tokens with no inline style; (2) classic stat-grid → confirm → promoted to
+    titleband/stats/quote, 0 free objects, one undo back to `stat-grid`; (3) `cover` slide → floating
+    object + toast "a 'cover' slide has no flow to join"; (4) inspector shows "Section 2 of 2" ▲ ▼ ✕.
 
 ## Notes for a fresh session
 - User's founding complaint (2026-08-15): slide-forge isn't user-friendly enough; layouts and
