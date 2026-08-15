@@ -55,6 +55,12 @@ Editor model (load-bearing facts):
   `overrides{}` (geometry incl. `w`/`h` reflow-resize, style, anim, fallback `html`; keyed by
   `data-el`) and `freeObjects[]`. Item add/dup/remove/reorder REMAP sibling override keys; a GC
   pass in `F.commit` drops orphaned overrides (logged, undoable).
+- **Free objects can be CONTENT-BACKED (v5, `type:'node'`):** `{layout,pick,content,overrides}` —
+  the editor re-renders the source layout each render and mounts the subtree at `pick` with its
+  authored keys intact, namespaced `<id>/<key>`. So a duplicated/inserted element keeps its fields,
+  list verbs and text binding. `partOf()`/`scopeOf()` route every content + override access to the
+  owning host (slide or node object) — **use them, never `slides[i].overrides[key]` directly**.
+  Legacy `type:'html'` (frozen markup) still renders for old decks.
 - **Inspector (right panel), v4:** home view is **"On this slide"** — one plain-language row per
   element (`stats.2` → "Stat 3 — 12×"), hover-syncs with the canvas, eye toggles
   `overrides[key].hide`. Selecting shows a **contextual** "Selected" panel: identity card, that
@@ -76,8 +82,13 @@ Editor model (load-bearing facts):
 ## Conventions & environment
 
 - Vanilla JS, **zero dependencies**; keep the single-file/offline guarantee.
-- **No Node** in this environment; **Python 3.13** is available. JS can't be lint-checked via `node` —
-  verify in a browser instead.
+- **Node 26 and Python 3.13 are both available** (`C:\Program Files\nodejs`). Run the tests from
+  `slide-forge/tests/` — `npm install` once, then `node parity.mjs && node editor-ops.mjs`.
+  Use the **PowerShell** tool for node (the Bash tool doesn't see it on PATH).
+  `node --check src/<file>.js` also works for a fast syntax check.
+- `parity.mjs` currently reports **7 pre-existing cosmetic diffs** (timeline/hero-asym text-node
+  splits, `figure`'s media-img class from the media plan, a closing-slide whitespace split). They are
+  on `master` too — treat "7 diffs" as the baseline and only investigate a change in that number.
 - **Verify the editor:** serve the **repo root** over HTTP (`python -m http.server`) and open
   `slide-forge/editor-template.html?edit` (the `?edit` query auto-opens edit mode). The preview
   tooling's static root is the repo root, so worktree files load via their `.claude/worktrees/...` path.
@@ -122,6 +133,33 @@ Reported bug: the in-window resize handle only scaled horizontally. Three causes
 - Also: Inspector shows **Height** for every element (0/blank = natural), `syncGeomFields` keeps
   W/H live during a drag, free text (`type:"txt"`) honours `h`, 4 new assertions in
   `tests/scale-gestures.html` (**19/19 pass in a real browser** — this file needs no Node).
+
+## Recent work (2026-08-02) — v5: content-backed copies (`freeObjects[].type:'node'`)
+
+Fixes the reported gap: a duplicated or inserted object "misses the same editable features and
+source structure". `cleanCopy`/`specFromSel` used to strip `data-el`/`data-bind`/`data-arr` from the
+clone — the exact attributes that make an element editable — so every copy froze into
+`{type:'html'}` with no fields, no text editing and no list verbs. Full write-up in
+`slide-forge/references/editor.md` ("v5").
+
+- New free-object shape `{type:'node', layout, pick, content, overrides}`. `mountNodeFree` re-renders
+  the layout and lifts the subtree at `pick`; `namespaceKeys` rewrites its keys to `<id>/<key>`.
+- `partOf()`/`scopeOf()` are the routing layer — every content/override accessor (`ovFor`,
+  `peekData`, `contentArr`, `endEdit`, item ops, `toggleHide`, `itemSummary`, `deleteSel`,
+  `gcOverrides`, `contentTargetOf`) now asks scopeOf which host owns a key.
+- `Ctrl+D`/`Ctrl+C` on a **composite** → node copy; a lone text leaf still → `txt`; `raw` markup
+  still → `html`. ⊞ Insert now emits node objects.
+- Honesty fixes: the dead "Text" field on html/node objects is gone (it wrote `fo.text`, which those
+  types never render); the gallery hint and the "duplicate as free copy (deep)" label no longer
+  promise editability the old path didn't deliver; legacy html objects now say they're static copies.
+- Item ops are gated on the list being MOUNTED (`listMounted`/`itemArr`): a copy that picked a single
+  item (`pick:'stats.0'`) still carries the whole array in its content but renders one item, so
+  add/duplicate/remove there would grow an array nothing draws. They decline, and `Ctrl+D` falls
+  through to copying the whole object — which is what "duplicate this card" should mean.
+- `validate.py`: node-object schema + `fs`/`name`/`hide` added to the key sets (v4 gaps).
+- **Tests actually run this time**: `editor-ops.mjs` 142/142 pass (~35 new assertions); `parity.mjs`
+  unchanged at the 7-diff baseline. The suite caught the unmounted-list bug above, which browser
+  testing had missed. Also verified end-to-end in a real browser.
 
 ## Recent work (2026-07-31) — v4 editor UX overhaul (design handoff)
 

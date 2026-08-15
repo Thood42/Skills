@@ -153,6 +153,13 @@ body.forge-edit .forge-block:hover{ outline:1.5px dashed rgba(120,170,255,.55); 
 .forge-free.txt{ color:var(--ink); font-family:var(--font-display,inherit); font-size:34px; font-weight:700; }
 .forge-free.box{ background:var(--panel); border:1px solid var(--brd); border-radius:14px; }
 .forge-free.image, .forge-free.svg{ background:var(--panel-2); }
+/* content-backed copy (type:'node'): the mounted subtree brings its own look,
+   so the wrapper adds nothing. The shell exists only to carry the source
+   layout's section classes for descendant-selector matching — display:contents
+   keeps it out of layout entirely. */
+.forge-part-shell{ display:contents; }
+.forge-part-gone{ font-family:var(--font-mono); font-size:13px; color:var(--muted);
+  border:1px dashed var(--brd); border-radius:10px; padding:12px 14px; background:var(--panel); }
 .forge-free.image img, .forge-free.svg svg{ pointer-events:none; }
 .forge-free.frame-panel{ background:var(--panel); border:1px solid var(--brd); padding:10px; box-sizing:border-box; }
 .forge-free.frame-glow{ box-shadow:0 0 0 1px var(--brd-2), 0 0 34px color-mix(in srgb, var(--cyan) 35%, transparent); }

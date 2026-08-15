@@ -15,6 +15,12 @@
                  remove parse the item index from the element key and REMAP
                  sibling override keys, so styling survives list edits. A GC
                  pass in commit drops overrides whose element no longer exists.
+   v5 adds CONTENT-BACKED free objects (type:'node'): a copied or inserted
+   element carries the layout + content it was made from and RE-RENDERS from
+   data, so it keeps the fields, list verbs and text binding of the original
+   instead of freezing into markup. Its inner keys are namespaced by the
+   object id ("f7x2k/ring.label") — see partOf()/scopeOf() below, which route
+   every content + override read to the object that owns it.
    Everything selectable shares one Element model and the same verbs — move,
    resize (corner drag = width+height/reflow, Shift = aspect lock, Alt = scale), rotate, style, animate,
    copy, duplicate, delete, reorder(z) — plus double-click text editing, smart
@@ -98,6 +104,33 @@
   /* ---------- small helpers ---------- */
   function el(tag,cls,html){ var n=D.createElement(tag); if(cls)n.className=cls; if(html!=null)n.innerHTML=html; return n; }
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+  /* ---- free-object PART KEYS (v5) ---------------------------------------
+     A content-backed free object (type:'node') mounts a real layout subtree,
+     authored keys and all. Those keys are namespaced with the object's id and
+     a "/" — a character no content path can contain — for two reasons:
+       1. they can never collide with the slide's own authored keys, so
+          sec.querySelector('[data-el="ring"]') still means the SLIDE's ring;
+       2. one parse tells any accessor which content root and which override
+          bag the key addresses (scopeOf), so item ops, text write-back,
+          overrides and GC all route themselves with no extra plumbing.
+     Everything that keys off data-el keeps working unchanged; only the
+     storage accessors branch. */
+  var PARTSEP='/';
+  function partOf(key){ var k=String(key==null?'':key), i=k.indexOf(PARTSEP);
+    return i<0?null:{id:k.slice(0,i),inner:k.slice(i+1)}; }
+  function partKey(id,inner){ return id+PARTSEP+inner; }
+  /* a key with its namespace removed — for anything user-facing (labels,
+     breadcrumbs, the identity chip), which should never show the id */
+  function deNs(key){ var p=partOf(key); return p?p.inner:key; }
+  /* The object a key's content + overrides live on: a node free object's own
+     {content, overrides}, or the slide's. `key` comes back stripped of its
+     namespace, ready to use against host.content / host.overrides.
+     null = a part key whose object is gone (stale selection mid-render). */
+  function scopeOf(slideIdx,key,data){ var s=((data||SG.data).slides||[])[slideIdx]; if(!s) return null;
+    var p=partOf(key); if(!p) return {host:s,key:key,free:null};
+    var fo=(s.freeObjects||[]).filter(function(f){ return f.id===p.id; })[0];
+    return fo?{host:fo,key:p.inner,free:fo}:null; }
   function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
   function curSlide(){ var i=(parseInt((location.hash||'').slice(1),10)||1)-1; return clamp(i,0,(SG.data.slides||[]).length-1); }
   function pretty(k){ var m={k:"Key",v:"Value",desc:"Description",by:"Source",sub:"Subtitle",xlabel:"X label",ylabel:"Y label",fmt:"Format"};
@@ -134,14 +167,16 @@
     if(node&&node.hasAttribute&&node.hasAttribute('data-free')){
       if(node.getAttribute('data-name')) return {icon:'★',name:node.getAttribute('data-name')};
       var t=node.classList.contains('box')?'Box':node.classList.contains('html')?'Copied group'
+        :node.classList.contains('node')?'Copied element'
         :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram'
         :node.classList.contains('embed')?'Embed':'Text';
       return {icon:'★',name:t}; }
-    var seg=String(key||'').split('.'), last=seg[seg.length-1];
+    var seg=String(deNs(key)||'').split('.'), last=seg[seg.length-1];
     if(/^\d+$/.test(last)) return {icon:'№',name:singular(seg[seg.length-2])+' '+(+last+1)};
     if(node&&node.getAttribute&&node.getAttribute('data-arr'))
-      return {icon:'▦',name:arrayName(node.getAttribute('data-arr'))};
-    var icon=key==='kicker'||key==='kicker.text'?'K':(key==='title'||/\.title$/.test(key))?'T'
+      return {icon:'▦',name:arrayName(deNs(node.getAttribute('data-arr')))};
+    var bare=deNs(key);
+    var icon=bare==='kicker'||bare==='kicker.text'?'K':(bare==='title'||/\.title$/.test(bare))?'T'
       :(node&&node.hasAttribute&&node.hasAttribute('data-bind'))?'T':'◻';
     return {icon:icon,name:fieldName(last)}; }
   function deckEl(){ return D.getElementById('deck'); }
@@ -235,12 +270,17 @@
      never silent. */
   function gcOverrides(deck){ var dropped=[];
     var secs=deck.querySelectorAll('.slide');
-    (SG.data.slides||[]).forEach(function(s,i){
-      if(!s.overrides||s.layout==='raw') return; var sec=secs[i]; if(!sec) return;
-      Object.keys(s.overrides).forEach(function(k){
-        var n=sec.querySelector('[data-el="'+k+'"]');
-        if(!n||!Object.keys(s.overrides[k]||{}).length){ delete s.overrides[k]; dropped.push((i+1)+':'+k); } });
-      if(!Object.keys(s.overrides).length) delete s.overrides; });
+    /* one host at a time: the slide itself, then each content-backed free
+       object (whose part keys live in its OWN bag, under its namespace) */
+    function sweep(host,sec,label,ns){ if(!host.overrides) return;
+      Object.keys(host.overrides).forEach(function(k){
+        var n=sec.querySelector('[data-el="'+(ns?partKey(ns,k):k)+'"]');
+        if(!n||!Object.keys(host.overrides[k]||{}).length){ delete host.overrides[k]; dropped.push(label+k); } });
+      if(!Object.keys(host.overrides).length) delete host.overrides; }
+    (SG.data.slides||[]).forEach(function(s,i){ var sec=secs[i]; if(!sec) return;
+      if(s.layout!=='raw') sweep(s,sec,(i+1)+':',null);
+      (s.freeObjects||[]).forEach(function(fo){
+        if(fo.type==='node') sweep(fo,sec,(i+1)+':'+fo.id+PARTSEP,fo.id); }); });
     if(dropped.length) try{ console.info('slide-forge: removed '+dropped.length+' orphaned/empty override(s) — '+dropped.join(', ')); }catch(e){} }
 
   function decorateSection(sec,slide){
@@ -254,11 +294,53 @@
       var n=el('div','forge-block forge-free '+(fo.type||'txt')); n.setAttribute('data-free',fo.id);
       if(fo.name) n.setAttribute('data-name',fo.name);
       if(fo.type==='html') n.innerHTML=fo.html||'';
+      else if(fo.type==='node') mountNodeFree(n,fo);
       else if(fo.type==='image') mountImageFree(n,fo);
       else if(fo.type==='svg') mountSvgFree(n,fo);
       else if(fo.type==='embed') SG.mountEmbed&&SG.mountEmbed(n,fo);
       else if(fo.type!=='box') n.textContent=fo.text||'Text';
-      sec.appendChild(n); applyFree(n,fo); }); }
+      sec.appendChild(n); applyFree(n,fo);
+      /* a node object's parts carry their own overrides, in its own bag */
+      if(fo.type==='node'&&fo.overrides) Object.keys(fo.overrides).forEach(function(k){
+        var pn=n.querySelector('[data-el="'+partKey(fo.id,k)+'"]');
+        if(pn) applyOverride(pn,fo.overrides[k]); }); }); }
+
+  /* CONTENT-BACKED free object (v5). Render the SOURCE LAYOUT against this
+     object's own content, lift out the subtree it was made from, and mount it
+     with its authored data-el/data-bind/data-arr intact — namespaced by the
+     object id. That is the whole point: the copy keeps the fields, list verbs
+     and text binding of the element it came from, instead of freezing into an
+     HTML string (the old type:'html', still rendered above for existing decks
+     and for anything with no layout to re-render).
+     The object keeps the layout's WHOLE content, not just the picked branch:
+     layouts routinely read sibling fields, so pruning would change what the
+     element renders. Only the picked subtree is mounted. */
+  function mountNodeFree(n,fo){
+    function fail(msg){ n.appendChild(el('div','forge-part-gone',msg)); }
+    var fn=SG.layouts&&SG.layouts[fo.layout];
+    if(!fn) return fail('Layout "'+(fo.layout||'?')+'" is not in this deck.');
+    var host=el('div'), out;
+    try{ out=fn(clone(fo.content||{}),{index:0,total:1}); }catch(e){ out=null; }
+    if(!out||out.raw!=null) return fail('This element can no longer be rendered.');
+    (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      host.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
+    var pick=fo.pick?host.querySelector('[data-el="'+fo.pick+'"]'):host.firstElementChild;
+    if(!pick) return fail('"'+(fo.pick||'?')+'" is no longer part of the '+fo.layout+' layout.');
+    namespaceKeys(pick,fo.id);
+    /* Some layouts' CSS is written against the bare layout name ON THE SECTION
+       (".quote blockquote"). A boxless shell carrying those classes keeps the
+       lifted subtree matching them — display:contents means it participates in
+       selector matching and inheritance but adds no layout of its own, so it
+       can't drag the section's own box model onto a free object. */
+    var shell=el('div','forge-part-shell'
+      +((SG.SECTION_LAYOUTS&&SG.SECTION_LAYOUTS[fo.layout])?' '+fo.layout:'')+' lyt-'+fo.layout);
+    shell.appendChild(pick); n.appendChild(shell); }
+  /* rewrite a lifted subtree's authored keys into the object's namespace */
+  function namespaceKeys(root,id){
+    [root].concat([].slice.call(root.querySelectorAll('[data-el],[data-bind],[data-arr]')))
+      .forEach(function(n){ ['data-el','data-bind','data-arr'].forEach(function(a){
+        var v=n.getAttribute(a); if(v!=null) n.setAttribute(a,partKey(id,v)); }); }); }
 
   /* image/svg free objects (media plan §3): content is mounted ONCE here;
      geometry/fit/frame styling is re-applied on every drag frame by
@@ -398,19 +480,24 @@
   var _ovStub=null;    /* one-slot cache, so two readers of the SAME unedited
                           element share one detached object. Without it the
                           inspector and a corner drag each got their own stub
-                          and whichever wrote last replaced the other's data. */
-  function ovFor(i,key){ var s=SG.data.slides[i];
-    if(s.overrides&&s.overrides[key]) return s.overrides[key];
-    if(_ovStub&&_ovStub.slide===s&&_ovStub.key===key) return _ovStub.proxy;
+                          and whichever wrote last replaced the other's data.
+                          Keyed on the resolved HOST (slide or node object) so
+                          namespaced node-object keys cache correctly too. */
+  function ovFor(i,key){ var sc=scopeOf(i,key); if(!sc) return {};
+    var h=sc.host, k=sc.key;
+    if(h.overrides&&h.overrides[k]) return h.overrides[k];
+    if(_ovStub&&_ovStub.host===h&&_ovStub.key===k) return _ovStub.proxy;
     var obj={};
-    var proxy=new Proxy(obj,{ set:function(t,p,v){ t[p]=v; s.overrides=s.overrides||{}; s.overrides[key]=t; return true; } });
-    _ovStub={slide:s,key:key,proxy:proxy};
+    var proxy=new Proxy(obj,{ set:function(t,p,v){ t[p]=v; h.overrides=h.overrides||{}; h.overrides[k]=t; return true; } });
+    _ovStub={host:h,key:k,proxy:proxy};
     return proxy; }
   function freeFor(i,id){ var s=SG.data.slides[i]; return (s.freeObjects||[]).filter(function(f){return f.id===id;})[0]; }
   function elData(sel){ if(!sel) return null; return sel.kind==='free'?freeFor(sel.slideIdx,sel.id):ovFor(sel.slideIdx,sel.key); }
   /* non-creating accessor (elData creates an empty override on read) */
   function peekData(x){ var s=SG.data.slides[x.slideIdx]; if(!s) return null;
-    return x.kind==='free'?freeFor(x.slideIdx,x.id):(s.overrides?s.overrides[x.key]:null); }
+    if(x.kind==='free') return freeFor(x.slideIdx,x.id);
+    var sc=scopeOf(x.slideIdx,x.key);
+    return sc&&sc.host.overrides?sc.host.overrides[sc.key]:null; }
   /* selecting any member of a group selects the whole group */
   function expandGroups(recs){ if(!recs.length) return recs;
     var gids={}, any=false;
@@ -637,24 +724,40 @@
   function endEdit(){ var node=F.editing; if(!node) return; teardownEdit(node);
     if(node.innerHTML===F._editOrig) return;                       /* no change: no-op */
     var markers=serializeMarks(node.innerHTML);
-    var i=slideIdxOf(node), key=node.getAttribute('data-el'), bind=node.getAttribute('data-bind');
+    var i=slideIdxOf(node), key=node.getAttribute('data-el'), bind=deNs(node.getAttribute('data-bind'));
     if(i<0||!key) return;
-    F.do('edit text',function(data){ var s=data.slides[i];
+    F.do('edit text',function(data){ var sc=scopeOf(i,key,data); if(!sc) return;
+      /* the host is the slide, or — for a part of a content-backed free
+         object — that object, so a copy's text edits stay inside the copy */
+      var h=sc.host, k=sc.key;
       /* data-bind names the exact content field this leaf renders — write back
          deterministically. Unbound leaves (raw slides, derived text like item
          numbers) store an html override instead (reversible via Reset). */
-      if(bind){ SG.setPath(s.content=s.content||{},bind,markers);
-        if(s.overrides&&s.overrides[key]&&s.overrides[key].html!=null){   /* clear stale shadow */
-          delete s.overrides[key].html;
-          if(!Object.keys(s.overrides[key]).length) delete s.overrides[key]; } }
-      else { s.overrides=s.overrides||{}; (s.overrides[key]=s.overrides[key]||{}).html=markers; } }); }
+      if(bind){ SG.setPath(h.content=h.content||{},bind,markers);
+        if(h.overrides&&h.overrides[k]&&h.overrides[k].html!=null){   /* clear stale shadow */
+          delete h.overrides[k].html;
+          if(!Object.keys(h.overrides[k]).length) delete h.overrides[k]; } }
+      else { h.overrides=h.overrides||{}; (h.overrides[k]=h.overrides[k]||{}).html=markers; } }); }
   F.endEdit=endEdit;
 
   /* =====================================================================
-     CLIPBOARD — copy/paste/duplicate. Free objects copy losslessly; template
-     elements land as free objects carrying their text + computed style.
+     CLIPBOARD — copy/paste/duplicate. Free objects copy losslessly; a keyed
+     COMPOSITE copies as a content-backed object (type:'node') that re-renders
+     from data and stays as editable as the original; a lone text leaf copies
+     as free text; only markup with no layout behind it freezes into html.
      ===================================================================== */
   F.clipboard=null;
+  /* the layout + content a keyed element re-renders from — the basis for a
+     content-backed copy. null when there is nothing to re-render FROM: a raw
+     slide's positional markup, a layout this deck no longer carries, or a
+     part whose owning object has gone away. */
+  function nodeSourceFor(x){ if(!x||x.kind==='free'||!x.key) return null;
+    var s=(SG.data.slides||[])[x.slideIdx]; if(!s) return null;
+    var p=partOf(x.key);
+    if(p){ var src=freeFor(x.slideIdx,p.id);
+      return (src&&src.type==='node')?{layout:src.layout,pick:p.inner,content:clone(src.content||{})}:null; }
+    if(s.layout==='raw'||!SG.layouts||!SG.layouts[s.layout]) return null;
+    return {layout:s.layout,pick:x.key,content:clone(s.content||{})}; }
   function specFromSel(x){ var d=elData(x)||{}, box=boxOf(x.node);
     if(x.kind==='free'){ var c=clone(d); delete c.id; return c; }
     var cs=W.getComputedStyle(x.node);
@@ -662,7 +765,18 @@
       return {type:'txt', text:serializeMarks(x.node.innerHTML), x:Math.round(box.x), y:Math.round(box.y),
         size:Math.round(parseFloat(cs.fontSize)||34), color:d.color||cs.color, font:d.font||cs.fontFamily,
         rot:d.rot||0, anim:d.anim||'', animDelay:d.animDelay||0};
-    /* deep copy: carry the container's full markup (nested items included) */
+    /* CONTENT-BACKED copy (v5): carry the layout + content instead of the
+       pixels, so the copy keeps its fields, list verbs and text binding.
+       Composites only — a lone leaf lifted out of its parent would lose any
+       styling written as a descendant selector, and the `txt` copy above is
+       already fully editable. No height: width reflows, height follows. */
+    var src=x.node.querySelector('[data-el]')?nodeSourceFor(x):null;
+    if(src){ var spec={type:'node',layout:src.layout,pick:src.pick,content:src.content,
+        x:Math.round(box.x), y:Math.round(box.y), w:Math.round(box.w), rot:d.rot||0};
+      ['color','font','fs','anim','animDelay','animTrigger','animStep','z','href'].forEach(function(k){ if(d[k]!=null) spec[k]=d[k]; });
+      if(d.theme) spec.theme=clone(d.theme);
+      return spec; }
+    /* last resort: no layout to re-render from — carry the raw markup */
     var cl=x.node.cloneNode(true);
     [].slice.call(cl.querySelectorAll('.forge-handles,.forge-guides,.forge-marquee,.forge-free,.sf-embed-iframe-wrap,.sf-embed-shield')).forEach(function(n){ n.remove(); });
     [].slice.call(cl.querySelectorAll('[data-el]')).forEach(function(n){
@@ -684,9 +798,10 @@
     var sec=deckEl().querySelectorAll('.slide')[i], nodes=[];
     ids.forEach(function(id){ var n=sec&&sec.querySelector('[data-free="'+id+'"]'); if(n) nodes.push(n); });
     if(nodes.length) selectNodes(nodes,false); };
-  /* Duplicate prefers FIDELITY: a nested layout item clones its content entry
-     in place (identical element, identical behavior); anything else becomes a
-     free copy that carries the full markup + style properties. */
+  /* Duplicate prefers FIDELITY *and* editability: a nested layout item clones
+     its content entry in place (identical element, identical behavior);
+     anything else goes through the clipboard, which now yields a
+     content-backed copy for composites (see specFromSel). */
   F.dupSel=function(){ if(!F.sels.length) return;
     if(F.sels.length===1){ var x=F.sel, it=x.kind!=='free'?itemOf(x.key):null;
       if(it&&x.key===it.path+'.'+it.idx&&F.dupItem(x.slideIdx,x.node)) return; }
@@ -697,7 +812,8 @@
   F.detachSel=function(){ var x=F.sel; if(!x||x.kind==='free'||!isLeafText(x.node)) return;
     var spec=specFromSel(x), i=x.slideIdx, key=x.key, id=uid(); spec.id=id; clearSel();
     F.do('detach',function(data){ var s=data.slides[i]; s.freeObjects=s.freeObjects||[]; s.freeObjects.push(spec);
-      s.overrides=s.overrides||{}; (s.overrides[key]=s.overrides[key]||{}).hide=1; });
+      var sc=scopeOf(i,key,data); if(!sc) return;
+      sc.host.overrides=sc.host.overrides||{}; (sc.host.overrides[sc.key]=sc.host.overrides[sc.key]||{}).hide=1; });
     var sec=deckEl().querySelectorAll('.slide')[i], n=sec&&sec.querySelector('[data-free="'+id+'"]');
     if(n) selectNode(n,false); };
 
@@ -714,11 +830,25 @@
     for(var e=seg.length;e>0;e--){ if(/^\d+$/.test(seg[e-1]))
       return {path:seg.slice(0,e-1).join('.'),idx:+seg[e-1]}; }
     return null; }
-  function contentArr(slideIdx,path){ var s=SG.data.slides[slideIdx]; if(!s||!path) return null;
-    var a=SG.getPath(s.content||{},path); return Array.isArray(a)?a:null; }
+  function contentArr(slideIdx,path){ if(!path) return null;
+    var sc=scopeOf(slideIdx,path); if(!sc||!sc.key) return null;
+    var a=SG.getPath(sc.host.content||{},sc.key); return Array.isArray(a)?a:null; }
+  /* An item op only means something when the LIST IS ACTUALLY ON SCREEN. A
+     content-backed copy mounts only its picked branch, so a copy of ONE stat
+     card still has the whole stats[] in its content while rendering a single
+     item: adding to it there would grow an array nothing draws. In that case
+     item ops decline, and Duplicate falls through to copying the whole object
+     — which is what "duplicate this stat card" should mean anyway. */
+  function listMounted(slideIdx,path){ if(!partOf(path)) return true;
+    var sec=deckEl().querySelectorAll('.slide')[slideIdx];
+    return !!(sec&&sec.querySelector('[data-arr="'+path+'"]')); }
+  function itemArr(slideIdx,path){ return listMounted(slideIdx,path)?contentArr(slideIdx,path):null; }
+  /* the three remap helpers below take a HOST — a slide, or a content-backed
+     free object — since either can own a content array and an override bag.
+     They only ever touch host.overrides, so the same code serves both. */
   /* shift override keys under `path` after an item insert (+1 at idx) or
      removal (-1 at idx: the removed item's overrides go with it) */
-  function remapItemOverrides(s,path,idx,delta){ if(!s.overrides) return;
+  function remapItemOverrides(s,path,idx,delta){ if(!s||!s.overrides) return;
     var pre=path+'.', out={};
     Object.keys(s.overrides).forEach(function(k){
       if(k.indexOf(pre)!==0){ out[k]=s.overrides[k]; return; }
@@ -729,12 +859,12 @@
       out[pre+seg.join('.')]=s.overrides[k]; });
     s.overrides=out; }
   /* copy one item's overrides to another index (duplicate keeps its styling) */
-  function copyItemOverrides(s,path,from,to){ if(!s.overrides) return;
+  function copyItemOverrides(s,path,from,to){ if(!s||!s.overrides) return;
     var a=path+'.'+from, out={};
     Object.keys(s.overrides).forEach(function(k){
       if(k===a||k.indexOf(a+'.')===0) out[path+'.'+to+k.slice(a.length)]=clone(s.overrides[k]); });
     Object.keys(out).forEach(function(k){ s.overrides[k]=out[k]; }); }
-  function swapItemOverrides(s,path,a,b){ if(!s.overrides) return;
+  function swapItemOverrides(s,path,a,b){ if(!s||!s.overrides) return;
     var pa=path+'.'+a, pb=path+'.'+b, out={};
     Object.keys(s.overrides).forEach(function(k){
       if(k===pa||k.indexOf(pa+'.')===0) out[pb+k.slice(pa.length)]=s.overrides[k];
@@ -743,23 +873,22 @@
     s.overrides=out; }
   F.addItem=function(slideIdx,containerNode){
     var path=containerNode.getAttribute&&containerNode.getAttribute('data-arr');
-    var a=contentArr(slideIdx,path); if(!a) return false;
-    F.do('add item',function(data){ var arr2=SG.getPath(data.slides[slideIdx].content,path);
-      arr2.push(arr2.length?newItemLike(arr2[arr2.length-1]):{title:''}); }); return true; };
+    if(!itemArr(slideIdx,path)) return false;
+    return F.addItemPath(slideIdx,path); };
   F.dupItem=function(slideIdx,node){
     var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
-    if(!contentArr(slideIdx,it.path)) return false;
-    F.do('duplicate item',function(data){ var s=data.slides[slideIdx];
-      var arr2=SG.getPath(s.content,it.path); arr2.splice(it.idx+1,0,clone(arr2[it.idx]));
-      remapItemOverrides(s,it.path,it.idx+1,+1);
-      copyItemOverrides(s,it.path,it.idx,it.idx+1); }); return true; };
+    if(!itemArr(slideIdx,it.path)) return false;
+    F.do('duplicate item',function(data){ var sc=scopeOf(slideIdx,it.path,data); if(!sc) return;
+      var arr2=SG.getPath(sc.host.content,sc.key); arr2.splice(it.idx+1,0,clone(arr2[it.idx]));
+      remapItemOverrides(sc.host,sc.key,it.idx+1,+1);
+      copyItemOverrides(sc.host,sc.key,it.idx,it.idx+1); }); return true; };
   F.removeItem=function(slideIdx,node){
     var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
-    if(!contentArr(slideIdx,it.path)) return false;
+    if(!itemArr(slideIdx,it.path)) return false;
     clearSel();
-    F.do('remove item',function(data){ var s=data.slides[slideIdx];
-      SG.getPath(s.content,it.path).splice(it.idx,1);
-      remapItemOverrides(s,it.path,it.idx,-1); }); return true; };
+    F.do('remove item',function(data){ var sc=scopeOf(slideIdx,it.path,data); if(!sc) return;
+      SG.getPath(sc.host.content,sc.key).splice(it.idx,1);
+      remapItemOverrides(sc.host,sc.key,it.idx,-1); }); return true; };
 
   /* =====================================================================
      ALIGN & DISTRIBUTE — multi-select verbs, slide-space math.
@@ -797,21 +926,22 @@
     var acts=sels.map(function(x){
       if(x.kind==='free') return {t:'free',i:x.slideIdx,id:x.id};
       var it=x.slideIdx!=null?itemOf(x.key):null;
-      if(it&&x.key!==null&&/^\S+$/.test(x.key)&&contentArr(x.slideIdx,it.path)
+      if(it&&x.key!==null&&/^\S+$/.test(x.key)&&itemArr(x.slideIdx,it.path)
         &&x.key===it.path+'.'+it.idx)                      /* the item itself, not a leaf inside it */
         return {t:'item',i:x.slideIdx,path:it.path,idx:it.idx};
       return {t:'reset',i:x.slideIdx,key:x.key}; });
     clearSel();
     F.do('delete',function(data){
-      /* group item removals per slide+array, delete high->low with remap */
+      /* group item removals per host+array, delete high->low with remap */
       acts.filter(function(a){ return a.t==='item'; })
         .sort(function(a,b){ return b.idx-a.idx; })
-        .forEach(function(a){ var s=data.slides[a.i];
-          SG.getPath(s.content,a.path).splice(a.idx,1);
-          remapItemOverrides(s,a.path,a.idx,-1); });
+        .forEach(function(a){ var sc=scopeOf(a.i,a.path,data); if(!sc) return;
+          SG.getPath(sc.host.content,sc.key).splice(a.idx,1);
+          remapItemOverrides(sc.host,sc.key,a.idx,-1); });
       acts.forEach(function(a){ var s=data.slides[a.i];
         if(a.t==='free'&&s) s.freeObjects=(s.freeObjects||[]).filter(function(f){ return f.id!==a.id; });
-        else if(a.t==='reset'&&s&&s.overrides) delete s.overrides[a.key]; }); }); };
+        else if(a.t==='reset'){ var sc=scopeOf(a.i,a.key,data);
+          if(sc&&sc.host.overrides) delete sc.host.overrides[sc.key]; } }); }); };
 
   /* =====================================================================
      FLOATING CONTEXTUAL TOOLBAR — appears over the selection.
@@ -877,13 +1007,13 @@
     if(!isSelected(node)) selectNode(node,false);
     if(isLeafText(node)) ctxMenu.appendChild(ctxItem('✎ Edit text',null,function(){ startEdit(node); }));
     if(!isFree){ var si=slideIdxOf(node), it=itemOf(node.getAttribute('data-el'));
-      if(it&&contentArr(si,it.path)){
+      if(it&&itemArr(si,it.path)){
         ctxMenu.appendChild(ctxItem('⧉ Duplicate item (in layout)',null,function(){ F.dupItem(si,node); }));
         ctxMenu.appendChild(ctxItem('✕ Remove item','warn',function(){ F.removeItem(si,node); })); }
       if(node.getAttribute('data-arr'))
         ctxMenu.appendChild(ctxItem('＋ Add item',null,function(){ F.addItem(si,node); })); }
     if(!isFree&&isLeafText(node)) ctxMenu.appendChild(ctxItem('⇱ Detach to free text',null,function(){ F.detachSel(); }));
-    ctxMenu.appendChild(ctxItem(isFree?'⧉ Duplicate':'⧉ Duplicate as free copy (deep)',null,function(){ F.dupSel(); }));
+    ctxMenu.appendChild(ctxItem(isFree?'⧉ Duplicate':'⧉ Duplicate as a free copy',null,function(){ F.dupSel(); }));
     ctxMenu.appendChild(ctxItem('⿻ Copy',null,function(){ F.copySel(); }));
     if(F.clipboard) ctxMenu.appendChild(ctxItem('⿹ Paste',null,function(){ F._pasteN=0; F.paste(); }));
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
@@ -909,7 +1039,10 @@
     var cur=F.sel.node;
     if(cur===hit||!cur.contains(hit)) return blk;
     var n=hit, parent;
-    while(n){ parent=n.parentNode&&n.parentNode.closest('[data-el]');
+    /* [data-free] terminates the chain too, so clicking again inside a
+       content-backed free object drills into its parts (the object itself is
+       the top of that hierarchy, and carries no data-el of its own) */
+    while(n){ parent=n.parentNode&&n.parentNode.closest('[data-el],[data-free]');
       if(parent===cur) return n; if(!parent) break; n=parent; }
     return blk; }
   function wireDeck(){ var deck=deckEl();
@@ -1192,24 +1325,28 @@
      renderer, used by the sidebar Content panel, the contextual inspector's
      Content section, and the Manage-items modal (v4), so those can never
      drift apart. */
-  function fieldFor(host,obj,k,slideIdx,path){ var v=obj[k];
-    if(Array.isArray(v)){ arrayEditor(host,obj,k,slideIdx,(path||'')+k); return; }
+  /* `own` (optional) is the object whose overrides follow these items around —
+     the slide by default, or a content-backed free object when the form is
+     editing that object's own content. Threaded through so array reorder /
+     duplicate / remove remap the RIGHT override bag. */
+  function fieldFor(host,obj,k,slideIdx,path,own){ var v=obj[k];
+    if(Array.isArray(v)){ arrayEditor(host,obj,k,slideIdx,(path||'')+k,own); return; }
     if(v!==null&&typeof v==='object'){ var grp=el('div','forge-card');
       grp.appendChild(el('div','forge-card-h','<span>'+fieldName(k)+'</span>'));
-      contentForm(grp,v,slideIdx,(path||'')+k+'.'); host.appendChild(grp); return; }
+      contentForm(grp,v,slideIdx,(path||'')+k+'.',own); host.appendChild(grp); return; }
     if(typeof v==='boolean'){ host.appendChild(fieldRow(fieldName(k),boundCheck(obj,k))); return; }
     if(typeof v==='number'){ host.appendChild(field(fieldName(k),boundNum(obj,k))); return; }
     if(ASSET_FIELDS[k]&&F.assets){ host.appendChild(field(fieldName(k),assetPickerField(obj,k,ASSET_FIELDS[k]))); return; }
     host.appendChild(field(fieldName(k),boundText(obj,k, k==='code'||k==='html'||k==='body'&&String(v).length>80||String(v).length>70||/\n/.test(String(v)) ))); }
-  function contentForm(host,obj,slideIdx,path){
-    Object.keys(obj).forEach(function(k){ fieldFor(host,obj,k,slideIdx,path); }); }
+  function contentForm(host,obj,slideIdx,path,own){
+    Object.keys(obj).forEach(function(k){ fieldFor(host,obj,k,slideIdx,path,own); }); }
   function newItemLike(item){ if(typeof item==='string') return '';
     if(typeof item==='number') return 0;
     if(item&&typeof item==='object'){ var o={}; Object.keys(item).forEach(function(k){
       var v=item[k]; o[k]=typeof v==='number'?0:typeof v==='boolean'?false:Array.isArray(v)?[]:(v&&typeof v==='object')?newItemLike(v):''; }); return o; }
     return ''; }
-  function arrayEditor(host,obj,k,slideIdx,apath){ var wrap=el('div','forge-arr');
-    function slideOf(data){ return data.slides[slideIdx]; }
+  function arrayEditor(host,obj,k,slideIdx,apath,own){ var wrap=el('div','forge-arr');
+    function slideOf(data){ return own||data.slides[slideIdx]; }
     var one=singular(k);
     var head=el('div','forge-arr-h','<span>'+arrayName(k)+' · '+obj[k].length+'</span>');
     var addB=el('button','forge-chip add','＋ Add '+one.toLowerCase());
@@ -1233,7 +1370,7 @@
       chip('✕','Remove',function(){ F.do('remove item',function(data){ obj[k].splice(i,1);
         if(apath) remapItemOverrides(slideOf(data),apath,i,-1); }); },'warn');
       h.appendChild(tools); card.appendChild(h);
-      if(item!==null&&typeof item==='object') contentForm(card,item,slideIdx,apath+'.'+i+'.');
+      if(item!==null&&typeof item==='object') contentForm(card,item,slideIdx,apath+'.'+i+'.',own);
       else { var t=el('textarea'); t.rows=2; t.value=item==null?'':item;
         t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ obj[k][i]=t.value; F.renderLiveSlide(); };
         var f=el('div','forge-field'); f.appendChild(t); card.appendChild(f); }
@@ -1332,8 +1469,11 @@
   /* build the hierarchy from the authored keys themselves ("stats.2" is a
      child of "stats"), so the list matches the CONTENT structure even when the
      DOM interleaves (pipeline connectors) or nests differently. */
-  function keyedTree(sec){ var map={}, roots=[];
-    [].slice.call(sec.querySelectorAll('[data-el]')).forEach(function(n){
+  function keyedTree(scope,inFree){ var map={}, roots=[];
+    [].slice.call(scope.querySelectorAll('[data-el]')).forEach(function(n){
+      /* a content-backed free object's parts are listed UNDER the object, not
+         as extra top-level rows — so the slide walk skips them */
+      if(!inFree&&n.closest('.forge-free')) return;
       map[n.getAttribute('data-el')]={node:n,kids:[]}; });
     Object.keys(map).forEach(function(k){ var p=k.lastIndexOf('.');
       var par=p>0?map[k.slice(0,p)]:null;
@@ -1362,35 +1502,52 @@
       entry.kids.forEach(walk); }
     keyedTree(sec).forEach(walk);
     [].slice.call(sec.querySelectorAll('.forge-free')).forEach(function(n){
-      out.push({node:n,key:n.getAttribute('data-free'),free:true,depth:0}); });
+      out.push({node:n,key:n.getAttribute('data-free'),free:true,depth:0});
+      partRows(n,out); });
     return out; }
+  /* rows for the editable parts inside a content-backed free object, indented
+     under it. Same rule as the slide's own elements — lists and list items
+     earn a row, the leaves inside them are fields in the Selected panel — and
+     the picked root IS the object, so it never gets a second row. */
+  function partRows(wrap,out){
+    function walk(entry,depth){ var n=entry.node, key=n.getAttribute('data-el');
+      if(depth>0&&!decorative(n)&&(n.getAttribute('data-arr')||/(^|\.)\d+$/.test(key)))
+        out.push({node:n,key:key,depth:Math.min(2,depth),part:true});
+      entry.kids.sort(function(a,b){ return a.node.getAttribute('data-el')
+        .localeCompare(b.node.getAttribute('data-el'),undefined,{numeric:true}); });
+      entry.kids.forEach(function(k){ walk(k,depth+1); }); }
+    keyedTree(wrap,true).forEach(function(e){ walk(e,0); }); }
   F.itemRows=itemRows;
   /* the array a slide's "＋ Add …" button appends to: the one the selection
      sits in, else the first array the layout renders. */
   function primaryArray(sec,slideIdx){
     var sel=F.sel&&F.sel.slideIdx===slideIdx?F.sel.key:null;
-    if(sel){ var it=itemOf(sel); if(it&&contentArr(slideIdx,it.path)) return it.path;
+    if(sel){ var it=itemOf(sel); if(it&&itemArr(slideIdx,it.path)) return it.path;
       var n=sec.querySelector('[data-el="'+sel+'"]');
       if(n&&n.getAttribute('data-arr')) return n.getAttribute('data-arr'); }
-    var c=sec.querySelector('[data-arr]'); return c?c.getAttribute('data-arr'):null; }
-  F.addItemPath=function(slideIdx,path){ if(!contentArr(slideIdx,path)) return false;
-    F.do('add item',function(data){ var a=SG.getPath(data.slides[slideIdx].content,path);
+    /* fallback: the slide's OWN first list, never one inside a free object */
+    var c=[].slice.call(sec.querySelectorAll('[data-arr]')).filter(function(n){ return !n.closest('.forge-free'); })[0];
+    return c?c.getAttribute('data-arr'):null; }
+  F.addItemPath=function(slideIdx,path){ if(!itemArr(slideIdx,path)) return false;
+    F.do('add item',function(data){ var sc=scopeOf(slideIdx,path,data); if(!sc) return;
+      var a=SG.getPath(sc.host.content,sc.key);
       a.push(a.length?newItemLike(a[a.length-1]):{title:''}); }); return true; };
   /* eye toggle -> overrides[key].hide (or freeObject.hide) */
   F.toggleHide=function(slideIdx,key,isFree){
     F.do('show/hide',function(data){ var s=data.slides[slideIdx];
       if(isFree){ var fo=(s.freeObjects||[]).filter(function(f){ return f.id===key; })[0];
         if(fo){ if(fo.hide) delete fo.hide; else fo.hide=1; } return; }
-      s.overrides=s.overrides||{}; var o=s.overrides[key]=s.overrides[key]||{};
-      if(o.hide){ delete o.hide; if(!Object.keys(o).length) delete s.overrides[key]; } else o.hide=1; }); };
+      var sc=scopeOf(slideIdx,key,data); if(!sc) return; var h=sc.host;
+      h.overrides=h.overrides||{}; var o=h.overrides[sc.key]=h.overrides[sc.key]||{};
+      if(o.hide){ delete o.hide; if(!Object.keys(o).length) delete h.overrides[sc.key]; } else o.hide=1; }); };
   /* An item's row reads from CONTENT, not the DOM: the DOM text of a stat is
      mid-count-up ("0", "3" for 3.2) and runs its fields together. Headline
      goes after the item number ("Stat 3 — 12×"), the descriptive field below. */
   var HEAD_FIELDS=['count','value','title','name','head','quote','year','k','tag','label'];
   var SUB_FIELDS=['label','desc','body','by','sub','v','caption','name','title'];
   function itemSummary(slideIdx,key){
-    var s=SG.data.slides[slideIdx]; if(!s) return null;
-    var v=SG.getPath(s.content||{},key);
+    var sc=scopeOf(slideIdx,key); if(!sc) return null;
+    var v=SG.getPath(sc.host.content||{},sc.key);
     if(typeof v==='string'||typeof v==='number') return {head:'',sub:String(v)};
     if(!v||typeof v!=='object') return null;
     var head='',subv='',i;
@@ -1401,7 +1558,8 @@
     return {head:head.slice(0,18),sub:subv}; }
   function isHidden(slideIdx,key,isFree){ var s=SG.data.slides[slideIdx]; if(!s) return false;
     if(isFree){ var fo=(s.freeObjects||[]).filter(function(f){ return f.id===key; })[0]; return !!(fo&&fo.hide); }
-    return !!((s.overrides||{})[key]||{}).hide; }
+    var sc=scopeOf(slideIdx,key); if(!sc) return false;
+    return !!((sc.host.overrides||{})[sc.key]||{}).hide; }
   function itemsPanel(host,slideIdx){
     var sec0=deckEl().querySelectorAll('.slide')[slideIdx]; if(!sec0) return;
     var s=el('div','forge-sec forge-items'); s.appendChild(el('div','forge-subh','On this slide'));
@@ -1450,8 +1608,13 @@
     if(!x||!x.section) return parts;
     var sec=x.section;
     if(x.kind==='free'){ parts.push({label:elName(x.node,x.id).name,key:x.id,free:true}); return parts; }
-    var seg=String(x.key).split('.');
-    for(var i=1;i<=seg.length;i++){ var k=seg.slice(0,i).join('.');
+    var seg=String(x.key).split('.'), start=1;
+    /* a part of a content-backed free object hangs off that OBJECT, so the
+       walk starts there — and skips seg[0], which is the object's own root */
+    var p=partOf(x.key);
+    if(p){ var fn=sec.querySelector('[data-free="'+p.id+'"]');
+      if(fn){ parts.push({label:elName(fn,p.id).name,key:p.id,free:true}); start=2; } }
+    for(var i=start;i<=seg.length;i++){ var k=seg.slice(0,i).join('.');
       var n=sec.querySelector('[data-el="'+k+'"]'); if(!n) continue;
       parts.push({label:elName(n,k).name,key:k}); }
     return parts; };
@@ -1734,12 +1897,16 @@
     /* animations overview: every animated element on this slide, in one place */
     var anims=[]; var ovv=slide.overrides||{};
     Object.keys(ovv).forEach(function(k){ if(ovv[k]&&ovv[k].anim) anims.push({key:k,d:ovv[k],free:false}); });
-    (slide.freeObjects||[]).forEach(function(fo){ if(fo.anim) anims.push({key:fo.id,d:fo,free:true}); });
+    (slide.freeObjects||[]).forEach(function(fo){ if(fo.anim) anims.push({key:fo.id,d:fo,free:true});
+      /* a content-backed copy's parts can be animated too — their overrides
+         live in the object's own bag, under its namespace */
+      Object.keys(fo.overrides||{}).forEach(function(k){
+        if(fo.overrides[k]&&fo.overrides[k].anim) anims.push({key:partKey(fo.id,k),d:fo.overrides[k],free:false}); }); });
     if(anims.length){ s.appendChild(el('div','forge-subh','Animations on this slide'));
       var sec0=deckEl().querySelectorAll('.slide')[i];
       anims.sort(function(a,b){ return (a.d.animStep||0)-(b.d.animStep||0); });
       anims.forEach(function(a){ var row=el('div','forge-anim-row');
-        var lb=el('span','lb'); lb.textContent=(a.free?'★ ':'')+a.key+' · '+a.d.anim
+        var lb=el('span','lb'); lb.textContent=(a.free?'★ ':partOf(a.key)?'★ ':'')+deNs(a.key)+' · '+a.d.anim
           +(a.d.animTrigger==='click'?(' · click #'+(a.d.animStep||0)):(ANIM_ENTRANCE[a.d.anim]?' · enter':' · loop'))
           +(a.d.animDelay?(' · '+a.d.animDelay+'s'):'');
         row.appendChild(lb);
@@ -1858,18 +2025,32 @@
   /* which content this selection edits: one bound field, or a whole item /
      object's fields. Containers and unbound composites return null. */
   function contentTargetOf(sel){
-    if(sel.kind==='free') return null;
-    var s=SG.data.slides[sel.slideIdx]; if(!s) return null; var c=s.content||{};
+    var c, key, own=null;
+    if(sel.kind==='free'){
+      /* a content-backed free object resolves to the content it re-renders
+         from, at the branch it was copied from — so selecting an inserted
+         metric ring shows Value / Suffix / Label straight away, with no
+         drill-down. Every other free type has no content model. */
+      var fo=freeFor(sel.slideIdx,sel.id);
+      if(!fo||fo.type!=='node'||!fo.pick) return null;
+      c=fo.content||{}; key=fo.pick; own=fo;
+      /* the object's root may itself be a bound leaf or a list container */
+      var rn=sel.node.querySelector('[data-el="'+partKey(fo.id,fo.pick)+'"]');
+      if(rn&&rn.getAttribute('data-arr')) return null; }
+    else { var sc=scopeOf(sel.slideIdx,sel.key); if(!sc) return null;
+      c=sc.host.content||{}; key=sc.key; own=sc.free;
+      var bind=deNs(sel.node.getAttribute&&sel.node.getAttribute('data-bind'));
+      if(bind) return single(bind);
+      if(sel.node.getAttribute&&sel.node.getAttribute('data-arr')) return null; }  /* container: count + Add instead */
     function single(path){ var p=path.lastIndexOf('.');
       var parent=p>0?SG.getPath(c,path.slice(0,p)):c, k=p>0?path.slice(p+1):path;
-      return (parent&&typeof parent==='object')?{single:true,obj:parent,key:k,path:p>0?path.slice(0,p)+'.':''}:null; }
-    var bind=sel.node.getAttribute&&sel.node.getAttribute('data-bind');
-    if(bind) return single(bind);
-    if(sel.node.getAttribute&&sel.node.getAttribute('data-arr')) return null;   /* container: count + Add instead */
-    var val=SG.getPath(c,sel.key);
+      return (parent&&typeof parent==='object')
+        ?{single:true,obj:parent,key:k,path:p>0?path.slice(0,p)+'.':'',own:own}:null; }
+    if(!key) return null;
+    var val=SG.getPath(c,key);
     if(Array.isArray(val)) return null;
-    if(val&&typeof val==='object') return {obj:val,path:sel.key+'.'};
-    if(typeof val==='string'||typeof val==='number') return single(sel.key);
+    if(val&&typeof val==='object') return {obj:val,path:key+'.',own:own};
+    if(typeof val==='string'||typeof val==='number') return single(key);
     return null; }
   /* whole-element formatting: wrap/unwrap the bound content value in the
      same markers rich() renders (**bold**, [[glow]], `mono`). Range-level
@@ -1883,11 +2064,11 @@
   /* reorder one list item and KEEP IT SELECTED (design decision: the
      selection follows the item, so repeated ↑ presses walk it up a list). */
   function moveItem(sel,dir){ var it=itemOf(sel.key); if(!it) return;
-    var a=contentArr(sel.slideIdx,it.path); if(!a) return;
+    var a=itemArr(sel.slideIdx,it.path); if(!a) return;
     var j=it.idx+dir; if(j<0||j>=a.length) return;
-    F.do('reorder',function(data){ var s=data.slides[sel.slideIdx];
-      var arr2=SG.getPath(s.content,it.path), t=arr2[j]; arr2[j]=arr2[it.idx]; arr2[it.idx]=t;
-      swapItemOverrides(s,it.path,it.idx,j); });
+    F.do('reorder',function(data){ var sc=scopeOf(sel.slideIdx,it.path,data); if(!sc) return;
+      var arr2=SG.getPath(sc.host.content,sc.key), t=arr2[j]; arr2[j]=arr2[it.idx]; arr2[it.idx]=t;
+      swapItemOverrides(sc.host,sc.key,it.idx,j); });
     reselectKey(sel.slideIdx,it.path+'.'+j); }
   function reselectKey(slideIdx,key){ var sc=deckEl().querySelectorAll('.slide')[slideIdx];
     var n=sc&&sc.querySelector('[data-el="'+key+'"]'); if(n) selectNode(n,false); }
@@ -1897,10 +2078,15 @@
 
   function objectPanel(body,sel){ var d=selData()||{}; var isFree=sel.kind==='free'; var isMedia=isFree&&MEDIA_FREE[d.type];
     var isEmbed=isFree&&d.type==='embed';
+    var isNode=isFree&&d.type==='node';
+    /* only these free types actually RENDER fo.text (see decorateSection) —
+       showing a Text box for the others gave html/node objects a field that
+       looked editable, changed nothing, and persisted a dead key */
+    var hasFreeText=isFree&&!/^(html|node|image|svg|embed|box)$/.test(d.type||'txt');
     var isText=!isFree&&isLeafText(sel.node);
     var arrPath=!isFree&&sel.node.getAttribute?sel.node.getAttribute('data-arr'):null;
     var it=!isFree?itemOf(sel.key):null;
-    var isItem=!!(it&&sel.key===it.path+'.'+it.idx&&contentArr(sel.slideIdx,it.path));
+    var isItem=!!(it&&sel.key===it.path+'.'+it.idx&&itemArr(sel.slideIdx,it.path));
     var nm=elName(sel.node,isFree?sel.id:sel.key);
     var s=sec(body,'Selected');
 
@@ -1908,19 +2094,27 @@
     var id=el('div','forge-ident');
     id.appendChild(el('span','forge-ident-ico',nm.icon));
     var idn=el('span','forge-ident-nm'); idn.textContent=nm.name; id.appendChild(idn);
-    var idk=el('span','forge-ident-key'); idk.textContent=isFree?'free object':sel.key;
+    var idk=el('span','forge-ident-key');
+    idk.textContent=isNode?('copy · '+(d.pick||d.layout)):isFree?'free object':deNs(sel.key);
     idk.title='The key this element’s styling is stored under'; id.appendChild(idk);
     s.appendChild(id);
 
     /* ---- content of the selection itself ---- */
-    if(isFree&&d.type!=='box'&&!isMedia&&!isEmbed){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
+    if(hasFreeText){ var t=el('textarea'); t.rows=2; t.value=d.text||'';
       t.onfocus=function(){ F.pushUndo(); }; t.oninput=function(){ d.text=t.value; F.renderLiveSlide(); };
       var f=el('div','forge-field'); f.appendChild(el('label',null,'Text')); f.appendChild(t); s.appendChild(f); }
     var tgt=contentTargetOf(sel);
-    if(tgt){ if(tgt.single) fieldFor(s,tgt.obj,tgt.key,sel.slideIdx,tgt.path);
-      else contentForm(s,tgt.obj,sel.slideIdx,tgt.path); }
+    if(tgt){ if(tgt.single) fieldFor(s,tgt.obj,tgt.key,sel.slideIdx,tgt.path,tgt.own);
+      else contentForm(s,tgt.obj,sel.slideIdx,tgt.path,tgt.own); }
+    if(isFree&&d.type==='html')
+      s.appendChild(el('div','forge-hint','This is a <b>static copy</b> — it keeps the look of what it was copied from, but not its editable fields. Newer copies (⧉ Duplicate, ⊞ Insert) re-render from data and stay editable.'));
+    if(isNode)
+      s.appendChild(el('div','forge-hint','A copy of the <b>'+(d.pick||'')+'</b> element from the <b>'+d.layout+'</b> layout. It re-renders from its own data, so edits here never touch the original.'));
+    /* a node object whose root is a list: same "pick one inside" treatment */
+    if(isNode&&!tgt){ var rootArr=sel.node.querySelector('[data-el="'+partKey(sel.id,d.pick)+'"]');
+      arrPath=rootArr&&rootArr.getAttribute('data-arr'); }
     if(arrPath){ var n=(contentArr(sel.slideIdx,arrPath)||[]).length;
-      var one=singular(String(arrPath).split('.').pop());
+      var one=singular(String(deNs(arrPath)).split('.').pop());
       s.appendChild(el('div','forge-hint','This is the whole list ('+n+' '+(n===1?one.toLowerCase():one.toLowerCase()+'s')+'). Pick one inside it — on the slide or in the list above — to edit it.'));
       var ab=el('button','forge-btn add','＋ Add '+one.toLowerCase());
       ab.onclick=function(){ F.addItemPath(sel.slideIdx,arrPath); }; s.appendChild(ab); }
@@ -1940,7 +2134,8 @@
       row.appendChild(step); s.appendChild(row); }
 
     /* ---- style & formatting (theme tokens, never hex) ---- */
-    var canFmt=!!(tgt&&tgt.single&&typeof tgt.obj[tgt.key]==='string')||(isFree&&d.type==='txt');
+    var fmtTxt=hasFreeText;                    /* format the object's own text */
+    var canFmt=!!(tgt&&tgt.single&&typeof tgt.obj[tgt.key]==='string')||fmtTxt;
     if(!isMedia&&!isEmbed){
       var sf=fold(s,'Style & formatting',true);
       sf.appendChild(el('label',null,'Text color'));
@@ -1961,13 +2156,15 @@
         sf.appendChild(el('label',null,'Formatting'));
         var chips=el('div','forge-fmtchips');
         [['B','b'],['✦','g'],['<>','m']].forEach(function(p){
-          var read=function(){ return isFree?d.text:tgt.obj[tgt.key]; };
+          var read=function(){ return fmtTxt?d.text:tgt.obj[tgt.key]; };
           var b=el('button','forge-fmtchip'+(hasMark(read(),p[1])?' on':''),p[0]);
           b.title=({b:'Bold',g:'Glow (accent color)',m:'Monospace'})[p[1]]+' the whole element';
           b.onclick=function(){ F.do('format',function(data){
-            if(isFree){ var fo=freeFor(sel.slideIdx,sel.id); fo.text=toggleMark(fo.text,p[1]); }
-            else { var c=data.slides[sel.slideIdx].content, path=tgt.path+tgt.key;
-              SG.setPath(c,path,toggleMark(SG.getPath(c,path),p[1])); } }); };
+            if(fmtTxt){ var fo=freeFor(sel.slideIdx,sel.id); fo.text=toggleMark(fo.text,p[1]); return; }
+            /* tgt.own = the content-backed free object that owns this field,
+               when the selection is inside a copy rather than on the slide */
+            var c=(tgt.own||data.slides[sel.slideIdx]).content, path=tgt.path+tgt.key;
+            SG.setPath(c,path,toggleMark(SG.getPath(c,path),p[1])); }); };
           chips.appendChild(b); });
         sf.appendChild(chips);
         sf.appendChild(el('div','forge-hint','These apply to the <b>whole element</b>. To format <b>part of the text</b>, double-click it on the slide and highlight a range — a floating B / ✦ / <code>&lt;&gt;</code> toolbar appears over the selection.')); }
@@ -2222,8 +2419,10 @@
      CONTENT comes from the DEFAULTS map (so an entry can never drift from
      what a fresh slide of that layout contains) and the preview is a live,
      scaled miniature of the real element — not a hand-drawn shape. Insert
-     lands it as a themed free object ({type:'html'}), the same faithful-copy
-     path Ctrl+D uses, centred on the current slide and selected.
+     lands it as a themed, CONTENT-BACKED free object ({type:'node'}) — the
+     same path Ctrl+D uses — centred on the current slide and selected. It
+     carries the layout + content it was built from, so it keeps its fields
+     and list verbs instead of freezing into markup.
      Entries whose key is missing (a layout changed) are skipped silently. */
   var GALLERY=[
     ['Stat card','stat-grid','stats.0'], ['Agenda item','agenda','items.0'],
@@ -2270,14 +2469,20 @@
     cl.style.transform=''; cl.style.zIndex=''; return cl; }
   F.insertElement=function(layout,key,extra,name){ var g=galleryNode(layout,key,extra); if(!g) return null;
     /* a grid cell measures as tall as the grid stretched it; land the copy at a
-       sane starting size instead — it is freely resizable afterwards */
+       sane starting width instead — height follows its content, and the width
+       is freely resizable afterwards (text reflows, as everywhere else) */
     var w=clamp(Math.round(g.node.offsetWidth||360),80,900);
-    var h=clamp(Math.round(g.node.offsetHeight||120),50,360);
-    var html=cleanCopy(g.node).outerHTML; g.host.remove();
+    var h=clamp(Math.round(g.node.offsetHeight||120),50,360);   /* for centring only */
+    g.host.remove();
+    /* the object keeps the layout's whole DEFAULTS content, exactly as the
+       ghost above rendered it — layouts read sibling fields, so pruning to
+       the picked branch would change what it draws */
+    var c=clone(DEFAULTS[layout]||{});
+    if(extra) Object.keys(extra).forEach(function(k){ c[k]=extra[k]; });
     var i=curSlide(), id=uid();
     F.do('insert element',function(data){ var s=data.slides[i]; s.freeObjects=s.freeObjects||[];
-      s.freeObjects.push({id:id,type:'html',name:name||'',html:html,
-        x:Math.round(640-w/2),y:Math.round(360-h/2),w:w,h:h,rot:0}); });
+      s.freeObjects.push({id:id,type:'node',layout:layout,pick:key,content:c,name:name||'',
+        x:Math.round(640-w/2),y:Math.round(360-h/2),w:w,rot:0}); });
     var sc=deckEl().querySelectorAll('.slide')[i], n=sc&&sc.querySelector('[data-free="'+id+'"]');
     if(n) selectNode(n,false);
     return id; };
@@ -2301,7 +2506,7 @@
       c.onclick=function(){ o.remove(); F.insertElement(g[1],g[2],g[3],g[0]); };
       grid.appendChild(c);
       made.push({node:got.node,host:got.host,inner:inner,prev:prev}); });
-    card.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. It arrives themed and fully editable as a free object — drag, resize, restyle or edit its text like anything else.'));
+    card.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. It arrives themed and keeps its own fields — drag, resize, restyle, edit its text or add items to it exactly as if it had come with the layout.'));
     var btns=el('div','forge-struct-btns');
     var close=el('button','forge-btn','Close'); close.style.marginLeft='auto';
     close.onclick=function(){ o.remove(); }; btns.appendChild(close);
