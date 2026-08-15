@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build a7648d04b2 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 67ce8cbf23 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -197,6 +197,14 @@ p{margin:0; color:var(--muted)}
   border-radius:5px; background:color-mix(in srgb, var(--ink) 12%, transparent);
   border:1px solid color-mix(in srgb, var(--ink) 14%, transparent)}
 
+/* An orb's SHAPE is not motion. These four declarations must apply whatever the
+   user's motion preference is — only the drift belongs in the media query below.
+   They used to live inside it, so a reduced-motion visitor got orbs with no
+   `position:absolute`: three in-flow blocks at the top of every cover/closing
+   slide, pushing the centred content down onto the absolutely-pinned .meta strip.
+   Invisible in normal-motion testing, which is exactly why it survived so long. */
+.orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:var(--p-orb-op,.5)}
+
 /* =====================================================================
    AMBIENT ANIMATIONS  (one per slide; calm + slow; disabled if user
    prefers reduced motion)
@@ -204,7 +212,7 @@ p{margin:0; color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){
   /* 1 cover: drifting orbs */
   @keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
-  .orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:var(--p-orb-op,.5); animation:drift 16s ease-in-out infinite}
+  .orb{animation:drift 16s ease-in-out infinite}
   /* 2 agenda: rail sheen */
   @keyframes sheen{0%{background-position:0 -200px}100%{background-position:0 400px}}
   /* 3 divider: breathing glow */
