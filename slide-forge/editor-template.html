@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 3e0ec2de6f — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 7bc65a98f5 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -3899,6 +3899,16 @@ body.forge-edit #forge-zoom{ display:flex; }
   function contentArr(slideIdx,path){ if(!path) return null;
     var sc=scopeOf(slideIdx,path); if(!sc||!sc.key) return null;
     var a=SG.getPath(sc.host.content||{},sc.key); return Array.isArray(a)?a:null; }
+  /* An item op only means something when the LIST IS ACTUALLY ON SCREEN. A
+     content-backed copy mounts only its picked branch, so a copy of ONE stat
+     card still has the whole stats[] in its content while rendering a single
+     item: adding to it there would grow an array nothing draws. In that case
+     item ops decline, and Duplicate falls through to copying the whole object
+     — which is what "duplicate this stat card" should mean anyway. */
+  function listMounted(slideIdx,path){ if(!partOf(path)) return true;
+    var sec=deckEl().querySelectorAll('.slide')[slideIdx];
+    return !!(sec&&sec.querySelector('[data-arr="'+path+'"]')); }
+  function itemArr(slideIdx,path){ return listMounted(slideIdx,path)?contentArr(slideIdx,path):null; }
   /* the three remap helpers below take a HOST — a slide, or a content-backed
      free object — since either can own a content array and an override bag.
      They only ever touch host.overrides, so the same code serves both. */
@@ -3929,18 +3939,18 @@ body.forge-edit #forge-zoom{ display:flex; }
     s.overrides=out; }
   F.addItem=function(slideIdx,containerNode){
     var path=containerNode.getAttribute&&containerNode.getAttribute('data-arr');
-    if(!contentArr(slideIdx,path)) return false;
+    if(!itemArr(slideIdx,path)) return false;
     return F.addItemPath(slideIdx,path); };
   F.dupItem=function(slideIdx,node){
     var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
-    if(!contentArr(slideIdx,it.path)) return false;
+    if(!itemArr(slideIdx,it.path)) return false;
     F.do('duplicate item',function(data){ var sc=scopeOf(slideIdx,it.path,data); if(!sc) return;
       var arr2=SG.getPath(sc.host.content,sc.key); arr2.splice(it.idx+1,0,clone(arr2[it.idx]));
       remapItemOverrides(sc.host,sc.key,it.idx+1,+1);
       copyItemOverrides(sc.host,sc.key,it.idx,it.idx+1); }); return true; };
   F.removeItem=function(slideIdx,node){
     var it=itemOf(node.getAttribute('data-el')); if(!it) return false;
-    if(!contentArr(slideIdx,it.path)) return false;
+    if(!itemArr(slideIdx,it.path)) return false;
     clearSel();
     F.do('remove item',function(data){ var sc=scopeOf(slideIdx,it.path,data); if(!sc) return;
       SG.getPath(sc.host.content,sc.key).splice(it.idx,1);
@@ -3982,7 +3992,7 @@ body.forge-edit #forge-zoom{ display:flex; }
     var acts=sels.map(function(x){
       if(x.kind==='free') return {t:'free',i:x.slideIdx,id:x.id};
       var it=x.slideIdx!=null?itemOf(x.key):null;
-      if(it&&x.key!==null&&/^\S+$/.test(x.key)&&contentArr(x.slideIdx,it.path)
+      if(it&&x.key!==null&&/^\S+$/.test(x.key)&&itemArr(x.slideIdx,it.path)
         &&x.key===it.path+'.'+it.idx)                      /* the item itself, not a leaf inside it */
         return {t:'item',i:x.slideIdx,path:it.path,idx:it.idx};
       return {t:'reset',i:x.slideIdx,key:x.key}; });
@@ -4063,7 +4073,7 @@ body.forge-edit #forge-zoom{ display:flex; }
     if(!isSelected(node)) selectNode(node,false);
     if(isLeafText(node)) ctxMenu.appendChild(ctxItem('✎ Edit text',null,function(){ startEdit(node); }));
     if(!isFree){ var si=slideIdxOf(node), it=itemOf(node.getAttribute('data-el'));
-      if(it&&contentArr(si,it.path)){
+      if(it&&itemArr(si,it.path)){
         ctxMenu.appendChild(ctxItem('⧉ Duplicate item (in layout)',null,function(){ F.dupItem(si,node); }));
         ctxMenu.appendChild(ctxItem('✕ Remove item','warn',function(){ F.removeItem(si,node); })); }
       if(node.getAttribute('data-arr'))
@@ -4578,13 +4588,13 @@ body.forge-edit #forge-zoom{ display:flex; }
      sits in, else the first array the layout renders. */
   function primaryArray(sec,slideIdx){
     var sel=F.sel&&F.sel.slideIdx===slideIdx?F.sel.key:null;
-    if(sel){ var it=itemOf(sel); if(it&&contentArr(slideIdx,it.path)) return it.path;
+    if(sel){ var it=itemOf(sel); if(it&&itemArr(slideIdx,it.path)) return it.path;
       var n=sec.querySelector('[data-el="'+sel+'"]');
       if(n&&n.getAttribute('data-arr')) return n.getAttribute('data-arr'); }
     /* fallback: the slide's OWN first list, never one inside a free object */
     var c=[].slice.call(sec.querySelectorAll('[data-arr]')).filter(function(n){ return !n.closest('.forge-free'); })[0];
     return c?c.getAttribute('data-arr'):null; }
-  F.addItemPath=function(slideIdx,path){ if(!contentArr(slideIdx,path)) return false;
+  F.addItemPath=function(slideIdx,path){ if(!itemArr(slideIdx,path)) return false;
     F.do('add item',function(data){ var sc=scopeOf(slideIdx,path,data); if(!sc) return;
       var a=SG.getPath(sc.host.content,sc.key);
       a.push(a.length?newItemLike(a[a.length-1]):{title:''}); }); return true; };
@@ -5119,7 +5129,7 @@ body.forge-edit #forge-zoom{ display:flex; }
   /* reorder one list item and KEEP IT SELECTED (design decision: the
      selection follows the item, so repeated ↑ presses walk it up a list). */
   function moveItem(sel,dir){ var it=itemOf(sel.key); if(!it) return;
-    var a=contentArr(sel.slideIdx,it.path); if(!a) return;
+    var a=itemArr(sel.slideIdx,it.path); if(!a) return;
     var j=it.idx+dir; if(j<0||j>=a.length) return;
     F.do('reorder',function(data){ var sc=scopeOf(sel.slideIdx,it.path,data); if(!sc) return;
       var arr2=SG.getPath(sc.host.content,sc.key), t=arr2[j]; arr2[j]=arr2[it.idx]; arr2[it.idx]=t;
@@ -5141,7 +5151,7 @@ body.forge-edit #forge-zoom{ display:flex; }
     var isText=!isFree&&isLeafText(sel.node);
     var arrPath=!isFree&&sel.node.getAttribute?sel.node.getAttribute('data-arr'):null;
     var it=!isFree?itemOf(sel.key):null;
-    var isItem=!!(it&&sel.key===it.path+'.'+it.idx&&contentArr(sel.slideIdx,it.path));
+    var isItem=!!(it&&sel.key===it.path+'.'+it.idx&&itemArr(sel.slideIdx,it.path));
     var nm=elName(sel.node,isFree?sel.id:sel.key);
     var s=sec(body,'Selected');
 

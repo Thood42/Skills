@@ -82,8 +82,13 @@ Editor model (load-bearing facts):
 ## Conventions & environment
 
 - Vanilla JS, **zero dependencies**; keep the single-file/offline guarantee.
-- **No Node** in this environment; **Python 3.13** is available. JS can't be lint-checked via `node` —
-  verify in a browser instead.
+- **Node 26 and Python 3.13 are both available** (`C:\Program Files\nodejs`). Run the tests from
+  `slide-forge/tests/` — `npm install` once, then `node parity.mjs && node editor-ops.mjs`.
+  Use the **PowerShell** tool for node (the Bash tool doesn't see it on PATH).
+  `node --check src/<file>.js` also works for a fast syntax check.
+- `parity.mjs` currently reports **7 pre-existing cosmetic diffs** (timeline/hero-asym text-node
+  splits, `figure`'s media-img class from the media plan, a closing-slide whitespace split). They are
+  on `master` too — treat "7 diffs" as the baseline and only investigate a change in that number.
 - **Verify the editor:** serve the **repo root** over HTTP (`python -m http.server`) and open
   `slide-forge/editor-template.html?edit` (the `?edit` query auto-opens edit mode). The preview
   tooling's static root is the repo root, so worktree files load via their `.claude/worktrees/...` path.
@@ -116,10 +121,14 @@ clone — the exact attributes that make an element editable — so every copy f
 - Honesty fixes: the dead "Text" field on html/node objects is gone (it wrote `fo.text`, which those
   types never render); the gallery hint and the "duplicate as free copy (deep)" label no longer
   promise editability the old path didn't deliver; legacy html objects now say they're static copies.
+- Item ops are gated on the list being MOUNTED (`listMounted`/`itemArr`): a copy that picked a single
+  item (`pick:'stats.0'`) still carries the whole array in its content but renders one item, so
+  add/duplicate/remove there would grow an array nothing draws. They decline, and `Ctrl+D` falls
+  through to copying the whole object — which is what "duplicate this card" should mean.
 - `validate.py`: node-object schema + `fs`/`name`/`hide` added to the key sets (v4 gaps).
-- **Verified in a real browser** (insert → fields → live re-render → text editing → list verbs →
-  override remap → GC → undo/redo → present mode → download). `tests/editor-ops.mjs` gained ~30
-  assertions but **was not run here (no Node)**.
+- **Tests actually run this time**: `editor-ops.mjs` 142/142 pass (~35 new assertions); `parity.mjs`
+  unchanged at the 7-diff baseline. The suite caught the unmounted-list bug above, which browser
+  testing had missed. Also verified end-to-end in a real browser.
 
 ## Recent work (2026-07-31) — v4 editor UX overhaul (design handoff)
 

@@ -407,6 +407,12 @@ the slide's.
 - **Selection.** First click selects the whole object (draggable); clicking again drills into it,
   exactly as on the slide. The breadcrumb reads `Slide ▸ Metric ring ▸ Stat 2 ▸ Label`.
 - **Items panel.** A copy's lists and list items get rows indented under it.
+- **Item ops need a MOUNTED list.** A copy keeps its layout's whole content but mounts only the
+  picked branch, so a copy of *one* stat card (`pick:"stats.0"`) still carries the entire `stats[]`
+  while rendering a single item. Adding to it there would grow an array nothing draws, so
+  add/duplicate/remove decline (`listMounted`/`itemArr`) and `Ctrl+D` falls through to copying the
+  **whole object** — which is what "duplicate this card" means anyway. A copy of the list itself
+  (`pick:"stats"`) does mount `data-arr` and gets the full set of verbs.
 - **Where it does NOT apply.** A lone text leaf still copies as `{type:"txt"}` — lifted out of its
   parent it would lose any styling written as a descendant selector, and free text is already fully
   editable. Markup with no layout behind it (a `raw` slide) still freezes into `{type:"html"}`, which

@@ -302,36 +302,68 @@ F.commit();
 ok(insWrap().querySelector('[data-bind="'+insId+'/stats.0.label"]').textContent==='Copy only','the copy re-renders from its OWN content');
 ok(SG.data.slides[2].content.stats[0].label===slideLabel0,'editing the copy leaves the original untouched');
 
-// list verbs work inside a copy, with overrides remapped in its own bag
-fo.overrides={'stats.0':{color:'var(--cyan)'}};
-F.dupItem(2,insWrap().querySelector('[data-el="'+insId+'/stats.0"]'));
+// an item op only applies when the LIST is mounted. This copy picked ONE stat
+// card, so its content still carries the whole stats[] while rendering a single
+// item — growing it there would add an item nothing draws.
 const fo2=()=>(SG.data.slides[2].freeObjects||[]).filter(f=>f.id===insId)[0];
-ok(fo2().content.stats.length===2,'duplicating an item inside a copy grows the COPY’s list');
-ok(SG.data.slides[2].content.stats.length===3,'…and not the slide’s');
-ok(fo2().overrides['stats.1']&&fo2().overrides['stats.1'].color==='var(--cyan)','item styling follows the duplicate, in the object’s own override bag');
-F.addItemPath(2,insId+'/stats');
-ok(fo2().content.stats.length===3,'＋ Add routes to the copy’s array via its namespaced path');
-F.removeItem(2,insWrap().querySelector('[data-el="'+insId+'/stats.0"]'));
-ok(fo2().content.stats.length===2&&fo2().overrides['stats.0'],'removal remaps the copy’s override keys down');
-
-// GC sweeps the object's own bag, not just the slide's
-fo2().overrides['stats.99']={x:5};
-fo2().overrides['stats.0.label']={};
-F.do('noop',()=>{});
-ok(!fo2().overrides['stats.99'],'GC drops an orphaned part override');
-ok(!fo2().overrides['stats.0.label'],'GC drops an empty part-override stub');
-ok(!!fo2().overrides['stats.0'],'GC keeps a live part override');
+const slideStats0=SG.data.slides[2].content.stats.length;
+const copyStats0=fo2().content.stats.length;
+ok(!insWrap().querySelector('[data-arr]'),'a single-item copy mounts no list container');
+ok(F.dupItem(2,insWrap().querySelector('[data-el="'+insId+'/stats.0"]'))===false,'item duplicate declines when the list is not mounted');
+ok(F.addItemPath(2,insId+'/stats')===false,'＋ Add declines for an unmounted list');
+ok(fo2().content.stats.length===copyStats0,'…and the copy’s array is left alone');
+// Ctrl+D on that card copies the whole OBJECT instead — what the user means
+F.clearSel();
+insWrap().dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
+F.dupSel();
+const cardCopy=(SG.data.slides[2].freeObjects||[]).slice(-1)[0];
+ok(cardCopy.id!==insId&&cardCopy.type==='node'&&cardCopy.pick==='stats.0','duplicating a single-item copy yields another object, not a hidden array entry');
+F.undoOp();
 
 // ---------- duplicate: composites go content-backed, leaves stay free text ----------
 F.clearSel();
 const statsC=statSec().querySelector('[data-el="stats"]');
 statsC.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
 F.dupSel();
-const dupd=(SG.data.slides[2].freeObjects||[]).slice(-1)[0];
-ok(dupd.type==='node'&&dupd.layout==='stat-grid'&&dupd.pick==='stats','Ctrl+D on a composite yields a content-backed copy');
-ok(!!dupd.content&&dupd.content.stats.length===3,'…carrying the content it re-renders from');
-ok(dupd.html===undefined,'…with no frozen markup');
-F.undoOp();
+const dupId=(SG.data.slides[2].freeObjects||[]).slice(-1)[0].id;
+const dupd=()=>(SG.data.slides[2].freeObjects||[]).filter(f=>f.id===dupId)[0];
+ok(dupd().type==='node'&&dupd().layout==='stat-grid'&&dupd().pick==='stats','Ctrl+D on a composite yields a content-backed copy');
+ok(!!dupd().content&&dupd().content.stats.length===slideStats0,'…carrying the content it re-renders from');
+ok(dupd().html===undefined,'…with no frozen markup');
+
+// ---------- list verbs inside a copy whose list IS mounted ----------
+const dupWrap=()=>statSec().querySelector('[data-free="'+dupId+'"]');
+ok(dupWrap().querySelector('[data-arr]').getAttribute('data-arr')===dupId+'/stats','the copy mounts its list container, namespaced');
+dupd().overrides={'stats.0':{color:'var(--cyan)'}};
+F.dupItem(2,dupWrap().querySelector('[data-el="'+dupId+'/stats.0"]'));
+ok(dupd().content.stats.length===slideStats0+1,'duplicating an item inside a copy grows the COPY’s list');
+ok(SG.data.slides[2].content.stats.length===slideStats0,'…and not the slide’s');
+ok(dupd().overrides['stats.1']&&dupd().overrides['stats.1'].color==='var(--cyan)','item styling follows the duplicate, in the object’s own override bag');
+F.addItemPath(2,dupId+'/stats');
+ok(dupd().content.stats.length===slideStats0+2,'＋ Add routes to the copy’s array via its namespaced path');
+F.removeItem(2,dupWrap().querySelector('[data-el="'+dupId+'/stats.0"]'));
+ok(dupd().content.stats.length===slideStats0+1&&!!dupd().overrides['stats.0'],'removal remaps the copy’s override keys down');
+
+// GC sweeps the object's own bag, not just the slide's
+dupd().overrides['stats.99']={x:5};
+dupd().overrides['stats.0.label']={};
+F.do('noop',()=>{});
+ok(!dupd().overrides['stats.99'],'GC drops an orphaned part override');
+ok(!dupd().overrides['stats.0.label'],'GC drops an empty part-override stub');
+ok(!!dupd().overrides['stats.0'],'GC keeps a live part override');
+
+// text write-back inside a copy lands on the copy's content, via data-bind
+const leaf=dupWrap().querySelector('[data-bind="'+dupId+'/stats.0.label"]');
+const slideLabelBefore=SG.data.slides[2].content.stats[0].label;
+leaf.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));
+ok(F.editing===leaf,'double-click starts an edit on a part of a copy');
+leaf.textContent='Edited in copy'; F.endEdit();
+ok(dupd().content.stats[0].label==='Edited in copy','the edit writes to the copy’s own content path');
+ok(SG.data.slides[2].content.stats[0].label===slideLabelBefore,'…and never to the slide’s');
+ok(!(dupd().overrides['stats.0.label']||{}).html,'a bound leaf writes content, not an html shadow override');
+
+F.clearSel();
+while(SG.data.slides[2].freeObjects&&SG.data.slides[2].freeObjects.length) F.undoOp();
 F.clearSel();
 const titleEl=statSec().querySelector('[data-bind="title"]');
 titleEl.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,button:0}));
