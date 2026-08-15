@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mockup — a composed slide</title>
+<style>
+  body{margin:0;padding:40px;background:#08090f;color:#e8ecf4;font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+  h1{font-size:20px;font-weight:600} p.note{color:#8b93a7;max-width:70ch}
+  .slide{position:relative;width:960px;height:540px;margin:24px 0;border:1px solid #232838;border-radius:14px;
+         background:radial-gradient(120% 140% at 80% -20%,#131a2e 0%,#0a0d18 60%);overflow:hidden;
+         display:flex;flex-direction:column;padding:44px 52px;box-sizing:border-box}
+  .tag{position:absolute;top:-11px;left:24px;background:#08090f;padding:0 10px;color:#57e6c8;font-size:12px;letter-spacing:.08em}
+  .kicker{color:#57e6c8;font-size:12px;letter-spacing:.22em;text-transform:uppercase;margin:0 0 6px}
+  .title{font-size:34px;font-weight:700;margin:0 0 22px;letter-spacing:-.01em}
+  .row{display:flex;gap:28px;flex:1;min-height:0}
+  .chart{flex:3;border:1px solid #222a3f;border-radius:10px;padding:18px;display:flex;flex-direction:column}
+  .chart .lbl{color:#8b93a7;font-size:12px;margin-bottom:10px}
+  .bars{flex:1;display:flex;align-items:flex-end;gap:14px}
+  .bars i{flex:1;background:linear-gradient(180deg,#57e6c8,#2b8f97);border-radius:4px 4px 0 0;opacity:.9}
+  .quote{flex:2;display:flex;flex-direction:column;justify-content:center;border-left:2px solid #57e6c8;padding-left:20px}
+  .quote q{font-size:19px;font-style:italic;color:#dfe5f2;quotes:"“" "”"}
+  .quote .by{color:#8b93a7;font-size:13px;margin-top:10px}
+  .stats{display:flex;gap:20px;margin-top:26px}
+  .stat{flex:1;border-top:1px solid #232838;padding-top:12px}
+  .stat b{font-size:26px;color:#57e6c8;font-weight:700}
+  .stat span{display:block;color:#8b93a7;font-size:12.5px;margin-top:2px}
+  .legend{margin-top:8px;color:#565f75;font-size:12px}
+  .callout{position:absolute;right:14px;bottom:12px;color:#565f75;font-size:11.5px}
+</style>
+<h1>Mockup 1 — a composed slide (impossible today without <code>raw</code>)</h1>
+<p class="note">One slide, four sections in an arrangement no catalog layout offers: a title band,
+then a chart (60%) beside a pull-quote (40%), then a three-stat row. Each section is the same
+component the classic layouts use — they simply stack and sit side-by-side now.</p>
+
+<div class="slide">
+  <span class="tag">composed: title / [chart | quote] / stat-row</span>
+  <p class="kicker">Q3 Field Report</p>
+  <h2 class="title">Adoption did not slow down — support tickets did.</h2>
+  <div class="row">
+    <div class="chart">
+      <span class="lbl">Weekly active teams, Q3</span>
+      <div class="bars">
+        <i style="height:34%"></i><i style="height:41%"></i><i style="height:39%"></i><i style="height:52%"></i>
+        <i style="height:58%"></i><i style="height:63%"></i><i style="height:71%"></i><i style="height:84%"></i>
+      </div>
+      <div class="legend">wk 27 → wk 39</div>
+    </div>
+    <div class="quote">
+      <q>The new onboarding is the first one our field techs didn't need a call for.</q>
+      <span class="by">— Regional ops lead, pilot cohort</span>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>+38%</b><span>active teams vs Q2</span></div>
+    <div class="stat"><b>−61%</b><span>setup support tickets</span></div>
+    <div class="stat"><b>11 days</b><span>median time-to-value</span></div>
+  </div>
+  <span class="callout">960×540 slide frame — sections flow; nothing is absolutely positioned</span>
+</div>
