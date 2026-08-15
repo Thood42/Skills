@@ -50,6 +50,33 @@ S = {
  'index-mosaic': {'?kicker':'s','?title':'s','items':'a'},
  'before-after': {'?kicker':'s','?title':'s','before':'o','after':'o'},
  'raw':          {'html':'s'},
+ # composer: a slide assembled from sections instead of being one fixed layout
+ 'composed':     {'sections':'a'},
+}
+# ---- section schemas (composer plan section C) ------------------------------
+# A section keeps the FIELD NAMES of the layout it was lifted from, minus the
+# parts that belong to a neighbouring section — a `stats` section has no title
+# because a `titleband` section above it owns that. Mirrors src/sections.js;
+# if you add a type there, add it here.
+SECTION_S = {
+ 'titleband':  {'?kicker':'s','?title':'s'},
+ 'stats':      {'stats':'a'},
+ 'bignum':     {'?count':'n','?value':'sn','?fmt':'s','?subtitle':'s'},
+ 'chart':      {'?kicker':'s','?title':'s','?note':'s','?body':'s','?svg':'s','?type':'s','?data':'o','?options':'o'},
+ 'table':      {'columns':'a','rows':'a','?options':'o','?note':'s'},
+ 'comparison': {'left':'o','right':'o','?badge':'s'},
+ 'quote':      {'quote':'s','?by':'s','?subtitle':'s'},
+ 'agenda':     {'items':'a'},
+ 'timeline':   {'items':'a'},
+ 'prose':      {'lead':'s','columns':'a'},
+ 'media':      {'image':'s','?fit':'s','?focal':'a'},
+ 'bullets':    {'?kicker':'s','?title':'s','?body':'s','?items':'a'},
+}
+SECTION_TYPES = set(SECTION_S)
+SECTION_ITEM = {   # same shape as ITEM, keyed by section type
+ ('stats','stats'):[('label','s')], ('agenda','items'):[('title','s')],
+ ('timeline','items'):[('year','sn'),('title','s')],
+ ('prose','columns'):[('head','s'),('body','s')],
 }
 ITEM = {   # required fields on each item of the named array
  ('agenda','items'):[('title','s')], ('stat-grid','stats'):[('label','s')],
@@ -96,6 +123,62 @@ def _check_overrides(ov, where, label, errs, warns):
             errs.append('%s: %s[%r].href %r is not https:/mailto:/#N (media plan section 5 allow-list)'
                         % (where, label, k, o['href']))
 
+def _check_sections(sections, where, errs, warns, depth=0):
+    """Recurse a composed slide's arrangement tree.
+
+    Rows are the ONLY nesting and they live at depth 0 only — that ceiling is
+    a design decision (composer plan section C), not an implementation limit, so
+    a nested row is an error rather than something to quietly flatten."""
+    if not sections:
+        warns.append('%s (composed): sections[] is empty - renders a blank slide' % where)
+    for i, sec in enumerate(sections):
+        at = '%s sections[%d]' % (where, i)
+        if not isinstance(sec, dict):
+            errs.append('%s is not an object' % at); continue
+        t = sec.get('type')
+        if 'size' in sec and not (isinstance(sec['size'], (int, float))
+                                  and not isinstance(sec['size'], bool) and sec['size'] > 0):
+            errs.append('%s: size %r must be a positive number (a flex weight)' % (at, sec.get('size')))
+        if t == 'row':
+            if depth:
+                errs.append('%s: rows cannot nest inside rows' % at); continue
+            items = sec.get('items')
+            if not isinstance(items, list) or not items:
+                errs.append('%s (row): needs a non-empty items[]' % at); continue
+            for k in sec:
+                if k not in ('type', 'size', 'items'):
+                    warns.append('%s (row): unknown key %r' % (at, k))
+            _check_sections(items, at, errs, warns, depth + 1)
+            continue
+        if t not in SECTION_TYPES:
+            errs.append('%s: unknown section type %r (one of %s)' % (at, t, sorted(SECTION_TYPES)))
+            continue
+        for k in sec:
+            if k not in ('type', 'size', 'content'):
+                warns.append('%s (%s): unknown key %r' % (at, t, k))
+        c = sec.get('content')
+        if not isinstance(c, dict):
+            errs.append('%s (%s): missing content object' % (at, t)); continue
+        schema = SECTION_S[t]
+        known = {k.lstrip('?') for k in schema}
+        for k, ty in schema.items():
+            opt, name = k.startswith('?'), k.lstrip('?')
+            if name not in c:
+                if not opt: errs.append('%s (%s): missing required field %r' % (at, t, name))
+            elif not typeok(c[name], ty):
+                errs.append('%s (%s): field %r should be %s' % (at, t, name, ty))
+        for k in c:
+            if k not in known: warns.append('%s (%s): unknown content key %r' % (at, t, k))
+        for (st, a), reqs in SECTION_ITEM.items():
+            if st != t or not isinstance(c.get(a), list): continue
+            for j, it in enumerate(c[a]):
+                if not isinstance(it, dict):
+                    errs.append('%s (%s): %s[%d] is not an object' % (at, t, a, j)); continue
+                for (fk, ft) in reqs:
+                    if fk not in it: errs.append('%s (%s): %s[%d] missing %r' % (at, t, a, j, fk))
+                    elif not typeok(it[fk], ft):
+                        errs.append('%s (%s): %s[%d].%s should be %s' % (at, t, a, j, fk, ft))
+
 def typeok(v, t):
     return {'s':lambda:isinstance(v,str), 'n':lambda:isinstance(v,(int,float)) and not isinstance(v,bool),
             'b':lambda:isinstance(v,bool), 'o':lambda:isinstance(v,dict), 'a':lambda:isinstance(v,list),
@@ -137,7 +220,10 @@ def validate(data, assets=None):
         lay = sl.get('layout')
         if lay not in S:
             errs.append('%s: unknown layout %r' % (where, lay)); continue
-        if lay == prev and lay not in ('divider','raw'):
+        # 'composed' is a container, not a shape — two composed slides in a row
+        # say nothing about whether they LOOK alike, so the repeat warning
+        # would fire on every deck that adopts composition
+        if lay == prev and lay not in ('divider','raw','composed'):
             warns.append('%s: layout %r repeats back-to-back' % (where, lay))
         prev = lay
         c = sl.get('content')
@@ -162,6 +248,8 @@ def validate(data, assets=None):
                 for (fk, ft) in reqs:
                     if fk not in it: errs.append('%s (%s): %s[%d] missing %r' % (where, lay, arr, j, fk))
                     elif not typeok(it[fk], ft): errs.append('%s (%s): %s[%d].%s should be %s' % (where, lay, arr, j, fk, ft))
+        if lay == 'composed' and isinstance(c.get('sections'), list):
+            _check_sections(c['sections'], where, errs, warns)
         if lay == 'chart' and isinstance(c.get('data'), dict):
             d = c['data']; labels = d.get('labels'); series = d.get('series')
             if not isinstance(labels, list) or not labels:

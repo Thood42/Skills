@@ -436,6 +436,42 @@ ok(!!cs().querySelector('.sec-unknown'),'an unknown section type renders a place
 ok(!!dC.querySelectorAll('#deck .slide')[1].querySelector('[data-el="stats.0"]'),
    'the same builder at base="" still authors flat classic keys');
 
+// ---------- the full v1 vocabulary ----------
+// Every type builds, mounts under its own .sec-<type> wrapper, and prefixes
+// EVERY key it authors — a builder that forgets `base` on one leaf would leak a
+// flat key that collides across sections, so this walks all of them.
+const V1=['titleband','stats','bignum','chart','table','comparison','quote',
+          'bullets','media','agenda','timeline','prose'];
+ok(V1.every(t=>wC.SG.S[t]&&typeof wC.SG.S[t].build==='function'),'all 12 v1 section types are registered');
+ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===V1.length,
+   'SG.SECTION_TYPES is exactly the v1 vocabulary (the editor + validator read it)');
+{
+  const secs=V1.map(t=>({type:t,content:JSON.parse(JSON.stringify(wC.SG.S[t].defaults||{}))}));
+  SGC.data.slides[0]={layout:'composed',content:{sections:secs}};
+  SGC.render(dC.getElementById('deck'),SGC.data);
+  const bad=V1.filter(t=>!cs().querySelector('.sec-'+t));
+  ok(bad.length===0,'every section type mounts its own wrapper (missing: '+bad+')');
+  const flat=[...cs().querySelectorAll('[data-el],[data-bind],[data-arr]')]
+    .flatMap(n=>['data-el','data-bind','data-arr'].map(a=>n.getAttribute(a)).filter(Boolean))
+    .filter(k=>!/^sections\./.test(k));
+  ok(flat.length===0,'no section leaks an unprefixed key (leaked: '+flat.slice(0,4)+')');
+  ok(V1.every(t=>typeof wC.SG.S[t].label==='string'&&wC.SG.S[t].label),'every type carries a human label');
+  // each type's own defaults must satisfy its own required fields — that is what
+  // an editor insert will drop onto a slide, so a broken default ships broken
+  const empty=V1.filter(t=>{const w=cs().querySelector('.sec-'+t);return w&&!w.textContent.trim()&&!w.querySelector('img,svg,.media-img');});
+  ok(empty.length===0,'every type renders something from its own defaults (empty: '+empty+')');
+}
+// ---------- media/bullets keep media-split's output ----------
+{
+  SGC.data.slides[1]={layout:'media-split',content:{title:'MS',body:'b',items:['i0'],image:''}};
+  SGC.render(dC.getElementById('deck'),SGC.data);
+  const ms=dC.querySelectorAll('#deck .slide')[1];
+  ok(!!ms.querySelector('.media-split.side-left .ms-media')&&!!ms.querySelector('.media-split .ms-text'),
+     'media-split still wraps the media + bullets sections in its grid');
+  ok(!!ms.querySelector('[data-el="image"]')&&!!ms.querySelector('[data-bind="items.0"]'),
+     'media-split keys stay flat at base=""');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

@@ -22,12 +22,30 @@
    Rows are the only nesting — rows cannot contain rows. That ceiling is
    deliberate: it keeps the editor's mental model and the validator sane.
 
+   The v1 vocabulary is 12 types, each lifted from the layout named in
+   parentheses, and each keeping that layout's field names verbatim:
+
+     titleband (every headed layout)  stats (stat-grid)   bignum (bignum)
+     chart (chart)     table (table)      comparison (comparison)
+     quote (quote)     agenda (agenda)    timeline (timeline)
+     prose (editorial) media (media-split picture side)
+     bullets (media-split text side)
+
+   Ten classic layouts are now compositions of these; the rest stay monolithic
+   because they are genuinely bespoke (cover, divider, closing, figure, image,
+   diptych, hero-asym, manifesto, embed, raw) or are simply deferred to a later
+   wave (pipeline, code, metric-dash, leaderboard, matrix, stack, the mosaics,
+   before-after). A non-decomposable layout is not broken — it just can't have
+   a section inserted into its flow, and the editor falls back to a floating
+   object there.
+
    Loads AFTER engine.js (consumes SG.N / SG.h / SG.layouts) and BEFORE
    editor.js.
    ===================================================================== */
 (function(){
   var W=window, SG=W.SG=W.SG||{}, N=SG.N, L=SG.layouts, h=SG.h||{};
-  var rich=h.rich, esc=h.esc, arr=h.arr, kickerN=h.kickerN, titleN=h.titleN;
+  var rich=h.rich, esc=h.esc, arr=h.arr, pad=h.pad, kickerN=h.kickerN, titleN=h.titleN;
+  var mediaImgWrap=h.mediaImgWrap, fitStyle=h.fitStyle;
 
   var S = SG.S = {};
 
@@ -71,13 +89,173 @@
         c.subtitle?N('p.subtitle',{bind:b+'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; }
   };
 
+  /* ---------- bignum — one enormous number. A SECTION_LAYOUTS refugee
+       (`.bignum` centres the whole <section>), dual-scoped `.bignum, .sec-bignum`.
+       The kicker stays OUT so a bignum section can sit under a titleband without
+       two kickers; the classic layout adds its own. ---------- */
+  S.bignum = {
+    label:'Big number',
+    fields:['value','count','unit','fmt','subtitle'],
+    defaults:{value:'42', subtitle:'What the number means'},
+    build:function(c,b){ b=b||'';
+      var hero = c.count!=null
+        ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
+        : esc(c.value);
+      return [ N('div.hero-num',{key:b+'num',html:hero}),
+        c.subtitle?N('p.subtitle',{bind:b+'subtitle',html:rich(c.subtitle)}):null ]; }
+  };
+
+  /* ---------- chart — carries its own head (the note sits on the title's
+       baseline), so it does NOT want a titleband above it ---------- */
+  S.chart = {
+    label:'Chart',
+    fields:['kicker','title','note','type','data'],
+    defaults:{title:'Chart title', type:'bar',
+              data:{labels:['A','B','C'], series:[{name:'Series', values:[3,5,4]}]}},
+    build:function(c,b){ b=b||'';
+      /* v2+: author charts as data (type + data.labels/series); SG.charts renders
+         theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
+      var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
+      return [ N('div.chart-head',{key:b+'head'},[
+          N('div',null,[kickerN(c.kicker,b),titleN(c.title,b)]),
+          c.note?N('p',{key:b+'note',bind:b+'note',text:c.note,
+            style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
+        N('div.chart-wrap',{key:b+'chart',html:body}) ]; }
+  };
+
+  S.table = {
+    label:'Table',
+    fields:['columns','rows','options','note'],
+    defaults:{columns:['','A','B'], rows:[['Row 1','–','–'],['Row 2','–','–']]},
+    build:function(c,b){ b=b||'';
+      var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
+      return [ N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:b+'table'},[
+        N('table.tbl'+(o.compact?'.compact':''),null,[
+          N('thead',null,N('tr',null,cols.map(function(hd,j){
+            return N('th'+(j===hi?'.hi':''),{bind:b+'columns.'+j,html:rich(hd)}); }))),
+          N('tbody',null,arr(c.rows).map(function(r,i){
+            return N('tr',null,arr(r).map(function(cell,j){
+              return N('td'+(j===hi?'.hi':''),{bind:b+'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
+        c.note?N('p.tbl-note',{key:b+'tnote',bind:b+'note',text:c.note}):null ]) ]; }
+  };
+
+  S.comparison = {
+    label:'Comparison',
+    fields:['left','right','badge'],
+    defaults:{left:{tag:'Option A',title:'This way',items:['Point one','Point two']},
+              right:{tag:'Option B',title:'That way',items:['Point one','Point two']},
+              badge:'VS'},
+    build:function(c,b){ b=b||'';
+      function col(side,cls,base){ if(!side) return null;
+        return N('div.cmp-col.'+cls,{key:b+base},[
+          side.tag?N('div.tag',{bind:b+base+'.tag',html:rich(side.tag)}):null,
+          N('h3',{bind:b+base+'.title',html:rich(side.title)}),
+          N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
+            return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
+      return [ N('div.cmp',{key:b+'cmp'},[ col(c.left,'sup','left'),
+        N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
+        col(c.right,'uns','right') ]) ]; }
+  };
+
+  S.agenda = {
+    label:'Numbered agenda',
+    fields:['items'],
+    defaults:{items:[{title:'First thing',desc:'One line about it'},
+                     {title:'Second thing',desc:'One line about it'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.agenda-grid.sg-stagger.sg-onenter',{key:b+'items',arr:b+'items'},
+        arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.ag-item',{key:P},[
+            N('div.ag-num',{key:P+'.num'},pad(i+1)),
+            N('div.ag-body',{key:P+'.body'},[
+              N('h3',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; }
+  };
+
+  S.timeline = {
+    label:'Timeline',
+    fields:['items'],
+    defaults:{items:[{year:'2024',title:'Then'},{year:'2026',title:'Now',now:true}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.timeline',{key:b+'timeline'},[
+        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.tl-item',{key:P},[
+            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.ev',{key:P+'.ev'},[
+              N('b',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; }
+  };
+
+  /* ---------- prose — the editorial lead + rule-lined columns ---------- */
+  S.prose = {
+    label:'Prose columns',
+    fields:['lead','columns'],
+    defaults:{lead:'The one sentence this section is about.',
+              columns:[{head:'First',body:'A short paragraph.'},
+                       {head:'Second',body:'A short paragraph.'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.editorial',{key:b+'editorial'},[
+        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:b+'lead',html:rich(c.lead)}),
+        N('div.ed-cols.sg-stagger.sg-onenter',{key:b+'columns',arr:b+'columns'},
+          arr(c.columns).map(function(col,i){ var P=b+'columns.'+i;
+            return N('div.ed-col',{key:P},[
+              N('h3',{bind:P+'.head',html:rich(col.head)}),
+              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; }
+  };
+
+  /* ---------- media + bullets — the two halves of media-split, now separable.
+       Both are CSS refugees: their rules are scoped `.media-split .ms-media` /
+       `.media-split .ms-text`, so deck/engine.css dual-scopes them on
+       `.sec-media` / `.sec-bullets` too. ---------- */
+  S.media = {
+    label:'Image',
+    fields:['image','focal','fit'],
+    defaults:{image:''},
+    build:function(c,b){ b=b||'';
+      var img=mediaImgWrap(c.image,{key:b+'image'},fitStyle(c));
+      img.classList.add('ms-media');
+      return [img]; }
+  };
+
+  S.bullets = {
+    label:'Bullets',
+    fields:['kicker','title','body','items'],
+    defaults:{title:'What matters here', items:['First point','Second point','Third point']},
+    build:function(c,b){ b=b||'';
+      return [ N('div.ms-text',{key:b+'text'},[ kickerN(c.kicker,b), titleN(c.title,b),
+        c.body?N('p.ms-body',{bind:b+'body',html:rich(c.body)}):null,
+        arr(c.items).length?N('ul.ms-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(x,i){
+          return N('li',{bind:b+'items.'+i,html:rich(x)}); })):null ]) ]; }
+  };
+
   /* =====================================================================
      CLASSIC LAYOUTS, RE-EXPRESSED
      One implementation, two callers. Byte-identical at base='' — that is
      what tests/parity.mjs checks against the frozen v2 build.
      ===================================================================== */
-  L['stat-grid'] = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
-  L.quote       = function(c){ return S.quote.build(c,''); };
+  L['stat-grid']  = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
+  L.quote         = function(c){ return S.quote.build(c,''); };
+  L.chart         = function(c){ return S.chart.build(c,''); };
+  L.table         = function(c){ return S.titleband.build(c,'').concat(S.table.build(c,'')); };
+  L.comparison    = function(c){ return S.titleband.build(c,'').concat(S.comparison.build(c,'')); };
+  L.timeline      = function(c){ return S.titleband.build(c,'').concat(S.timeline.build(c,'')); };
+  /* bignum + editorial open with a kicker but never a title, so they take
+     kickerN directly rather than a titleband that would render a stray <h1>
+     the moment someone typed a `title` into their content. */
+  L.bignum        = function(c){ return [kickerN(c.kicker,'')].concat(S.bignum.build(c,'')); };
+  L.editorial     = function(c){ return [kickerN(c.kicker,'')].concat(S.prose.build(c,'')); };
+  /* the rail is slide chrome (absolutely positioned against the section), not
+     part of the agenda section */
+  L.agenda        = function(c){ return [N('div.rail',{key:'rail'})]
+                                   .concat(S.titleband.build(c,''), S.agenda.build(c,'')); };
+  /* media-split is the one classic that is ALREADY two sections — it just wraps
+     them in a grid that decides which side the picture takes */
+  L['media-split']= function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=S.media.build(c,'')[0], text=S.bullets.build(c,'')[0];
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
 
   /* =====================================================================
      THE `composed` LAYOUT
@@ -85,7 +263,14 @@
      a horizontal band of weighted sections. `size` is a flex weight; absent
      means "take your natural height" (flex:0 1 auto, the CSS default).
      ===================================================================== */
-  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex:'+(+sz||0)); }
+  /* `size` writes flex-GROW only, never the shorthand. The flex-BASIS is the
+     stylesheet's job, and it differs by axis: a row's children get basis 0 so
+     the weights are literal width proportions, while a column's children keep
+     basis auto so a weight distributes the LEFTOVER height and can never force
+     a section shorter than its own content. Writing `flex:N` here would set
+     basis 0 in both, which silently pushed content off the bottom of the slide
+     whenever a weighted column section's content was taller than its share. */
+  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex-grow:'+(+sz||0)); }
 
   function sectionNode(entry,key){
     if(!entry||typeof entry!=='object') return null;
@@ -105,4 +290,8 @@
           arr(entry.items).map(function(it,j){ return sectionNode(it,key+'.items.'+j); }));
       return sectionNode(entry,key); });
   };
+
+  /* the vocabulary as data — the editor's gallery and the Python validator
+     both need the list, and it should have exactly one source */
+  SG.SECTION_TYPES = Object.keys(S);
 })();

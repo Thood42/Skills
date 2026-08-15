@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 5a38e9ac2e — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 042b0944d1 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -290,11 +290,15 @@ p{margin:0; color:var(--muted)}
 .stat .num small{font-size:26px; color:var(--cyan); font-weight:700}
 .stat .lbl{margin-top:8px; font-size:16px; color:var(--muted); line-height:1.45}
 
-/* 5 BIG NUMBER */
-.bignum{justify-content:center; align-items:flex-start; text-align:left}
+/* 5 BIG NUMBER — DUAL-SCOPED (see QUOTE below): `.bignum` is the classic
+   <section>, `.sec-bignum` the same content as one section of a composed slide.
+   The section copy shrinks the hero, since 118px is sized for a whole slide. */
+.bignum,.sec-bignum{justify-content:center; align-items:flex-start; text-align:left}
 .hero-num{font-family:var(--font-mono); font-weight:700; font-size:118px; letter-spacing:-.03em;
   color:var(--cyan); line-height:1; margin:14px 0 0}
-.bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .hero-num{font-size:76px}
+.bignum .subtitle,.sec-bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .subtitle{margin-top:16px; font-size:18px}
 
 /* 6 CHART */
 .chart-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px}
@@ -664,19 +668,51 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
 /* =====================================================================
    COMPOSED SLIDES — section arrangement (composer plan §C).
    `.slide` is already display:flex/column, so a section is just a flex child
-   and the whole arrangement is four rules. `size` in the deck JSON becomes an
-   inline `flex:N`; absent = flex:0 1 auto = "your natural height".
-   `min-height/min-width:0` are load-bearing, not decoration: without them a
-   flex child refuses to shrink below its content and a section holding a
-   chart or a long list blows out of the slide.
+   and the whole arrangement is a handful of rules. `size` in the deck JSON
+   becomes an inline `flex-grow:N` — grow only. The BASIS lives here, and it
+   differs by axis on purpose:
+     • in a ROW, basis 0, so the weights read as literal width proportions
+       (size 2 next to size 1 really is two-thirds of the row);
+     • in the COLUMN, basis auto, so a weight distributes the LEFTOVER height
+       and can never squeeze a section below its own content — basis 0 there
+       pushes tall content straight off the bottom of the slide.
+   When a slide asks for more than 720px, SOMETHING has to give, and which
+   section gives is the one real decision here. A section keeps flexbox's
+   automatic minimum height by default, so it is never handed less room than the
+   content it draws. The genuinely ELASTIC types opt out with `min-height:0` and
+   absorb the whole overflow — a chart, a table, a timeline or an image renders
+   at whatever height it is given, whereas a stat card is 163px of padding and
+   type no matter what. Without this split, an over-full slide shrinks every
+   section proportionally and the rigid ones quietly spill off the bottom.
+   `min-width:0` is unconditional: across a row, text should re-wrap.
    ===================================================================== */
-.sec{position:relative; display:flex; flex-direction:column; min-height:0; min-width:0}
+.sec{position:relative; display:flex; flex-direction:column; min-width:0}
+.sec-chart,.sec-table,.sec-timeline,.sec-media{min-height:0}
+/* Layout bodies all declare `flex:1` (= grow 1, basis 0), because as a direct
+   child of `.slide` each is meant to eat the whole slide. Inside a section that
+   basis of 0 erases the block from its section's intrinsic height, so a RIGID
+   section would measure at nothing and be handed nothing. Same split, one level
+   down: only the rigid bodies get their content height back. */
+.sec > .stat-grid, .sec > .cmp, .sec > .editorial, .sec > .agenda-grid,
+.sec > .take, .sec > .gallery{flex-basis:auto}
 .sec-row{position:relative; display:flex; align-items:stretch; gap:34px; min-height:0; min-width:0}
 .sec-row > .sec{flex:1 1 0}
-/* a section whose builder emits a flex:1 block (stat-grid, chart-wrap …) must
-   be allowed to grow, or that block collapses to nothing inside the wrapper */
-.sec > .stat-grid{margin-top:0}
+/* Section bodies carry the leading margin their classic layout used to separate
+   them from the title above (.stat-grid 42px, .cmp 40px, .timeline 64px …).
+   Mid-column that IS the spacing, and it comes for free. It is wrong in exactly
+   two places: inside a row, where two sections must align at the row's top, and
+   at the very top of the slide, where there is nothing to be spaced from. */
+.sec-row > .sec > :first-child,
+.lyt-composed > .sec:first-child > :first-child,
+.lyt-composed > .sec-row:first-child > .sec > :first-child{margin-top:0}
 .sec-unknown{padding:18px 22px; border:1px dashed var(--brd-2); border-radius:12px}
+
+/* Refugee rules: these are scoped to the classic layout's own wrapper
+   (`.media-split .ms-media`), which does not exist when the same builder runs
+   as a standalone section. Match the section wrapper too, or the composed copy
+   renders unstyled. */
+.sec-media .ms-media{border-radius:18px; min-height:0; flex:1}
+.sec-bullets .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1}
 
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
 .ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
@@ -1595,7 +1631,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
      render loop, assets, embeds) and the composition vocabulary is one readable
      file. It needs the same tiny helpers the layouts use; this is the whole
      widening of the internal API. */
-  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad};
+  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad,
+          emRich:emRich, icon:icon, mediaImgWrap:mediaImgWrap, fitStyle:fitStyle};
 
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
@@ -1622,15 +1659,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           ? N('span',{key:'meta.'+i},N('b',null,t))
           : N('span',{bind:'meta.'+i,text:t}); })):null ]; };
 
-  L.agenda=function(c){
-    return [ N('div.rail',{key:'rail'}), kickerN(c.kicker), titleN(c.title),
-      N('div.agenda-grid.sg-stagger.sg-onenter',{key:'items',arr:'items'},
-        arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.ag-item',{key:P},[
-            N('div.ag-num',{key:P+'.num'},pad(i+1)),
-            N('div.ag-body',{key:P+'.body'},[
-              N('h3',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; };
+  /* agenda -> sections.js (rail + titleband + agenda) */
 
   L.divider=function(c){
     return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
@@ -1640,49 +1669,12 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
 
   /* stat-grid -> sections.js (titleband + stats) */
 
-  L.bignum=function(c){
-    var hero = c.count!=null
-      ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
-      : esc(c.value);
-    return [ kickerN(c.kicker), N('div.hero-num',{key:'num',html:hero}),
-      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
-
-  L.chart=function(c){
-    /* v2+: author charts as data (type + data.labels/series); SG.charts renders
-       theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
-    var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
-    return [ N('div.chart-head',{key:'head'},[
-        N('div',null,[kickerN(c.kicker),titleN(c.title)]),
-        c.note?N('p',{key:'note',bind:'note',text:c.note,
-          style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
-      N('div.chart-wrap',{key:'chart',html:body}) ]; };
-
-  L.table=function(c){
-    var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:'table'},[
-        N('table.tbl'+(o.compact?'.compact':''),null,[
-          N('thead',null,N('tr',null,cols.map(function(h,j){
-            return N('th'+(j===hi?'.hi':''),{bind:'columns.'+j,html:rich(h)}); }))),
-          N('tbody',null,arr(c.rows).map(function(r,i){
-            return N('tr',null,arr(r).map(function(cell,j){
-              return N('td'+(j===hi?'.hi':''),{bind:'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
-        c.note?N('p.tbl-note',{key:'tnote',bind:'note',text:c.note}):null ]) ]; };
-
-  L.comparison=function(c){
-    function col(side,cls,base){ if(!side) return null;
-      return N('div.cmp-col.'+cls,{key:base},[
-        side.tag?N('div.tag',{bind:base+'.tag',html:rich(side.tag)}):null,
-        N('h3',{bind:base+'.title',html:rich(side.title)}),
-        N('ul',{key:base+'.items',arr:base+'.items'},arr(side.items).map(function(x,i){
-          return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.cmp',{key:'cmp'},[ col(c.left,'sup','left'),
-        N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
-        col(c.right,'uns','right') ]) ]; };
-
-  /* quote -> sections.js (a SECTION_LAYOUTS CSS refugee; its rules are
-     dual-scoped `.quote, .sec-quote` in deck.css) */
+  /* bignum     -> sections.js (kicker + bignum; a CSS refugee, dual-scoped
+                   `.bignum, .sec-bignum`)
+     chart      -> sections.js (chart, which carries its own head)
+     table      -> sections.js (titleband + table)
+     comparison -> sections.js (titleband + comparison)
+     quote      -> sections.js (a CSS refugee, dual-scoped `.quote, .sec-quote`) */
 
   L.code=function(c){
     return [ kickerN(c.kicker), titleN(c.title),
@@ -1693,17 +1685,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
         c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
-  L.timeline=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.timeline',{key:'timeline'},[
-        N('div.tl-track'), N('div.tl-spark'),
-        N('div.tl-items',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.tl-item',{key:P},[
-            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
-            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
-            N('div.ev',{key:P+'.ev'},[
-              N('b',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; };
+  /* timeline -> sections.js (titleband + timeline) */
 
   L.pipeline=function(c){
     var nodes=arr(c.nodes), kids=[];
@@ -1743,15 +1725,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       N('div.statement.sg-glow-pulse-box',{bind:'statement',html:emRich(c.statement||'')}),
       c.lead?N('p.lead',{bind:'lead',html:rich(c.lead)}):null ]; };
 
-  L.editorial=function(c){
-    return [ kickerN(c.kicker),
-      N('div.editorial',{key:'editorial'},[
-        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:'lead',html:rich(c.lead)}),
-        N('div.ed-cols.sg-stagger.sg-onenter',{key:'columns',arr:'columns'},
-          arr(c.columns).map(function(col,i){ var P='columns.'+i;
-            return N('div.ed-col',{key:P},[
-              N('h3',{bind:P+'.head',html:rich(col.head)}),
-              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; };
+  /* editorial -> sections.js (kicker + prose) */
 
   L['hero-asym']=function(c){
     return [ N('div.hero-asym',{key:'hero'},[
@@ -1786,16 +1760,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
       c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
 
-  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
-  L['media-split']=function(c){
-    var side=c.side==='right'?'right':'left';
-    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
-    img.classList.add('ms-media');
-    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
-      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
-      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
-        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
-    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+  /* media-split -> sections.js (the `media` + `bullets` sections, wrapped in
+     the .media-split grid; both halves are CSS refugees, dual-scoped) */
 
   /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
   L.gallery=function(c){
@@ -2230,12 +2196,30 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
    Rows are the only nesting — rows cannot contain rows. That ceiling is
    deliberate: it keeps the editor's mental model and the validator sane.
 
+   The v1 vocabulary is 12 types, each lifted from the layout named in
+   parentheses, and each keeping that layout's field names verbatim:
+
+     titleband (every headed layout)  stats (stat-grid)   bignum (bignum)
+     chart (chart)     table (table)      comparison (comparison)
+     quote (quote)     agenda (agenda)    timeline (timeline)
+     prose (editorial) media (media-split picture side)
+     bullets (media-split text side)
+
+   Ten classic layouts are now compositions of these; the rest stay monolithic
+   because they are genuinely bespoke (cover, divider, closing, figure, image,
+   diptych, hero-asym, manifesto, embed, raw) or are simply deferred to a later
+   wave (pipeline, code, metric-dash, leaderboard, matrix, stack, the mosaics,
+   before-after). A non-decomposable layout is not broken — it just can't have
+   a section inserted into its flow, and the editor falls back to a floating
+   object there.
+
    Loads AFTER engine.js (consumes SG.N / SG.h / SG.layouts) and BEFORE
    editor.js.
    ===================================================================== */
 (function(){
   var W=window, SG=W.SG=W.SG||{}, N=SG.N, L=SG.layouts, h=SG.h||{};
-  var rich=h.rich, esc=h.esc, arr=h.arr, kickerN=h.kickerN, titleN=h.titleN;
+  var rich=h.rich, esc=h.esc, arr=h.arr, pad=h.pad, kickerN=h.kickerN, titleN=h.titleN;
+  var mediaImgWrap=h.mediaImgWrap, fitStyle=h.fitStyle;
 
   var S = SG.S = {};
 
@@ -2279,13 +2263,173 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         c.subtitle?N('p.subtitle',{bind:b+'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; }
   };
 
+  /* ---------- bignum — one enormous number. A SECTION_LAYOUTS refugee
+       (`.bignum` centres the whole <section>), dual-scoped `.bignum, .sec-bignum`.
+       The kicker stays OUT so a bignum section can sit under a titleband without
+       two kickers; the classic layout adds its own. ---------- */
+  S.bignum = {
+    label:'Big number',
+    fields:['value','count','unit','fmt','subtitle'],
+    defaults:{value:'42', subtitle:'What the number means'},
+    build:function(c,b){ b=b||'';
+      var hero = c.count!=null
+        ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
+        : esc(c.value);
+      return [ N('div.hero-num',{key:b+'num',html:hero}),
+        c.subtitle?N('p.subtitle',{bind:b+'subtitle',html:rich(c.subtitle)}):null ]; }
+  };
+
+  /* ---------- chart — carries its own head (the note sits on the title's
+       baseline), so it does NOT want a titleband above it ---------- */
+  S.chart = {
+    label:'Chart',
+    fields:['kicker','title','note','type','data'],
+    defaults:{title:'Chart title', type:'bar',
+              data:{labels:['A','B','C'], series:[{name:'Series', values:[3,5,4]}]}},
+    build:function(c,b){ b=b||'';
+      /* v2+: author charts as data (type + data.labels/series); SG.charts renders
+         theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
+      var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
+      return [ N('div.chart-head',{key:b+'head'},[
+          N('div',null,[kickerN(c.kicker,b),titleN(c.title,b)]),
+          c.note?N('p',{key:b+'note',bind:b+'note',text:c.note,
+            style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
+        N('div.chart-wrap',{key:b+'chart',html:body}) ]; }
+  };
+
+  S.table = {
+    label:'Table',
+    fields:['columns','rows','options','note'],
+    defaults:{columns:['','A','B'], rows:[['Row 1','–','–'],['Row 2','–','–']]},
+    build:function(c,b){ b=b||'';
+      var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
+      return [ N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:b+'table'},[
+        N('table.tbl'+(o.compact?'.compact':''),null,[
+          N('thead',null,N('tr',null,cols.map(function(hd,j){
+            return N('th'+(j===hi?'.hi':''),{bind:b+'columns.'+j,html:rich(hd)}); }))),
+          N('tbody',null,arr(c.rows).map(function(r,i){
+            return N('tr',null,arr(r).map(function(cell,j){
+              return N('td'+(j===hi?'.hi':''),{bind:b+'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
+        c.note?N('p.tbl-note',{key:b+'tnote',bind:b+'note',text:c.note}):null ]) ]; }
+  };
+
+  S.comparison = {
+    label:'Comparison',
+    fields:['left','right','badge'],
+    defaults:{left:{tag:'Option A',title:'This way',items:['Point one','Point two']},
+              right:{tag:'Option B',title:'That way',items:['Point one','Point two']},
+              badge:'VS'},
+    build:function(c,b){ b=b||'';
+      function col(side,cls,base){ if(!side) return null;
+        return N('div.cmp-col.'+cls,{key:b+base},[
+          side.tag?N('div.tag',{bind:b+base+'.tag',html:rich(side.tag)}):null,
+          N('h3',{bind:b+base+'.title',html:rich(side.title)}),
+          N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
+            return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
+      return [ N('div.cmp',{key:b+'cmp'},[ col(c.left,'sup','left'),
+        N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
+        col(c.right,'uns','right') ]) ]; }
+  };
+
+  S.agenda = {
+    label:'Numbered agenda',
+    fields:['items'],
+    defaults:{items:[{title:'First thing',desc:'One line about it'},
+                     {title:'Second thing',desc:'One line about it'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.agenda-grid.sg-stagger.sg-onenter',{key:b+'items',arr:b+'items'},
+        arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.ag-item',{key:P},[
+            N('div.ag-num',{key:P+'.num'},pad(i+1)),
+            N('div.ag-body',{key:P+'.body'},[
+              N('h3',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; }
+  };
+
+  S.timeline = {
+    label:'Timeline',
+    fields:['items'],
+    defaults:{items:[{year:'2024',title:'Then'},{year:'2026',title:'Now',now:true}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.timeline',{key:b+'timeline'},[
+        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.tl-item',{key:P},[
+            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.ev',{key:P+'.ev'},[
+              N('b',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; }
+  };
+
+  /* ---------- prose — the editorial lead + rule-lined columns ---------- */
+  S.prose = {
+    label:'Prose columns',
+    fields:['lead','columns'],
+    defaults:{lead:'The one sentence this section is about.',
+              columns:[{head:'First',body:'A short paragraph.'},
+                       {head:'Second',body:'A short paragraph.'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.editorial',{key:b+'editorial'},[
+        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:b+'lead',html:rich(c.lead)}),
+        N('div.ed-cols.sg-stagger.sg-onenter',{key:b+'columns',arr:b+'columns'},
+          arr(c.columns).map(function(col,i){ var P=b+'columns.'+i;
+            return N('div.ed-col',{key:P},[
+              N('h3',{bind:P+'.head',html:rich(col.head)}),
+              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; }
+  };
+
+  /* ---------- media + bullets — the two halves of media-split, now separable.
+       Both are CSS refugees: their rules are scoped `.media-split .ms-media` /
+       `.media-split .ms-text`, so deck/engine.css dual-scopes them on
+       `.sec-media` / `.sec-bullets` too. ---------- */
+  S.media = {
+    label:'Image',
+    fields:['image','focal','fit'],
+    defaults:{image:''},
+    build:function(c,b){ b=b||'';
+      var img=mediaImgWrap(c.image,{key:b+'image'},fitStyle(c));
+      img.classList.add('ms-media');
+      return [img]; }
+  };
+
+  S.bullets = {
+    label:'Bullets',
+    fields:['kicker','title','body','items'],
+    defaults:{title:'What matters here', items:['First point','Second point','Third point']},
+    build:function(c,b){ b=b||'';
+      return [ N('div.ms-text',{key:b+'text'},[ kickerN(c.kicker,b), titleN(c.title,b),
+        c.body?N('p.ms-body',{bind:b+'body',html:rich(c.body)}):null,
+        arr(c.items).length?N('ul.ms-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(x,i){
+          return N('li',{bind:b+'items.'+i,html:rich(x)}); })):null ]) ]; }
+  };
+
   /* =====================================================================
      CLASSIC LAYOUTS, RE-EXPRESSED
      One implementation, two callers. Byte-identical at base='' — that is
      what tests/parity.mjs checks against the frozen v2 build.
      ===================================================================== */
-  L['stat-grid'] = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
-  L.quote       = function(c){ return S.quote.build(c,''); };
+  L['stat-grid']  = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
+  L.quote         = function(c){ return S.quote.build(c,''); };
+  L.chart         = function(c){ return S.chart.build(c,''); };
+  L.table         = function(c){ return S.titleband.build(c,'').concat(S.table.build(c,'')); };
+  L.comparison    = function(c){ return S.titleband.build(c,'').concat(S.comparison.build(c,'')); };
+  L.timeline      = function(c){ return S.titleband.build(c,'').concat(S.timeline.build(c,'')); };
+  /* bignum + editorial open with a kicker but never a title, so they take
+     kickerN directly rather than a titleband that would render a stray <h1>
+     the moment someone typed a `title` into their content. */
+  L.bignum        = function(c){ return [kickerN(c.kicker,'')].concat(S.bignum.build(c,'')); };
+  L.editorial     = function(c){ return [kickerN(c.kicker,'')].concat(S.prose.build(c,'')); };
+  /* the rail is slide chrome (absolutely positioned against the section), not
+     part of the agenda section */
+  L.agenda        = function(c){ return [N('div.rail',{key:'rail'})]
+                                   .concat(S.titleband.build(c,''), S.agenda.build(c,'')); };
+  /* media-split is the one classic that is ALREADY two sections — it just wraps
+     them in a grid that decides which side the picture takes */
+  L['media-split']= function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=S.media.build(c,'')[0], text=S.bullets.build(c,'')[0];
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
 
   /* =====================================================================
      THE `composed` LAYOUT
@@ -2293,7 +2437,14 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
      a horizontal band of weighted sections. `size` is a flex weight; absent
      means "take your natural height" (flex:0 1 auto, the CSS default).
      ===================================================================== */
-  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex:'+(+sz||0)); }
+  /* `size` writes flex-GROW only, never the shorthand. The flex-BASIS is the
+     stylesheet's job, and it differs by axis: a row's children get basis 0 so
+     the weights are literal width proportions, while a column's children keep
+     basis auto so a weight distributes the LEFTOVER height and can never force
+     a section shorter than its own content. Writing `flex:N` here would set
+     basis 0 in both, which silently pushed content off the bottom of the slide
+     whenever a weighted column section's content was taller than its share. */
+  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex-grow:'+(+sz||0)); }
 
   function sectionNode(entry,key){
     if(!entry||typeof entry!=='object') return null;
@@ -2313,6 +2464,10 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           arr(entry.items).map(function(it,j){ return sectionNode(it,key+'.items.'+j); }));
       return sectionNode(entry,key); });
   };
+
+  /* the vocabulary as data — the editor's gallery and the Python validator
+     both need the list, and it should have exactly one source */
+  SG.SECTION_TYPES = Object.keys(S);
 })();
 </script>
 <style id="forge-css">

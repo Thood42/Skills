@@ -188,11 +188,15 @@ p{margin:0; color:var(--muted)}
 .stat .num small{font-size:26px; color:var(--cyan); font-weight:700}
 .stat .lbl{margin-top:8px; font-size:16px; color:var(--muted); line-height:1.45}
 
-/* 5 BIG NUMBER */
-.bignum{justify-content:center; align-items:flex-start; text-align:left}
+/* 5 BIG NUMBER — DUAL-SCOPED (see QUOTE below): `.bignum` is the classic
+   <section>, `.sec-bignum` the same content as one section of a composed slide.
+   The section copy shrinks the hero, since 118px is sized for a whole slide. */
+.bignum,.sec-bignum{justify-content:center; align-items:flex-start; text-align:left}
 .hero-num{font-family:var(--font-mono); font-weight:700; font-size:118px; letter-spacing:-.03em;
   color:var(--cyan); line-height:1; margin:14px 0 0}
-.bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .hero-num{font-size:76px}
+.bignum .subtitle,.sec-bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .subtitle{margin-top:16px; font-size:18px}
 
 /* 6 CHART */
 .chart-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px}

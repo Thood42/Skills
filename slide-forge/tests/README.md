@@ -69,7 +69,18 @@ from PowerShell (a Git-Bash shell may not have it on PATH).
   (gitignored — it's a build product of the template + the JSON), then serve
   the repo root and open it. jsdom can assert the section KEYS but not that a
   weighted row actually lands where it should, which is the whole question a
-  composition feature has to answer.
+  composition feature has to answer. What to look for: **no element's bounding
+  box may cross the 1280×720 frame**, row children must share one top edge, and
+  the weights must read as literal width proportions (`size` 2 beside 1 = 713 /
+  357 px with the 34px gap). The composed slides are followed by their classic
+  originals so the two can be compared directly.
+
+  The sizing rules this checks are the subtle part and jsdom returns zeros for
+  all of them: a section keeps flexbox's automatic minimum height so it is never
+  handed less room than it draws, while the elastic types (`chart`, `table`,
+  `timeline`, `media`) opt out with `min-height:0` and absorb an over-full
+  slide. A chart's SVG carries ~600px of intrinsic height, so without that split
+  every section shrinks proportionally and the rigid ones spill off the bottom.
 
 Run:  `node tests/parity.mjs && node tests/editor-ops.mjs`
 (with jsdom resolvable, e.g. `NODE_PATH=/path/to/node_modules`)
