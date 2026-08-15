@@ -4,6 +4,23 @@
    so it themes globally and honours per-slide overrides.
    ===================================================================== */
 
+/* =====================================================================
+   COMPOSED SLIDES — section arrangement (composer plan §C).
+   `.slide` is already display:flex/column, so a section is just a flex child
+   and the whole arrangement is four rules. `size` in the deck JSON becomes an
+   inline `flex:N`; absent = flex:0 1 auto = "your natural height".
+   `min-height/min-width:0` are load-bearing, not decoration: without them a
+   flex child refuses to shrink below its content and a section holding a
+   chart or a long list blows out of the slide.
+   ===================================================================== */
+.sec{position:relative; display:flex; flex-direction:column; min-height:0; min-width:0}
+.sec-row{position:relative; display:flex; align-items:stretch; gap:34px; min-height:0; min-width:0}
+.sec-row > .sec{flex:1 1 0}
+/* a section whose builder emits a flex:1 block (stat-grid, chart-wrap …) must
+   be allowed to grow, or that block collapses to nothing inside the wrapper */
+.sec > .stat-grid{margin-top:0}
+.sec-unknown{padding:18px 22px; border:1px dashed var(--brd-2); border-radius:12px}
+
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
 .ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
 .ico-wrap svg{width:1em; height:1em; display:block; fill:none; stroke:currentColor}

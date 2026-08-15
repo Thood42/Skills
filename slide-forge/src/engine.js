@@ -98,9 +98,13 @@
   function H(s){ var t=D.createElement('template'); t.innerHTML=s==null?'':String(s); return t.content; }
   SG.N=N; SG.H=H;
 
-  function kickerN(t){ return t?N('div.eyebrow-row',{key:'kicker'},
-    N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
-  function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
+  /* The optional `b` (base) prefix is what lets one builder serve two callers:
+     '' for a classic layout (keys stay "kicker"/"title", byte-identical to v3)
+     and 'sections.N.content.' when the same nodes are built inside a composed
+     slide (composer plan §A). Every helper that authors a key takes it. */
+  function kickerN(t,b){ b=b||''; return t?N('div.eyebrow-row',{key:b+'kicker'},
+    N('span.kicker',{key:b+'kicker.text',bind:b+'kicker',html:rich(t)})):null; }
+  function titleN(t,b){ b=b||''; return t?N('h1.title',{bind:b+'title',html:rich(t)}):null; }
 
   /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
      v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
@@ -277,11 +281,21 @@
       iframe.src=url; }
     return {shield:shield,wrap:wrap,poster:poster}; };
 
+  /* ---------- helper surface for src/sections.js (composer plan §"Types") ----------
+     sections.js is a separate module so the engine stays a kernel (node builder,
+     render loop, assets, embeds) and the composition vocabulary is one readable
+     file. It needs the same tiny helpers the layouts use; this is the whole
+     widening of the internal API. */
+  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad};
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
      Keys are authored: named blocks ("title","rail"), array items by content
      path ("stats.2"), leaves bound to the field they render ("stats.2.label").
+     Layouts that decompose into sections are registered in src/sections.js
+     instead (they become thin S[...] compositions); their entries are absent
+     here on purpose.
      ===================================================================== */
   var L = SG.layouts = {};
 
@@ -315,16 +329,7 @@
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
-  L['stat-grid']=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.stat-grid',{key:'stats',arr:'stats'},arr(c.stats).map(function(s,i){ var P='stats.'+i;
-        var num = s.count!=null
-          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
-              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
-          : esc(s.value);
-        return N('div.stat',{key:P},[
-          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
-          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; };
+  /* stat-grid -> sections.js (titleband + stats) */
 
   L.bignum=function(c){
     var hero = c.count!=null
@@ -367,12 +372,8 @@
         N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
         col(c.right,'uns','right') ]) ]; };
 
-  L.quote=function(c){
-    return [ N('div.quote-mark',{key:'mark',html:'&ldquo;'}),
-      N('blockquote.sg-reveal-wipe.sg-onenter',{bind:'quote',html:rich(c.quote)}),
-      c.by?N('div.by',{key:'by'},[N('div.line'),
-        N('span',{key:'by.text',bind:'by',html:rich(c.by)})]):null,
-      c.subtitle?N('p.subtitle',{bind:'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; };
+  /* quote -> sections.js (a SECTION_LAYOUTS CSS refugee; its rules are
+     dual-scoped `.quote, .sec-quote` in deck.css) */
 
   L.code=function(c){
     return [ kickerN(c.kicker), titleN(c.title),

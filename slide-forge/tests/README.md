@@ -62,6 +62,15 @@ from PowerShell (a Git-Bash shell may not have it on PATH).
   non-compositing tab — the transition itself is a cosmetic nicety, not
   something correctness needs.
 
+- `make-demo.py` + `composed-demo.json` — **no Node required.** Rebuilds the
+  template with a hand-authored deck so composed slides can be eyeballed in a
+  real browser beside their classic originals (the "proof" step each composer
+  slice ends with). `python tests/make-demo.py` writes `composed-demo.html`
+  (gitignored — it's a build product of the template + the JSON), then serve
+  the repo root and open it. jsdom can assert the section KEYS but not that a
+  weighted row actually lands where it should, which is the whole question a
+  composition feature has to answer.
+
 Run:  `node tests/parity.mjs && node tests/editor-ops.mjs`
 (with jsdom resolvable, e.g. `NODE_PATH=/path/to/node_modules`)
 

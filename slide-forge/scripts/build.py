@@ -28,6 +28,7 @@ PARTS = {                       # marker -> src file
     '%ENGINE_CSS%':  'engine.css',
     '%CHARTS_JS%':   'charts.js',
     '%ENGINE_JS%':   'engine.js',
+    '%SECTIONS_JS%': 'sections.js',
     '%EDITOR_CSS%':  'editor.css',
     '%EDITOR_JS%':   'editor.js',
     '%MEDIA_JS%':    'media.js',
@@ -60,7 +61,7 @@ def main():
     html = html.replace('%BUILD%', 'v3 build %s' % h)
 
     leftover = [m for m in ('%SG_JS%','%DECK_CSS%','%ANIM_CSS%','%ANIM_JS%','%ENGINE_CSS%','%CHARTS_JS%',
-                            '%ENGINE_JS%','%EDITOR_CSS%','%EDITOR_JS%','%MEDIA_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
+                            '%ENGINE_JS%','%SECTIONS_JS%','%EDITOR_CSS%','%EDITOR_JS%','%MEDIA_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
                 if m in html]
     if leftover:
         sys.exit('unresolved markers: %s' % leftover)

@@ -392,6 +392,50 @@ F.setZoom(99); ok(F.zoom===3,'zoom clamps at 3x');
 F.setZoom(0.01); ok(F.zoom===0.25,'zoom clamps at 0.25x');
 F.zoomFit(); ok(F.zoom===1&&F.focus===false,'Fit resets zoom and turns Focus off');
 
+// =====================================================================
+// COMPOSED SLIDES (composer plan §C) — sections render with authored keys
+// that are literal content paths, so the whole v3 identity layer applies at
+// section depth with no new machinery.
+// =====================================================================
+const COMPOSED={meta:{title:'Composed',seed:7},slides:[
+  {layout:'composed',content:{sections:[
+    {type:'titleband',content:{kicker:'K',title:'Composed'}},
+    {type:'row',items:[
+      {type:'stats',size:2,content:{stats:[{value:'42',unit:'%',label:'L0'},{count:9,label:'L1'}]}},
+      {type:'quote',content:{quote:'Qq',by:'By'}} ]} ]}},
+  {layout:'stat-grid',content:{title:'Classic',stats:[{value:'1',label:'a'}]}} ]};
+const domC=boot(NEW,COMPOSED); await new Promise(r=>setTimeout(r,400));
+const wC=domC.window, dC=wC.document, SGC=wC.SG;
+const cs=()=>dC.querySelectorAll('#deck .slide')[0];
+ok(!!wC.SG.S&&!!wC.SG.S.titleband&&!!wC.SG.layouts.composed,'section registry + composed layout are exposed');
+ok(cs().classList.contains('lyt-composed'),'composed slide gets its lyt- hook');
+ok(cs().children.length>=2&&cs().querySelector('.sec-titleband')&&cs().querySelector('.sec-row'),'sections and the row mount as flex children');
+// keys are content paths, one prefix deeper per nesting level
+ok(!!cs().querySelector('[data-el="sections.0"]'),'section key sections.0');
+ok(!!cs().querySelector('[data-bind="sections.0.content.title"]'),'title bind is a literal content path');
+ok(!!cs().querySelector('[data-el="sections.1.items.0"]'),'row item key sections.1.items.0');
+ok(!!cs().querySelector('[data-el="sections.1.items.0.content.stats.1"]'),'array item key at row depth');
+ok(cs().querySelector('[data-arr="sections.1.items.0.content.stats"]')!==null,'data-arr survives the prefix');
+// every bound leaf resolves through the same getPath the editor writes back with
+const binds=[...cs().querySelectorAll('[data-bind]')].map(n=>n.getAttribute('data-bind'));
+ok(binds.length>0&&binds.every(b=>SGC.getPath(SGC.data.slides[0].content,b)!==undefined),
+   'every data-bind on a composed slide resolves via SG.getPath');
+// overrides key off those same paths
+SGC.data.slides[0].overrides={'sections.1.items.0.content.stats.0':{w:220}};
+SGC.renderSlide(dC.getElementById('deck'),0);
+ok(cs().querySelector('[data-el="sections.1.items.0.content.stats.0"]').style.width==='220px',
+   'an override keyed at section depth styles the right node');
+// size -> flex weight; absent size leaves the CSS default alone
+ok(cs().querySelector('[data-el="sections.1.items.0"]').style.flexGrow==='2','size becomes a flex weight');
+ok(!cs().querySelector('[data-el="sections.0"]').getAttribute('style'),'a section with no size carries no inline style');
+// an unknown type degrades to a visible placeholder rather than a blank slide
+SGC.data.slides[0].content.sections.push({type:'nope',content:{}});
+SGC.renderSlide(dC.getElementById('deck'),0);
+ok(!!cs().querySelector('.sec-unknown'),'an unknown section type renders a placeholder, not an exception');
+// the classic caller is untouched (base='' — parity.mjs is the real guard)
+ok(!!dC.querySelectorAll('#deck .slide')[1].querySelector('[data-el="stats.0"]'),
+   'the same builder at base="" still authors flat classic keys');
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

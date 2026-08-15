@@ -1,0 +1,51 @@
+{
+  "meta": {"title": "Composed — section vocabulary demo", "seed": 7, "schemaVersion": 3},
+  "slides": [
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"kicker": "Composed slide", "title": "A shape no classic layout makes"}},
+          {"type": "row", "size": 1, "items": [
+            {"type": "stats", "size": 2, "content": {"stats": [
+              {"count": 84, "unit": "%", "label": "Rebuilt without an escape hatch"},
+              {"value": "3x", "label": "Arrangements per layout"},
+              {"count": 12, "label": "Section types in the vocabulary"},
+              {"value": "1", "unit": " file", "label": "Still ships as one .html"}
+            ]}},
+            {"type": "quote", "size": 1, "content": {"quote": "It looks designed-in, not pasted on.", "by": "The point of the exercise"}}
+          ]}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"title": "Stacked, no row"}},
+          {"type": "stats", "size": 1, "content": {"stats": [
+            {"value": "A", "label": "First"},
+            {"value": "B", "label": "Second"}
+          ]}}
+        ]
+      }
+    },
+    {
+      "layout": "stat-grid",
+      "content": {
+        "kicker": "Parity canary",
+        "title": "The classic stat-grid, unchanged",
+        "stats": [
+          {"count": 84, "unit": "%", "label": "Rebuilt without an escape hatch"},
+          {"value": "3x", "label": "Arrangements per layout"},
+          {"count": 12, "label": "Section types in the vocabulary"},
+          {"value": "1", "unit": " file", "label": "Still ships as one .html"}
+        ]
+      }
+    },
+    {
+      "layout": "quote",
+      "content": {"quote": "It looks designed-in, not pasted on.", "by": "The classic quote, unchanged"}
+    }
+  ]
+}

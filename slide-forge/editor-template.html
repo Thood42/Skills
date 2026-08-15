@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 8e0e0c4581 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 5a38e9ac2e — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -318,15 +318,24 @@ p{margin:0; color:var(--muted)}
   width:54px; height:54px; border-radius:50%; background:var(--bg-2); border:1px solid var(--brd-2);
   display:grid; place-items:center; font-family:var(--font-mono); font-size:14px; letter-spacing:.1em; color:var(--ink); z-index:2}
 
-/* 8 QUOTE */
-.quote{justify-content:center}
+/* 8 QUOTE — DUAL-SCOPED. `.quote` is the classic layout's <section> (one of the
+   SECTION_LAYOUTS whose CSS targets the section itself); `.sec-quote` is the same
+   content rendered as one section of a composed slide. Every rule below has to
+   match both or the composed copy renders unstyled (composer plan, risk #1).
+   The section copy is smaller and its oversized quote mark is reined in, because
+   it lives in a fraction of a slide rather than the whole of one. */
+.quote,.sec-quote{justify-content:center}
+.sec-quote{overflow:hidden}
 .quote-mark{position:absolute; top:40px; left:64px; font-family:var(--font-display);
   font-size:380px; line-height:1; color:var(--indigo); opacity:.12; pointer-events:none}
-.quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
+.sec-quote .quote-mark{top:-52px; left:-8px; font-size:200px}
+.quote blockquote,.sec-quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
   font-size:52px; line-height:1.22; letter-spacing:-.015em; max-width:20ch; position:relative}
-.quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
-.quote .by .line{width:48px; height:2px; background:var(--cyan)}
-.quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
+.sec-quote blockquote{font-size:34px; max-width:26ch}
+.quote .by,.sec-quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
+.sec-quote .by{margin-top:22px}
+.quote .by .line,.sec-quote .by .line{width:48px; height:2px; background:var(--cyan)}
+.quote .by span,.sec-quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
 
 /* 9 CODE */
 .code-stage{flex:1; margin-top:36px; display:flex; flex-direction:column; min-height:0}
@@ -651,6 +660,23 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    and the print stylesheet for PDF export. Everything reads CSS variables
    so it themes globally and honours per-slide overrides.
    ===================================================================== */
+
+/* =====================================================================
+   COMPOSED SLIDES — section arrangement (composer plan §C).
+   `.slide` is already display:flex/column, so a section is just a flex child
+   and the whole arrangement is four rules. `size` in the deck JSON becomes an
+   inline `flex:N`; absent = flex:0 1 auto = "your natural height".
+   `min-height/min-width:0` are load-bearing, not decoration: without them a
+   flex child refuses to shrink below its content and a section holding a
+   chart or a long list blows out of the slide.
+   ===================================================================== */
+.sec{position:relative; display:flex; flex-direction:column; min-height:0; min-width:0}
+.sec-row{position:relative; display:flex; align-items:stretch; gap:34px; min-height:0; min-width:0}
+.sec-row > .sec{flex:1 1 0}
+/* a section whose builder emits a flex:1 block (stat-grid, chart-wrap …) must
+   be allowed to grow, or that block collapses to nothing inside the wrapper */
+.sec > .stat-grid{margin-top:0}
+.sec-unknown{padding:18px 22px; border:1px dashed var(--brd-2); border-radius:12px}
 
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
 .ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
@@ -1381,9 +1407,13 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   function H(s){ var t=D.createElement('template'); t.innerHTML=s==null?'':String(s); return t.content; }
   SG.N=N; SG.H=H;
 
-  function kickerN(t){ return t?N('div.eyebrow-row',{key:'kicker'},
-    N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
-  function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
+  /* The optional `b` (base) prefix is what lets one builder serve two callers:
+     '' for a classic layout (keys stay "kicker"/"title", byte-identical to v3)
+     and 'sections.N.content.' when the same nodes are built inside a composed
+     slide (composer plan §A). Every helper that authors a key takes it. */
+  function kickerN(t,b){ b=b||''; return t?N('div.eyebrow-row',{key:b+'kicker'},
+    N('span.kicker',{key:b+'kicker.text',bind:b+'kicker',html:rich(t)})):null; }
+  function titleN(t,b){ b=b||''; return t?N('h1.title',{bind:b+'title',html:rich(t)}):null; }
 
   /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
      v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
@@ -1560,11 +1590,21 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       iframe.src=url; }
     return {shield:shield,wrap:wrap,poster:poster}; };
 
+  /* ---------- helper surface for src/sections.js (composer plan §"Types") ----------
+     sections.js is a separate module so the engine stays a kernel (node builder,
+     render loop, assets, embeds) and the composition vocabulary is one readable
+     file. It needs the same tiny helpers the layouts use; this is the whole
+     widening of the internal API. */
+  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad};
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
      Keys are authored: named blocks ("title","rail"), array items by content
      path ("stats.2"), leaves bound to the field they render ("stats.2.label").
+     Layouts that decompose into sections are registered in src/sections.js
+     instead (they become thin S[...] compositions); their entries are absent
+     here on purpose.
      ===================================================================== */
   var L = SG.layouts = {};
 
@@ -1598,16 +1638,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
-  L['stat-grid']=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.stat-grid',{key:'stats',arr:'stats'},arr(c.stats).map(function(s,i){ var P='stats.'+i;
-        var num = s.count!=null
-          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
-              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
-          : esc(s.value);
-        return N('div.stat',{key:P},[
-          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
-          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; };
+  /* stat-grid -> sections.js (titleband + stats) */
 
   L.bignum=function(c){
     var hero = c.count!=null
@@ -1650,12 +1681,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
         col(c.right,'uns','right') ]) ]; };
 
-  L.quote=function(c){
-    return [ N('div.quote-mark',{key:'mark',html:'&ldquo;'}),
-      N('blockquote.sg-reveal-wipe.sg-onenter',{bind:'quote',html:rich(c.quote)}),
-      c.by?N('div.by',{key:'by'},[N('div.line'),
-        N('span',{key:'by.text',bind:'by',html:rich(c.by)})]):null,
-      c.subtitle?N('p.subtitle',{bind:'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; };
+  /* quote -> sections.js (a SECTION_LAYOUTS CSS refugee; its rules are
+     dual-scoped `.quote, .sec-quote` in deck.css) */
 
   L.code=function(c){
     return [ kickerN(c.kicker), titleN(c.title),
@@ -2174,6 +2201,117 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     mountNav(deck);
     var inp=D.getElementById('deck-import');
     if(inp) inp.addEventListener('change',function(){ if(inp.files&&inp.files[0]) onImportFile(inp.files[0]); inp.value=''; });
+  };
+})();
+</script>
+<!-- section registry: the composition vocabulary + the `composed` layout -->
+<script id="deck-sections">
+/* =====================================================================
+   SECTION REGISTRY  —  the composition vocabulary (composer plan §A–§C).
+
+   A slide used to be exactly one of 29 fixed layouts. A SECTION is the piece
+   a layout is made of — a title band, a stat row, a quote — extracted from
+   the layout's own body and parameterized by ONE thing: a key prefix.
+
+     S[type].build(content, base) -> Node[]
+
+   `base` is '' for a classic caller, so `L['stat-grid']` is now literally
+   `S.titleband.build(c,'').concat(S.stats.build(c,''))` and renders
+   byte-identically to v3 (tests/parity.mjs is the guard). The `composed`
+   layout calls the SAME builders with base='sections.N.content.', so every
+   authored data-el/data-bind/data-arr key stays a literal content path and
+   the entire v3 identity machinery (overrides, bind write-back, hide/fs,
+   item verbs, GC) works at section depth with no new machinery.
+
+   Composed slide content:
+     content.sections = [ Section | Row ]
+     Section = {type:<name in S>, size?:<flex weight>, content:{…}}
+     Row     = {type:'row', size?:<flex weight>, items:[Section]}
+   Rows are the only nesting — rows cannot contain rows. That ceiling is
+   deliberate: it keeps the editor's mental model and the validator sane.
+
+   Loads AFTER engine.js (consumes SG.N / SG.h / SG.layouts) and BEFORE
+   editor.js.
+   ===================================================================== */
+(function(){
+  var W=window, SG=W.SG=W.SG||{}, N=SG.N, L=SG.layouts, h=SG.h||{};
+  var rich=h.rich, esc=h.esc, arr=h.arr, kickerN=h.kickerN, titleN=h.titleN;
+
+  var S = SG.S = {};
+
+  /* ---------- titleband — the kicker + title every headed layout opens with ---------- */
+  S.titleband = {
+    label:'Title band',
+    fields:['kicker','title'],
+    defaults:{kicker:'Kicker', title:'Section title'},
+    build:function(c,b){ b=b||'';
+      return [ kickerN(c.kicker,b), titleN(c.title,b) ]; }
+  };
+
+  /* ---------- stats — the stat-grid card row ---------- */
+  S.stats = {
+    label:'Stat row',
+    fields:['stats'],
+    defaults:{stats:[{value:'42',unit:'%',label:'What it measures'},
+                     {value:'3x',label:'What it measures'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.stat-grid',{key:b+'stats',arr:b+'stats'},arr(c.stats).map(function(s,i){ var P=b+'stats.'+i;
+        var num = s.count!=null
+          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
+              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
+          : esc(s.value);
+        return N('div.stat',{key:P},[
+          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
+          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; }
+  };
+
+  /* ---------- quote — a SECTION_LAYOUTS refugee: its CSS targets the <section>
+       itself, so deck.css dual-scopes those rules `.quote, .sec-quote` ---------- */
+  S.quote = {
+    label:'Quote',
+    fields:['quote','by','subtitle'],
+    defaults:{quote:'A line worth putting on a slide.', by:'Attribution'},
+    build:function(c,b){ b=b||'';
+      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;'}),
+        N('blockquote.sg-reveal-wipe.sg-onenter',{bind:b+'quote',html:rich(c.quote)}),
+        c.by?N('div.by',{key:b+'by'},[N('div.line'),
+          N('span',{key:b+'by.text',bind:b+'by',html:rich(c.by)})]):null,
+        c.subtitle?N('p.subtitle',{bind:b+'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; }
+  };
+
+  /* =====================================================================
+     CLASSIC LAYOUTS, RE-EXPRESSED
+     One implementation, two callers. Byte-identical at base='' — that is
+     what tests/parity.mjs checks against the frozen v2 build.
+     ===================================================================== */
+  L['stat-grid'] = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
+  L.quote       = function(c){ return S.quote.build(c,''); };
+
+  /* =====================================================================
+     THE `composed` LAYOUT
+     Renders content.sections as flex children of the .slide column. A row is
+     a horizontal band of weighted sections. `size` is a flex weight; absent
+     means "take your natural height" (flex:0 1 auto, the CSS default).
+     ===================================================================== */
+  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex:'+(+sz||0)); }
+
+  function sectionNode(entry,key){
+    if(!entry||typeof entry!=='object') return null;
+    var def=S[entry.type];
+    if(!def) return N('div.sec.sec-unknown',{key:key},
+      N('p.subtitle',{text:'Unknown section type "'+String(entry.type||'')+'"'}));
+    return N('div.sec.sec-'+entry.type,{key:key,style:sizeStyle(entry.size)},
+      def.build(entry.content||{}, key+'.content.'));
+  }
+  SG.sectionNode=sectionNode;   /* exposed for the editor's insert/preview paths */
+
+  L.composed = function(c){
+    return arr(c.sections).map(function(entry,i){
+      var key='sections.'+i;
+      if(entry&&entry.type==='row')
+        return N('div.sec-row',{key:key,style:sizeStyle(entry.size)},
+          arr(entry.items).map(function(it,j){ return sectionNode(it,key+'.items.'+j); }));
+      return sectionNode(entry,key); });
   };
 })();
 </script>

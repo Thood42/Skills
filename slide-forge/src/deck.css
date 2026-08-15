@@ -216,15 +216,24 @@ p{margin:0; color:var(--muted)}
   width:54px; height:54px; border-radius:50%; background:var(--bg-2); border:1px solid var(--brd-2);
   display:grid; place-items:center; font-family:var(--font-mono); font-size:14px; letter-spacing:.1em; color:var(--ink); z-index:2}
 
-/* 8 QUOTE */
-.quote{justify-content:center}
+/* 8 QUOTE — DUAL-SCOPED. `.quote` is the classic layout's <section> (one of the
+   SECTION_LAYOUTS whose CSS targets the section itself); `.sec-quote` is the same
+   content rendered as one section of a composed slide. Every rule below has to
+   match both or the composed copy renders unstyled (composer plan, risk #1).
+   The section copy is smaller and its oversized quote mark is reined in, because
+   it lives in a fraction of a slide rather than the whole of one. */
+.quote,.sec-quote{justify-content:center}
+.sec-quote{overflow:hidden}
 .quote-mark{position:absolute; top:40px; left:64px; font-family:var(--font-display);
   font-size:380px; line-height:1; color:var(--indigo); opacity:.12; pointer-events:none}
-.quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
+.sec-quote .quote-mark{top:-52px; left:-8px; font-size:200px}
+.quote blockquote,.sec-quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
   font-size:52px; line-height:1.22; letter-spacing:-.015em; max-width:20ch; position:relative}
-.quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
-.quote .by .line{width:48px; height:2px; background:var(--cyan)}
-.quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
+.sec-quote blockquote{font-size:34px; max-width:26ch}
+.quote .by,.sec-quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
+.sec-quote .by{margin-top:22px}
+.quote .by .line,.sec-quote .by .line{width:48px; height:2px; background:var(--cyan)}
+.quote .by span,.sec-quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
 
 /* 9 CODE */
 .code-stage{flex:1; margin-top:36px; display:flex; flex-direction:column; min-height:0}
