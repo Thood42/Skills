@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 7bc65a98f5 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 8e0e0c4581 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -3103,7 +3103,7 @@ body.forge-edit #forge-zoom{ display:flex; }
    object id ("f7x2k/ring.label") — see partOf()/scopeOf() below, which route
    every content + override read to the object that owns it.
    Everything selectable shares one Element model and the same verbs — move,
-   resize (corner drag = width/reflow, Alt = scale), rotate, style, animate,
+   resize (corner drag = width+height/reflow, Shift = aspect lock, Alt = scale), rotate, style, animate,
    copy, duplicate, delete, reorder(z) — plus double-click text editing, smart
    guides + snapping, multi-select, align/distribute, groups.
    Source of truth = SG.data. Edits route through Forge.do()/pushUndo so undo/
@@ -3502,23 +3502,26 @@ body.forge-edit #forge-zoom{ display:flex; }
     else if(hide){ n.style.display='none'; n.classList.remove('forge-hidden'); }
     else { n.style.display=''; n.style.opacity=''; n.classList.remove('forge-hidden'); } }
   function applyOverride(b,o){ b.style.transform=o?transformStr(o):''; applyAnim(b,o); if(!o) return; b.style.transformOrigin='center center'; applyStyle(b,o);
-    if(o.w!=null&&o.w>0){ b.style.width=o.w+'px'; b.style.boxSizing='border-box'; }
-    if(o.h!=null&&o.h>0) b.style.height=o.h+'px';
+    if(o.w!=null&&o.w>0){ b.style.width=o.w+'px'; b.style.boxSizing='border-box'; } else b.style.width='';
+    if(o.h!=null&&o.h>0){ b.style.height=o.h+'px'; b.style.boxSizing='border-box'; } else b.style.height='';
+    /* most layout blocks are flex items, and a flex item's default shrink lets
+       the container claw back an explicit width/height (a dragged size would
+       silently come out smaller than the gesture). An authored size wins. */
+    b.style.flexShrink=((o.w>0)||(o.h>0))?'0':'';
     applyHidden(b,o.hide);
     if(o.html!=null && !b.querySelector('[data-el]')) b.innerHTML=SG.rich(o.html); }
   var MEDIA_FREE={image:1,svg:1};
   var SIZED_FREE={box:1,image:1,svg:1,embed:1};
-  /* free-object types whose corner drag resizes BOTH axes independently (vs.
-     text, where a corner drag only changes width and the text reflows).
-     image/svg additionally default to aspect-locked (see MEDIA_FREE + the
-     Shift-frees-it logic in startDrag) — embed/box/html resize freely. */
-  var TWO_AXIS_FREE={box:1,html:1,image:1,svg:1,embed:1};
+  /* SIZED_FREE = types that always carry an explicit w/h (with a default box
+     size); everything else is auto-height until the user drags/types one.
+     image/svg additionally default to aspect-locked on corner drag (see
+     MEDIA_FREE + the Shift-frees-it logic in startDrag). */
   function applyFree(n,fo){ n.style.left='0px'; n.style.top='0px';
     n.style.transform='translate('+(fo.x||0)+'px,'+(fo.y||0)+'px)'+(fo.rot?' rotate('+fo.rot+'deg)':'')+(fo.scale&&fo.scale!==1?' scale('+fo.scale+')':'');
     applyStyle(n,fo); applyAnim(n,fo); if(fo.size) n.style.fontSize=fo.size+'px';
     if(SIZED_FREE[fo.type]){ n.style.width=(fo.w||(fo.type==='box'?300:fo.type==='embed'?480:360))+'px';
       n.style.height=(fo.h||(fo.type==='box'?160:fo.type==='embed'?270:240))+'px'; }
-    else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h&&fo.type==='html') n.style.height=fo.h+'px'; }
+    else { if(fo.w) n.style.width=fo.w+'px'; if(fo.h>0) n.style.height=fo.h+'px'; else n.style.height=''; }
     if(MEDIA_FREE[fo.type]){
       n.style.overflow='hidden'; n.style.borderRadius=(fo.radius||0)+'px'; n.style.opacity=fo.opacity!=null?fo.opacity:1;
       n.classList.remove('frame-panel','frame-glow','frame-shadow');
@@ -3555,11 +3558,20 @@ body.forge-edit #forge-zoom{ display:flex; }
      element a user so much as clicked on. Return a proxy over a detached
      object instead; it attaches itself to the slide on its first real write,
      so selecting-without-editing never touches SG.data at all. */
+  var _ovStub=null;    /* one-slot cache, so two readers of the SAME unedited
+                          element share one detached object. Without it the
+                          inspector and a corner drag each got their own stub
+                          and whichever wrote last replaced the other's data.
+                          Keyed on the resolved HOST (slide or node object) so
+                          namespaced node-object keys cache correctly too. */
   function ovFor(i,key){ var sc=scopeOf(i,key); if(!sc) return {};
     var h=sc.host, k=sc.key;
     if(h.overrides&&h.overrides[k]) return h.overrides[k];
+    if(_ovStub&&_ovStub.host===h&&_ovStub.key===k) return _ovStub.proxy;
     var obj={};
-    return new Proxy(obj,{ set:function(t,p,v){ t[p]=v; h.overrides=h.overrides||{}; h.overrides[k]=t; return true; } }); }
+    var proxy=new Proxy(obj,{ set:function(t,p,v){ t[p]=v; h.overrides=h.overrides||{}; h.overrides[k]=t; return true; } });
+    _ovStub={host:h,key:k,proxy:proxy};
+    return proxy; }
   function freeFor(i,id){ var s=SG.data.slides[i]; return (s.freeObjects||[]).filter(function(f){return f.id===id;})[0]; }
   function elData(sel){ if(!sel) return null; return sel.kind==='free'?freeFor(sel.slideIdx,sel.id):ovFor(sel.slideIdx,sel.key); }
   /* non-creating accessor (elData creates an empty override on read) */
@@ -3659,9 +3671,13 @@ body.forge-edit #forge-zoom{ display:flex; }
   /* =====================================================================
      DRAG — move (with snap, multi), resize (corner = width/height with text
      REFLOW; Alt+corner = proportional scale, the v2 behavior), rotate.
-     Template blocks resize width only (height stays auto so text rewraps);
-     free boxes / copied groups resize both axes.
+     A corner drag changes BOTH axes for every element type. Auto-height
+     elements (text blocks, list containers, free text) only take an explicit
+     height once the pointer moves >HDRAG on the Y axis, so a horizontal-only
+     drag still leaves them free to rewrap. Shift locks the aspect ratio —
+     except for image/svg, which are aspect-locked by default and freed by Shift.
      ===================================================================== */
+  var HDRAG=5, HMIN=24;      /* Y-drag deadzone before height is pinned; min height */
   function startDrag(e,mode,corner){ if(!F.sels.length) return; e.preventDefault(); e.stopPropagation();
     var s=scale(), prim=F.sels[0];
     var parts=F.sels.map(function(x){ var d=elData(x); return {sel:x,d:d,d0:clone(d),box0:boxOf(x.node)}; });
@@ -3681,22 +3697,21 @@ body.forge-edit #forge-zoom{ display:flex; }
       } else if(mode==='size'){
         parts.forEach(function(p){
           var isMedia=p.sel.kind==='free'&&MEDIA_FREE[p.d.type];
-          var newW=Math.max(40,Math.round(p.box0.w+(cL?-dx:dx)));
-          /* image/svg corner-drag keeps the intrinsic aspect ratio by default;
-             Shift frees it (mirrors the text case, where reflow is the point) */
-          if(isMedia&&!ev.shiftKey){
-            var ratio=(p.box0.h||1)/(p.box0.w||1);
-            var newH=Math.max(30,Math.round(newW*ratio));
-            p.d.w=newW; p.d.h=newH;
-            if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
-            if(cT) p.d.y=Math.round((p.d0.y||0)+(p.box0.h-newH));
-          } else {
-            p.d.w=newW;
-            if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
-            if(p.sel.kind==='free'&&TWO_AXIS_FREE[p.d.type]){
-              p.d.h=Math.max(30,Math.round(p.box0.h+(cT?-dy:dy)));
-              if(cT) p.d.y=Math.round((p.d0.y||0)+dy); }
-          }
+          /* aspect lock: ON by default for image/svg (Shift frees it), OFF by
+             default for everything else (Shift locks it) */
+          var lock=isMedia?!ev.shiftKey:ev.shiftKey;
+          var newW=Math.max(40,Math.round(p.box0.w+(cL?-dx:dx))), newH=null;
+          if(lock){ var ratio=(p.box0.h||1)/(p.box0.w||1); newH=Math.max(HMIN,Math.round(newW*ratio)); }
+          /* Vertical drag sets an explicit height on ANY element. Elements that
+             are naturally auto-height (text blocks, list containers, free text)
+             only commit a height once the pointer has actually moved on the Y
+             axis past HDRAG — so a purely horizontal drag still leaves the box
+             free to grow as the text reflows. */
+          else if((p.d0.h!=null&&p.d0.h>0)||Math.abs(dy)>HDRAG)
+            newH=Math.max(HMIN,Math.round(p.box0.h+(cT?-dy:dy)));
+          p.d.w=newW; if(newH!=null) p.d.h=newH;
+          if(cL) p.d.x=Math.round((p.d0.x||0)+dx);
+          if(cT) p.d.y=Math.round((p.d0.y||0)+(p.box0.h-(newH!=null?newH:p.box0.h)));
           p.sel.kind==='free'?applyFree(p.sel.node,p.d):applyOverride(p.sel.node,p.d); });
       } else { var d0=Math.hypot(sx-cx,sy-cy)||1, d1=Math.hypot(ev.clientX-cx,ev.clientY-cy);
         parts.forEach(function(p){ p.d.scale=clamp((p.d0.scale||1)*(d1/d0),0.2,6);
@@ -4906,7 +4921,8 @@ body.forge-edit #forge-zoom{ display:flex; }
   var geomInputs=null;
   function syncGeomFields(){ if(!geomInputs||!F.sel) return; var d=selData()||{};
     if(geomInputs.x) geomInputs.x.value=d.x||0; if(geomInputs.y) geomInputs.y.value=d.y||0;
-    if(geomInputs.scale) geomInputs.scale.value=d.scale||1; if(geomInputs.rot) geomInputs.rot.value=d.rot||0; }
+    if(geomInputs.scale) geomInputs.scale.value=d.scale||1; if(geomInputs.rot) geomInputs.rot.value=d.rot||0;
+    if(geomInputs.w) geomInputs.w.value=d.w||0; if(geomInputs.h) geomInputs.h.value=d.h||0; }
 
   /* ---- the Inspector ---- */
   var _inspSlide=-1;
@@ -5252,7 +5268,7 @@ body.forge-edit #forge-zoom{ display:flex; }
       verb('⧉ Duplicate','Duplicate this item',function(){ dupItemSel(sel); });
       verb('✕ Remove','Remove this item',function(){ F.removeItem(sel.slideIdx,sel.node); },'warn');
       s.appendChild(verbs);
-      s.appendChild(el('div','forge-hint','Drag the item on the slide to move it; the corner handle resizes it and the text rewraps.')); }
+      s.appendChild(el('div','forge-hint','Drag the item on the slide to move it; the corner handle resizes it (width and height) and the text rewraps. Hold Shift to keep its proportions.')); }
 
     /* ---- geometry ---- */
     var sg=fold(secPlain(body),'Position & size',false);
@@ -5266,7 +5282,7 @@ body.forge-edit #forge-zoom{ display:flex; }
       geomInputs[key]=n; sg.appendChild(fieldRow(label,n)); }
     num('X','x'); num('Y','y'); num('Scale','scale','0.05'); num('Rotate','rot');
     num('Width','w');                                       /* width reflows text (0 = natural) */
-    if(isFree&&(d.type==='box'||d.type==='html'||isMedia||isEmbed)) num('Height','h');
+    num('Height','h');                                      /* 0/blank = natural (auto) height */
     if(isEmbed){
       var se=sec(body,'Embed');
       function reapplyEmbed(){ var n=sel.node; var host=n; /* remount: URL/mode/sandbox changes need a fresh iframe */
@@ -5648,7 +5664,8 @@ body.forge-edit #forge-zoom{ display:flex; }
     o=el('div','forge-chrome'); o.id='forge-keys';
     var rows=[['Click / click again','Select a group / step inside it'],
       ['Drag / Alt','Move with snap guides / snap off'],
-      ['Drag corner / Alt+corner','Resize width \u2014 text reflows / scale'],['Double-click','Edit text in place'],
+      ['Drag corner','Resize width + height \u2014 text reflows'],
+      ['Shift+corner / Alt+corner','Lock aspect ratio / scale the whole element'],['Double-click','Edit text in place'],
       ['Shift-click / marquee','Multi-select'],['Ctrl+C · V · D','Copy / paste / duplicate (deep)'],
       ['Ctrl+G / Ctrl+Shift+G','Group / ungroup'],['Arrows / Shift+arrows','Nudge 1px / 10px'],
       ['Delete','Delete / reset selection'],['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],

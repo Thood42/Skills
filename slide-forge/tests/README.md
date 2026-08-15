@@ -53,7 +53,9 @@ from PowerShell (a Git-Bash shell may not have it on PATH).
   without Node. Covers: corner-drag resize math staying gesture-accurate
   (screen-px moved == pointer-px moved) at 100% AND 200% zoom, the
   slide-space delta halving correctly at 2x zoom, Alt+corner proportional
-  scale (width/height move together), ⌖ Focus centering the selection
+  scale (width/height move together), two-axis corner resize (downward drag
+  changes height 1:1, horizontal-only drag leaves the height unpinned,
+  Shift locks the aspect ratio), ⌖ Focus centering the selection
   between the side panels, zoom clamping to `[0.25, 3]`, and undo restoring
   pre-resize geometry. Kills `#deck`'s CSS transition before measuring
   (`transition:none`) so results are deterministic even in a backgrounded/
