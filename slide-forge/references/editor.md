@@ -78,8 +78,9 @@ the same verbs. New in v2:
   floating toolbar gains **align** (left/center/right/top/middle/bottom) and, at 3+, **distribute**
   (horizontal/vertical). All geometry math is in slide-space (pre-transform), so it's correct at any
   fit scale.
-- **Clipboard.** `Cmd/Ctrl+C · V · D` copy / paste / duplicate within and across slides. A pasted
-  template element lands as a free object carrying its text + computed style.
+- **Clipboard.** `Cmd/Ctrl+C · V · D` copy / paste / duplicate within and across slides. A copied
+  template element lands as a free object — content-backed if it has a layout to re-render from
+  (see v5 below), free text if it's a lone leaf.
 - **Z-order.** Bring forward / send back (`overrides[key].z` or `freeObjects[i].z`).
 - **Keyboard.** Arrow keys nudge the selection (Shift = 10px); `Delete`/`Backspace` removes/resets;
   `Esc` clears; `Cmd/Ctrl+S` saves the `.html`; `Cmd/Ctrl+Z` / `Shift+Z` undo/redo.
@@ -131,10 +132,10 @@ first render (unmappable ones are dropped with a console note), then the deck re
   Stored as `animTrigger`/`animStep` on the override or free object. New **"Stagger children"**
   effect animates a container's children in sequence. The Slide panel shows an **Animations**
   overview — every animated element with its trigger/step/delay, select / replay / clear, and Play all.
-- **Faithful duplication.** Duplicating a container (right-click, toolbar, `Ctrl+D`) now deep-copies
-  its full markup — nested items included — as a `{type:"html"}` free object (previously an empty
-  box). Nested array items additionally offer **Duplicate item (in layout)**, which clones the
-  content entry in place.
+- **Faithful duplication.** Duplicating a container (right-click, toolbar, `Ctrl+D`) deep-copies it
+  instead of producing an empty box. (v2.1 froze the markup into a `{type:"html"}` object; **v5**
+  replaced that with a content-backed `{type:"node"}` copy — see below.) Nested array items
+  additionally offer **Duplicate item (in layout)**, which clones the content entry in place.
 - **`?` opens a keyboard-shortcut overlay** in Edit mode; editor chrome carries aria-labels and
   visible focus rings.
 
@@ -359,10 +360,10 @@ mode and plain decks are unaffected (the hook returns `null` when `body` isn't `
   Ghosts are always removed before anything commits — they must never be in `#deck` during a render,
   or `.slide` indices would shift. A catalog entry whose key no longer resolves is skipped silently,
   so a layout change degrades to a missing card rather than a crash.
-- Clicking inserts it as a themed `freeObjects` `{type:'html'}` entry (the faithful-duplicate path),
-  centred and selected, at a clamped starting size — a grid cell measures as tall as the grid
-  stretched it, which is not a sane object size. Free objects may now carry a `name`, shown in the
-  items panel and inspector instead of "Copied group".
+- Clicking inserts it as a themed `freeObjects` entry (the same path `Ctrl+D` uses — `{type:'node'}`
+  since v5), centred and selected, at a clamped starting width — a grid cell measures as wide as the
+  grid stretched it, which is not a sane object size. Free objects may now carry a `name`, shown in
+  the items panel and inspector instead of "Copied group".
 - **Top bar**: ＋ Slide · ⧉ Duplicate · T Text · ▭ Box · ▣ Image · ⊞ Insert · 🖼 Assets · ◲ Embed ‖
   ▦ Sorter · ◐ Theme · ⚙ Deck ‖ ⟲ ⟳ ‖ ？ · { } JSON · ▶ Present · **Save .html**. Every button has a
   tooltip. ◐ Theme and ⚙ Deck open the *same* renderers the sidebar uses (`themeSection`,
@@ -373,6 +374,59 @@ mode and plain decks are unaffected (the hook returns `null` when `body` isn't `
 
 `overrides[key].hide` · `overrides[key].fs` · `freeObjects[].hide` · `freeObjects[].name`.
 `meta.schemaVersion` stays **3** — nothing about identity or write-back changed.
+
+## v5 — content-backed copies (`{type:"node"}`)
+
+**The problem.** A duplicated or inserted element used to freeze into `{type:"html"}`: the clone had
+its `data-el`/`data-bind`/`data-arr` stripped, which are exactly the attributes that make an element
+editable. The copy kept its looks and lost its fields — an inserted metric ring had no way to change
+its value, no text editing, no list verbs, and (until this release) a "Text" box in the inspector
+that did nothing at all.
+
+**The fix.** A copy now carries the *data* it was made from, not the pixels:
+
+```jsonc
+{ "id":"f7x2k", "type":"node",
+  "layout":"metric-dash",                      // the layout to re-render
+  "pick":"ring",                               // the branch of it to mount
+  "content":{ "ring":{"value":72,"suffix":"%","label":"Uptime"}, … },
+  "overrides":{ "ring.label":{"color":"var(--cyan)"} },   // its OWN bag, keys relative to `pick`
+  "x":565, "y":270, "w":150 }                  // no h — height follows content, width reflows
+```
+
+On every render the editor runs `SG.layouts[layout](content)`, lifts the subtree at `pick`, and
+mounts it **with its authored keys intact**. So the copy behaves like the element it came from:
+fields in the inspector, double-click text editing, `＋ Add item` / reorder / remove on its lists,
+per-part styling and animation — all of it writing to the object's own `content`/`overrides`, never
+the slide's.
+
+- **Namespaced keys.** A mounted part's key is `<objectId>/<key>` (`f7x2k/ring.label`). The `/` can't
+  occur in a content path, so a copy can never collide with the slide's own keys, and one parse
+  (`partOf`) tells every accessor which content root and override bag a key belongs to (`scopeOf`).
+  Nothing user-facing shows the namespace — labels, breadcrumbs and the identity chip strip it.
+- **Selection.** First click selects the whole object (draggable); clicking again drills into it,
+  exactly as on the slide. The breadcrumb reads `Slide ▸ Metric ring ▸ Stat 2 ▸ Label`.
+- **Items panel.** A copy's lists and list items get rows indented under it.
+- **Item ops need a MOUNTED list.** A copy keeps its layout's whole content but mounts only the
+  picked branch, so a copy of *one* stat card (`pick:"stats.0"`) still carries the entire `stats[]`
+  while rendering a single item. Adding to it there would grow an array nothing draws, so
+  add/duplicate/remove decline (`listMounted`/`itemArr`) and `Ctrl+D` falls through to copying the
+  **whole object** — which is what "duplicate this card" means anyway. A copy of the list itself
+  (`pick:"stats"`) does mount `data-arr` and gets the full set of verbs.
+- **Where it does NOT apply.** A lone text leaf still copies as `{type:"txt"}` — lifted out of its
+  parent it would lose any styling written as a descendant selector, and free text is already fully
+  editable. Markup with no layout behind it (a `raw` slide) still freezes into `{type:"html"}`, which
+  keeps rendering for existing decks and now says so in the inspector.
+- **Layout CSS.** Rules written against the section (`.quote blockquote`) still match: the subtree is
+  mounted inside a `.forge-part-shell` carrying the source layout's classes, at `display:contents`
+  so it adds no box of its own.
+- **Degradation.** If the layout or the picked key no longer exists (a deck edited by hand, a layout
+  renamed), the object renders a short "no longer part of this layout" card instead of throwing.
+
+`scripts/validate.py` checks `layout`/`pick`/`content` and the object's own override bag; the
+content is schema-checked against its layout exactly like a slide's.
+
+**Still schemaVersion 3.** `type:"node"` is a new optional free-object shape, not a migration.
 
 ### Verification
 

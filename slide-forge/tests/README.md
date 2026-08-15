@@ -1,16 +1,21 @@
 # slide-forge tests (jsdom)
 
-Requires Node + `npm i jsdom` (any scratch dir, or here). Not runnable in the
-skill-authoring sandbox (no Node there) — run wherever Node exists.
+Requires Node + `npm i jsdom` (any scratch dir, or here).
+
+    cd slide-forge/tests && npm install && node parity.mjs && node editor-ops.mjs
+
+On the Windows authoring box Node 26 lives at `C:\Program Files\nodejs`; drive it
+from PowerShell (a Git-Bash shell may not have it on PATH).
 
 - `parity.mjs` — renders a 26-slide deck covering every layout through the v3
   node-tree engine AND through the frozen v2 build (`fixtures/v2-template.html`),
   then structurally diffs the DOM (ignoring `data-el`/`data-bind`/`data-arr`,
   `forge-*` classes, and the Docs (D) panel — deck chrome added after this
-  fixture was frozen, not layout content). Expected output: exactly the
-  documented cosmetic deltas (timeline desc span, hero-asym value span,
-  closing whitespace split, figure's `media-img` class from the media-plan
-  `<img>` upgrade).
+  fixture was frozen, not layout content). Expected output: **`PARITY: 7 diffs`**
+  — the documented cosmetic deltas (timeline desc span, two hero-asym value
+  spans, figure's `media-img` class from the media-plan `<img>` upgrade, and a
+  three-part closing-slide whitespace split). That count is the baseline; only a
+  CHANGE in it is a regression.
 - `editor-ops.mjs` — data-layer assertions on the editor: authored keys,
   item add/dup/remove with override REMAP, orphan-override GC, bind write-back,
   targeted `SG.renderSlide`, w/h overrides, undo coalescing, the one-time
@@ -58,5 +63,6 @@ skill-authoring sandbox (no Node there) — run wherever Node exists.
 Run:  `node tests/parity.mjs && node tests/editor-ops.mjs`
 (with jsdom resolvable, e.g. `NODE_PATH=/path/to/node_modules`)
 
-Run (no Node): `python -m http.server` at the repo root, then open
+Gesture math needs a real layout engine, so it stays a browser page:
+`python -m http.server` at the repo root, then open
 `http://localhost:PORT/slide-forge/tests/scale-gestures.html`.
