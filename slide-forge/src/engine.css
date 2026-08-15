@@ -34,7 +34,7 @@
    down: only the rigid bodies get their content height back. */
 .sec > .stat-grid, .sec > .cmp, .sec > .editorial, .sec > .agenda-grid,
 .sec > .take, .sec > .gallery{flex-basis:auto}
-.sec-row{position:relative; display:flex; align-items:stretch; gap:34px; min-height:0; min-width:0}
+.sec-row{position:relative; display:flex; align-items:stretch; gap:var(--p-sec-gap,34px); min-height:0; min-width:0}
 .sec-row > .sec{flex:1 1 0}
 /* Section bodies carry the leading margin their classic layout used to separate
    them from the title above (.stat-grid 42px, .cmp 40px, .timeline 64px …).
@@ -50,7 +50,7 @@
    (`.media-split .ms-media`), which does not exist when the same builder runs
    as a standalone section. Match the section wrapper too, or the composed copy
    renders unstyled. */
-.sec-media .ms-media{border-radius:18px; min-height:0; flex:1}
+.sec-media .ms-media{border-radius:var(--p-radius,18px); min-height:0; flex:1}
 .sec-bullets .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1}
 
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
@@ -141,7 +141,7 @@ body.presenting{cursor:none}
 
 /* MEDIA-SPLIT — picture one side, prose/bullets the other */
 .media-split{display:grid; grid-template-columns:1fr 1fr; gap:40px; flex:1; min-height:0; align-items:stretch}
-.media-split .ms-media{border-radius:18px; min-height:0}
+.media-split .ms-media{border-radius:var(--p-radius,18px); min-height:0}
 .media-split .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0}
 .ms-body{margin-top:16px; font-size:17px; line-height:1.6; color:var(--muted); max-width:48ch}
 .ms-items{margin-top:16px; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px}

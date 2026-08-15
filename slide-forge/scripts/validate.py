@@ -73,6 +73,8 @@ SECTION_S = {
  'bullets':    {'?kicker':'s','?title':'s','?body':'s','?items':'a'},
 }
 SECTION_TYPES = set(SECTION_S)
+# composer plan section E: the second design axis. Absent = today's rendering.
+PERSONALITIES = {'editorial', 'blueprint'}
 SECTION_ITEM = {   # same shape as ITEM, keyed by section type
  ('stats','stats'):[('label','s')], ('agenda','items'):[('title','s')],
  ('timeline','items'):[('year','sn'),('title','s')],
@@ -214,6 +216,11 @@ def validate(data, assets=None):
         return ['deck has no slides[]'], []
     if not (4 <= len(slides) <= 20):
         warns.append('slide count %d outside the usual 4-20' % len(slides))
+    if 'personality' in data and data['personality'] is not None:
+        p = data['personality']
+        if not isinstance(p, str) or p not in PERSONALITIES:
+            errs.append('deck: unknown personality %r (one of %s, or omit it for the default)'
+                        % (p, sorted(PERSONALITIES)))
     prev = None
     for i, sl in enumerate(slides):
         where = 'slide %d' % (i+1)

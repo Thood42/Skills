@@ -550,6 +550,34 @@
     if(brand.fonts){
       if(brand.fonts.display) root.style.setProperty('--font-display',"'"+brand.fonts.display+"','DejaVu Sans',system-ui,sans-serif");
       if(brand.fonts.body) root.style.setProperty('--font-body',"'"+brand.fonts.body+"','DejaVu Sans',system-ui,sans-serif"); } }
+  /* ---------- deck personality (composer plan §E) ----------
+     The second design axis: themes own colour, personalities own type, space,
+     shape and motif. `data.personality` becomes an attribute on <html> and
+     src/personality.css does the rest — EXCEPT the font pairing, which a
+     stylesheet cannot win: applyGlobalTheme writes the theme's font variables
+     as INLINE styles, and inline beats any rule. So each personality declares
+     `--p-font-*`, and we read those back off the cascade and re-apply them
+     inline here — after the theme, before the brand kit, which is meant to
+     override both.
+
+     The clearing is a SEPARATE step that has to run BEFORE applyGlobalTheme,
+     not inside applyPersonality: the two write the same inline properties, so
+     clearing afterwards would strip the font the theme had just set and a deck
+     that turned its personality off would lose its theme's typeface too. */
+  var P_FONTS=['display','body','mono'];
+  function clearPersonalityFonts(){ var root=D.documentElement;
+    (SG._pFonts||[]).forEach(function(p){ root.style.removeProperty(p); });
+    SG._pFonts=[]; }
+  function applyPersonality(name){ var root=D.documentElement;
+    if(name) root.setAttribute('data-personality',String(name));
+    else { root.removeAttribute('data-personality'); return; }
+    var cs=W.getComputedStyle(root);
+    P_FONTS.forEach(function(k){
+      var v=(cs.getPropertyValue('--p-font-'+k)||'').trim(); if(!v) return;
+      root.style.setProperty('--font-'+k,v); SG._pFonts.push('--font-'+k); }); }
+  SG.applyPersonality=applyPersonality;
+  SG.clearPersonalityFonts=clearPersonalityFonts;
+
   function brandMark(brand,lay){ if(!brand||!brand.logo) return null;
     if(lay!=='cover'&&lay!=='closing') return null;
     var url=imageURL(brand.logo); if(!url) return null;
@@ -601,7 +629,9 @@
     data=data||SG.data; SG.data=data;
     var slides=arr(data.slides), total=slides.length;
     var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
+    clearPersonalityFonts();              /* BEFORE the theme — see the note above */
     applyGlobalTheme(data.theme);
+    applyPersonality(data.personality);   /* after the theme, before the brand */
     applyBrand(data.brand);
     if(data.meta){ if(data.meta.title) D.title=data.meta.title;
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);

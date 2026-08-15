@@ -2128,7 +2128,26 @@
         SG.data.theme[tk]=v; F.renderLive(); }));
       lab.appendChild(el('span',null,tk)); grid.appendChild(lab); });
     s.appendChild(grid);
-    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.')); }
+    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.'));
+    personalityField(s); }
+
+  /* ---- personality: the second design axis, beside Theme on purpose ----
+     Colour and character are the two things you pick for a deck, so they are
+     one decision made in one place. */
+  var PERSONALITIES=[['— default —',''],['Editorial','editorial'],['Blueprint','blueprint']];
+  F.personalities=PERSONALITIES;
+  F.setPersonality=function(name){
+    if(name&&!PERSONALITIES.some(function(p){ return p[1]===name; })) return false;
+    F.do('personality',function(data){
+      if(name) data.personality=name; else delete data.personality; });
+    return true; };
+  function personalityField(s){
+    var cur=SG.data.personality||'';
+    s.appendChild(field('Personality',selectInput(PERSONALITIES.map(function(p){ return p[0]; }),
+      (PERSONALITIES.filter(function(p){ return p[1]===cur; })[0]||PERSONALITIES[0])[0],
+      function(v){ var hit=PERSONALITIES.filter(function(p){ return p[0]===v; })[0];
+        F.setPersonality(hit?hit[1]:''); })));
+    s.appendChild(el('div','forge-hint','The theme picks the <b>colours</b>; the personality picks the <b>character</b> — type scale, spacing, corners and the decorative motif. Two decks on the same palette still look designed rather than generated.')); }
 
   /* ---- Brand kit (v2 phase 4): colors -> accent slots, fonts, inlined logo ---- */
   var BRAND_FONTS=['','Sora','Unbounded','Exo 2','Archivo','Syne','Epilogue','Bricolage Grotesque',

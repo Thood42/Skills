@@ -634,6 +634,48 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
   di.body.classList.remove('forge-edit');
 }
 
+// =====================================================================
+// PERSONALITY (composer plan §E) — the type/space/shape/motif axis.
+// The contract worth guarding: a deck WITHOUT one must carry no attribute at
+// all, so the default rendering can't drift; and the attribute must survive a
+// full re-render, since that is what a saved deck reopens through.
+// =====================================================================
+{
+  const PL={meta:{title:'Personality',seed:7},slides:[
+    {layout:'cover',content:{title:'C'}},{layout:'quote',content:{quote:'Q'}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dL=boot(NEW,PL); await new Promise(r=>setTimeout(r,400));
+  const wL=dL.window, dl=wL.document, SGL=wL.SG, FL=wL.Forge;
+  const root=()=>dl.documentElement;
+
+  ok(!('personality' in SGL.data),'a deck without a personality has no such key');
+  ok(!root().hasAttribute('data-personality'),'…and no attribute — the default path is untouched');
+
+  ok(FL.setPersonality('blueprint'),'setPersonality accepts a known name');
+  ok(SGL.data.personality==='blueprint','…and stores it on the deck');
+  ok(root().getAttribute('data-personality')==='blueprint','…and reaches the root attribute');
+  SGL.render(dl.getElementById('deck'),SGL.data);
+  ok(root().getAttribute('data-personality')==='blueprint','the attribute survives a full re-render (the boot path)');
+
+  ok(FL.setPersonality('editorial')&&root().getAttribute('data-personality')==='editorial','switching swaps the attribute');
+  ok(FL.setPersonality('nope')===false&&root().getAttribute('data-personality')==='editorial',
+     'an unknown personality is refused, leaving the current one alone');
+
+  FL.setPersonality('');
+  ok(!('personality' in SGL.data),'clearing removes the key rather than storing ""');
+  ok(!root().hasAttribute('data-personality'),'…and removes the attribute');
+  FL.undoOp();
+  ok(SGL.data.personality==='editorial'&&root().getAttribute('data-personality')==='editorial','undo restores both');
+
+  // personality is deck-level, never per-slide, and never touches slide content
+  const snap=JSON.stringify(SGL.data.slides);
+  FL.setPersonality('blueprint');
+  ok(JSON.stringify(SGL.data.slides)===snap,'switching personality does not touch a single slide');
+  ok(FL.personalities.length>=3&&FL.personalities.some(p=>p[1]==='editorial')&&FL.personalities.some(p=>p[1]==='blueprint'),
+     'the picker offers the default plus both v1 personalities');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

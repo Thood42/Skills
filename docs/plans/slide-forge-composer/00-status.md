@@ -10,7 +10,7 @@
 - [x] Slice 2 — full 12-type vocabulary + ~10 classics re-expressed + validator
 - [x] Slice 3 — promotion (`TO_SECTIONS`, override remap, single-undo restore)
 - [x] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
-- [ ] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
+- [x] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
 - [ ] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
 - [ ] Slice 7 — generation surface docs + the Gate-1 rack test (≥8/10)
 
@@ -65,6 +65,25 @@
     deck tokens with no inline style; (2) classic stat-grid → confirm → promoted to
     titleband/stats/quote, 0 free objects, one undo back to `stat-grid`; (3) `cover` slide → floating
     object + toast "a 'cover' slide has no flow to join"; (4) inspector shows "Section 2 of 2" ▲ ▼ ✕.
+
+- **Slice 5 done 2026-08-15.** `src/personality.css` (Editorial + Blueprint), `%PERSONALITY_CSS%`
+  marker, `SG.applyPersonality` + `SG.clearPersonalityFonts`, `F.setPersonality` + picker under
+  Theme, `validate.py` membership check. 13 `--p-*` tokens, every one consumed as
+  `var(--p-x, <today's value>)` at its use site, so deleting the file changes nothing.
+  editor-ops 235/235 (13 new); parity 7.
+  - **The font-precedence trap, solved once — don't undo it.** Themes write `--font-*` as INLINE
+    styles on `<html>`, which beat any stylesheet, so a personality's pairing is declared as
+    `--p-font-*` and copied onto `--font-*` inline by the engine. The CLEARING of those inline props
+    must run BEFORE `applyGlobalTheme`, in its own `clearPersonalityFonts()` — doing it inside
+    `applyPersonality` strips the font the theme just set, and turning a personality off silently
+    took the theme's typeface with it. (Found and fixed in the browser; jsdom can't resolve
+    `--p-font-*` from a stylesheet, so this is NOT covered by the Node suite.)
+  - Browser-verified order: theme Playfair → +blueprint Archivo → +editorial Fraunces → off Playfair
+    → brand Syne wins over both. `--cyan` stays the theme's `#b98cff` throughout — colour never moves.
+  - Measured deltas (default → editorial → blueprint): title 62/58/54px, radius 16/4/0px, pad
+    70·88 / 84·104 / 56·68, row gap 34/44/26px, dot texture .30/0/.55, editorial adds a 1px hairline
+    under every title band. Turning it off returns EVERY value to the default probe. Zero overflow
+    under both personalities across all 12 demo slides.
 
 ## Notes for a fresh session
 - User's founding complaint (2026-08-15): slide-forge isn't user-friendly enough; layouts and
