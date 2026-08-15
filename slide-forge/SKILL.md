@@ -24,6 +24,7 @@ slide-forge/
 │   ├── layouts.md          ← FULL per-layout content schema (read when authoring slides)
 │   ├── charts.md           ← chart + table data schemas (v2: author charts as DATA, never SVG)
 │   ├── themes.md           ← 11 drop-in palettes (let the user pick)
+│   ├── personalities.md    ← 2 design personalities (type/space/shape) — picked WITH the theme
 │   ├── audiences.md        ← 8 content strategies (let the user pick)
 │   ├── templates.md        ← brand kits, masters, template packs
 │   └── editor.md           ← how the in-file editor works + what to tell the user
@@ -43,19 +44,29 @@ position/scale/rotation/recolor *overrides* and free-floating objects on top lat
 
 ## Workflow (follow in order)
 
-1. **Ask the user three things first.** The **audience strategy** (how the content is built), the
-   **theme** (how it looks) — both required, presented as short pick-lists, never silently defaulted —
-   and a **brand kit** (optional; skip fast if none: "logo / brand colors / fonts, or shall I use the
-   theme as-is?"). Strategies live in `references/audiences.md`, themes in `references/themes.md`,
-   brand format in `references/templates.md`. If the user has a team template pack, apply it instead:
+1. **Ask the user first.** The **audience strategy** (how the content is built) and the **theme**
+   (what colour it is) are required, presented as short pick-lists, never silently defaulted. Then
+   two optional ones, asked fast: a **personality** (what character it has — type, spacing, shape;
+   "editorial / blueprint / default?") and a **brand kit** ("logo / brand colors / fonts, or shall I
+   use the theme as-is?"). Strategies live in `references/audiences.md`, themes in
+   `references/themes.md`, personalities in `references/personalities.md`, brand format in
+   `references/templates.md`. If the user has a team template pack, apply it instead:
    `python3 scripts/deckdata.py template apply pack.json <deck>.html`.
 2. **Plan the narrative.** Using the chosen strategy's arc, turn the topic/notes into an ordered
-   slide list — one idea per slide — and pick a layout for each. Aim for variety; don't repeat a
-   layout back-to-back. Skim `references/layouts.md` for the palette of 24 layouts and their fields.
+   slide list — one idea per slide — and give each one a shape. Aim for variety; don't repeat a
+   shape back-to-back. Skim `references/layouts.md` for the fields.
+   **Fit the shape to the idea, not the idea to a shape.** If a fixed layout matches the idea
+   exactly, use it — it is the shortest way to write a common arrangement. If it doesn't, build a
+   `composed` slide out of sections (title band, stat row, chart, quote, picture, bullets…) rather
+   than forcing the idea into the nearest layout or dropping to `raw`. A stat row under a chart, a
+   quote beside numbers, a picture next to bullets with a headline over both — all of those are one
+   `composed` slide and none of them is a fixed layout. `raw` is a last resort, not a second option.
 3. **Copy the template:** `cp editor-template.html <deck>.html`. You edit its JSON, not its markup.
-4. **Apply the theme once.** Swap the font `<link>` and the `:root` block for the chosen theme's
-   (from `references/themes.md`). The user can still re-theme later from the editor; this sets the
-   starting look.
+4. **Apply the theme once, and the personality if there is one.** Swap the font `<link>` and the
+   `:root` block for the chosen theme's (from `references/themes.md`), and add the personality's font
+   pairing to the same `<link>`. The personality itself is one key in the deck JSON —
+   `"personality": "editorial"` — not a CSS edit. Omit the key for the default look. The user can
+   change both later from the editor; this sets the starting look.
 5. **Write the content as JSON.** Charts are DATA (`references/charts.md`) — labels + series, never
    hand-drawn SVG.  Replace the `<script id="deck-data">` block: set `meta.title`,
    and build the `slides` array — one `{ "layout", "content" }` object per slide. Read
@@ -83,6 +94,7 @@ One JSON object in `<script id="deck-data">`:
 {
   "meta":   { "title": "How Machines Learn", "seed": 7 },
   "theme":  "midnight-neon",                 // label; the real palette is the :root you pasted
+  "personality": "editorial",                // optional: type/space/shape/motif. Omit = default look.
   "defaults": { "ambient": "auto" },
   "slides": [
     { "layout": "cover",  "content": { "title": "How Machines", "accent": "Learn", "subtitle": "…" } },
@@ -224,6 +236,10 @@ You can't see a rendered HTML file here, so verify what you *can*:
    the font `<link>` match the chosen palette, not Midnight Neon.
 4. **Asset references resolve** — every `icon`/`iconAsset`/`image` name maps to a file you inlined.
 5. **Counts and structure are sane** — slide count matches the plan; no layout repeats back-to-back.
+6. **No slide was forced into the wrong shape.** Re-read the plan against the deck: if any slide's
+   idea had to be trimmed or padded to fit its layout, that slide wanted to be `composed`. Also check
+   the reverse — a `composed` slide whose sections are exactly one classic layout's decomposition
+   should just be that layout.
 
 If you have a browser-capable renderer available, also open the file, toggle **Edit**, and confirm
 panels appear and an element drags. If not, rely on the JSON + structure checks above and tell the
@@ -240,6 +256,14 @@ user the deck is generated and ready to open.
 3. **Keep `deck-data` valid JSON.** Escape quotes inside strings; the engine shows an error slide if
    it can't parse. `scripts/validate.py` catches this and every schema mistake — run it.
 4. **Don't fetch or invent imagery.** User-provided assets only.
-5. **Don't edit the engine or the editor `<script>` blocks.** You only replace `deck-data` (and
+5. **Don't reach for `raw` before `composed`.** A shape no fixed layout makes is what `composed` is
+   for, and it stays fully editable — sections can be reordered, restyled and retyped in the editor.
+   `raw` freezes into markup with none of that. `raw` is for genuinely one-off HTML, not for
+   "none of the 29 quite fit".
+6. **One heading per section stack.** `chart` and `bullets` sections carry their own heading; putting
+   a `titleband` above either gives the slide two titles.
+7. **`size` goes on the stretchy section.** Weight the chart / table / timeline / picture and leave
+   stat rows and title bands unweighted — they should be exactly as tall as their content.
+8. **Don't edit the engine or the editor `<script>` blocks.** You only replace `deck-data` (and
    `deck-assets` via `assets.py`). The template's source lives in `src/` and is rebuilt with
    `scripts/build.py` — that's for developing the tool, never for authoring a deck.

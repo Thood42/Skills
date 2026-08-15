@@ -196,13 +196,18 @@
               columns:[{head:'First',body:'A short paragraph.'},
                        {head:'Second',body:'A short paragraph.'}]},
     build:function(c,b){ b=b||'';
+      /* An EMPTY columns array used to still emit the .ed-cols grid, which
+         carries a 30px top margin and a rule line — 30-odd pixels of nothing,
+         enough to push a section past the bottom of a full slide. Caught by the
+         rack test on a prose section used for a lead with no columns. */
+      var cols=arr(c.columns);
       return [ N('div.editorial',{key:b+'editorial'},[
         N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:b+'lead',html:rich(c.lead)}),
-        N('div.ed-cols.sg-stagger.sg-onenter',{key:b+'columns',arr:b+'columns'},
-          arr(c.columns).map(function(col,i){ var P=b+'columns.'+i;
+        cols.length?N('div.ed-cols.sg-stagger.sg-onenter',{key:b+'columns',arr:b+'columns'},
+          cols.map(function(col,i){ var P=b+'columns.'+i;
             return N('div.ed-col',{key:P},[
               N('h3',{bind:P+'.head',html:rich(col.head)}),
-              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; }
+              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })):null ]) ]; }
   };
 
   /* ---------- media + bullets — the two halves of media-split, now separable.

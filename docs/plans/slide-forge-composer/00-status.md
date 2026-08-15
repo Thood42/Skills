@@ -12,7 +12,7 @@
 - [x] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
 - [x] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
 - [x] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
-- [ ] Slice 7 — generation surface docs + the Gate-1 rack test (≥8/10)
+- [x] Slice 7 — generation surface docs + the Gate-1 rack test (≥8/10) — **scored 10/10**
 
 ## Progress log
 - **Slice 1 done 2026-08-15.** `src/sections.js` (registry `S` + `L.composed` + `SG.sectionNode`),
@@ -103,6 +103,20 @@
   - **Size watch:** the built template is now **443 KB of the 450 KB budget**. Gate 1 put quality
     above the budget, but slice 7 is docs-only for a reason — the next code slice needs either a
     raised budget or a trim.
+
+- **Slice 7 done 2026-08-15 — ALL SEVEN SLICES COMPLETE.** `references/layouts.md` gained a full
+  `composed` entry (shape, the `size` rule of thumb, the 12-type table, the classic→composition map);
+  new `references/personalities.md`; `references/editor.md` "v6"; `SKILL.md` step 1 asks for a
+  personality, step 2 says fit the shape to the idea and reach for `composed` before `raw`, step 4
+  applies it, plus 3 new pitfalls and 1 new self-check.
+  - **Gate-1 rack test: 10/10** (bar was ≥8/10). `tests/rack-test.json`, kept as a fixture. Ten
+    real-world slide shapes; 9 composed + 1 classic `quote`; **zero `raw` slides**, zero bounding
+    boxes crossing 1280×720, zero elements with clipped text, under the `blueprint` personality.
+  - The test earned its keep on the first pass: slide 4 overflowed 68px because `prose` emitted its
+    `.ed-cols` grid (30px margin + rule) even with an EMPTY columns array. Fixed in `S.prose`, and
+    `layouts.md` now says one line of body text is a `bullets` section with only `body`.
+  - Final state: parity 7 (baseline), editor-ops 253/253, `build.py --check` clean, template
+    443 KB / 450 KB.
 
 ## Notes for a fresh session
 - User's founding complaint (2026-08-15): slide-forge isn't user-friendly enough; layouts and
