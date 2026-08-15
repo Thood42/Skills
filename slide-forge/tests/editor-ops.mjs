@@ -676,6 +676,75 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
      'the picker offers the default plus both v1 personalities');
 }
 
+// =====================================================================
+// SLIDE PRESETS (composer plan §F) — whole slide designs in the ⊞ gallery.
+// The two things that can actually go wrong: a preset getting mutated by the
+// slide inserted from it, and a `.forge-ghost` thumbnail surviving into #deck
+// (which shifts every .slide index and breaks navigation — the known pitfall).
+// =====================================================================
+{
+  const PS={meta:{title:'Presets',seed:7},slides:[
+    {layout:'cover',content:{title:'C'}},{layout:'quote',content:{quote:'Q'}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dS=boot(NEW,PS); await new Promise(r=>setTimeout(r,400));
+  const wS=dS.window, ds=dS.window.document, SGS=wS.SG, FS=wS.Forge;
+  ds.body.classList.add('forge-edit');
+  const slides=()=>SGS.data.slides;
+  const ghosts=()=>ds.getElementById('deck').querySelectorAll('.forge-ghost').length;
+
+  ok(Array.isArray(FS.presets)&&FS.presets.length>=8,'the built-in preset list is exposed and populated');
+  ok(FS.presets.every(p=>p.name&&p.desc&&p.slide&&p.slide.layout),'every preset has a name, a description and a slide');
+  ok(FS.presets.filter(p=>p.slide.layout==='composed').length>=6,
+     'most presets are composed — the classics are already one click away elsewhere');
+  // every preset must be a slide the validator would accept, i.e. it renders
+  const bad=FS.presets.filter(p=>{ try{ return !SGS.layouts[p.slide.layout]; }catch(e){ return true; } });
+  ok(bad.length===0,'every preset names a real layout ('+bad.map(p=>p.name)+')');
+
+  const n0=slides().length, cur=0;
+  wS.location.hash='#1';
+  ok(FS.insertPreset(FS.presets[0]),'insertPreset reports success');
+  ok(slides().length===n0+1,'a slide was added');
+  ok(slides()[1].layout===FS.presets[0].slide.layout,'…right after the current one');
+  // deep clone: editing the inserted slide must not reach back into the preset
+  const presetJSON=JSON.stringify(FS.presets[0].slide);
+  SGS.setPath(slides()[1].content,'sections.0.content.title','MUTATED');
+  ok(JSON.stringify(FS.presets[0].slide)===presetJSON,'mutating the inserted slide never touches the preset');
+  FS.undoOp();
+
+  // masters round-trip, now that a master may hold a composed slide
+  SGS.data.slides[1]={layout:'composed',content:{sections:[
+    {type:'titleband',content:{title:'Mine'}},{type:'stats',content:{stats:[{value:'9',label:'x'}]}} ]},
+    overrides:{'sections.1.content.stats.0':{w:200}}};
+  SGS.render(ds.getElementById('deck'),SGS.data);
+  wS.location.hash='#2';
+  FS.saveMaster('My composed');
+  ok(!!(SGS.data.masters||{})['My composed'],'a composed slide saves as a master');
+  ok(SGS.data.masters['My composed'].base==='composed','…recording composed as its base layout');
+  const before2=slides().length;
+  FS.addSlide(null,'My composed');
+  ok(slides().length===before2+1,'the master inserts as a new slide');
+  const made=slides()[2];
+  ok(made.layout==='composed'&&made.content.sections.length===2,'…and round-trips its sections');
+  ok(!!(made.overrides||{})['sections.1.content.stats.0'],'…and its section-depth overrides');
+
+  // the ghost pitfall: opening and closing the gallery must leave #deck clean
+  const nSlides=ds.getElementById('deck').querySelectorAll('.slide').length;
+  ok(ghosts()===0,'no ghosts before opening the gallery');
+  FS.insertGallery();
+  const gal=ds.getElementById('forge-gallery');
+  ok(!!gal,'the gallery opened');
+  const tabs=[...gal.querySelectorAll('.forge-gal-tab')].map(b=>b.textContent);
+  ok(tabs.join('|')==='Elements|Slides|From this deck','three tabs, in order');
+  [...gal.querySelectorAll('.forge-gal-tab')].forEach(b=>b.click());   // build every pane
+  gal.remove();
+  await new Promise(r=>setTimeout(r,50));
+  ok(ghosts()===0,'closing the gallery leaves NO .forge-ghost inside #deck');
+  ok(ds.getElementById('deck').querySelectorAll('.slide').length===nSlides,
+     '…so the .slide indices are unchanged (the known ghost pitfall)');
+  ds.body.classList.remove('forge-edit');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

@@ -11,7 +11,7 @@
 - [x] Slice 3 — promotion (`TO_SECTIONS`, override remap, single-undo restore)
 - [x] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
 - [x] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
-- [ ] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
+- [x] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
 - [ ] Slice 7 — generation surface docs + the Gate-1 rack test (≥8/10)
 
 ## Progress log
@@ -84,6 +84,25 @@
     70·88 / 84·104 / 56·68, row gap 34/44/26px, dot texture .30/0/.55, editorial adds a 1px hairline
     under every title band. Turning it off returns EVERY value to the default probe. Zero overflow
     under both personalities across all 12 demo slides.
+
+- **Slice 6 done 2026-08-15.** 10 built-in `PRESETS` (8 composed, 2 classic) + `F.insertPreset`;
+  ⊞ Insert grew tabs (Elements | Slides | From this deck); `gallerySlideThumb` renders a WHOLE slide
+  into the ghost and scales it into a 16:9 well; `F.saveMaster(name,slideIdx)` extracted from its
+  button so masters are testable and the third tab can show them. editor-ops 253/253 (18 new);
+  parity 7.
+  - **Naming collision, cost an hour — don't repeat it.** The preset card was `class="forge-gal-card
+    slide"`, which picked up **deck.css's** `.slide{position:absolute; inset:0; display:flex}` and
+    blew every card out to 1280px inside a 202px grid track. Editor chrome must never reuse a DECK
+    class name; the modifier is now `whole`.
+  - Ghost hygiene is asserted three ways (before/while open/after close) in both jsdom and the
+    browser, plus a MutationObserver that sweeps `#deck` when the modal leaves. A surviving
+    `.forge-ghost` shifts every `.slide` index and breaks navigation.
+  - Browser proof: 10 cards at 197px in a 3-column grid, thumbnails fitting their 179×101 wells
+    exactly, rendered in the deck's live theme AND personality (blueprint padding 56·68 visible in
+    the miniature), 0 ghosts throughout, inserting a preset took the deck 12 → 13 slides.
+  - **Size watch:** the built template is now **443 KB of the 450 KB budget**. Gate 1 put quality
+    above the budget, but slice 7 is docs-only for a reason — the next code slice needs either a
+    raised budget or a trim.
 
 ## Notes for a fresh session
 - User's founding complaint (2026-08-15): slide-forge isn't user-friendly enough; layouts and
