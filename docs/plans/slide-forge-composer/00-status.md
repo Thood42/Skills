@@ -8,7 +8,7 @@
 ## Slices
 - [x] Slice 1 — tracer: `composed` renders (3 section types incl. a CSS refugee; parity canary)
 - [x] Slice 2 — full 12-type vocabulary + ~10 classics re-expressed + validator
-- [ ] Slice 3 — promotion (`TO_SECTIONS`, override remap, single-undo restore)
+- [x] Slice 3 — promotion (`TO_SECTIONS`, override remap, single-undo restore)
 - [ ] Slice 4 — integrated insert + section verbs (move/remove/resize, fallback toast)
 - [ ] Slice 5 — personality (Editorial + Blueprint, picker, boot, validator)
 - [ ] Slice 6 — preset gallery (tabs, whole-slide thumbnails, masters round-trip)
@@ -40,6 +40,17 @@
   - Browser-verified on a 12-slide demo (6 composed exercising all 12 types + rows, then the 6
     classic originals): **zero bounding boxes cross 1280×720**, rows share one top edge, weights
     land 713/357 and 535/535.
+
+- **Slice 3 done 2026-08-15.** `SG.TO_SECTIONS` (all 10 decomposable layouts) + `SG.canPromote`;
+  `F.promoteSlide` / `F.canPromote` + `remapPrefixes` (longest-prefix-first, which is why `title`
+  can't swallow `timeline` — the `+'.'` in the match is load-bearing); right-click →
+  "⧉ Convert to composed". One `F.do` = one undo. media-split promotes to a ROW (its real
+  arrangement) and `side:"right"` flips which item is which. **Known + deliberate:** agenda's `rail`
+  is slide chrome with no section home, so converting an agenda slide drops a styled rail; the GC
+  logs it and one undo restores it. editor-ops 187/187; parity 7.
+  - Browser proof: styled a classic stat-grid (mint rotated title, 280px stat, 24px label), hit
+    convert — all three overrides re-key and still apply, and the stat-grid's rendered box is
+    **identical at 1104×427 before and after**; one undo returns the classic keys.
 
 ## Notes for a fresh session
 - User's founding complaint (2026-08-15): slide-forge isn't user-friendly enough; layouts and

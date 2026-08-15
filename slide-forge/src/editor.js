@@ -891,6 +891,41 @@
       remapItemOverrides(sc.host,sc.key,it.idx,-1); }); return true; };
 
   /* =====================================================================
+     PROMOTION — turn a classic slide into a composed one (composer plan §D).
+
+     The decomposition itself lives in sections.js (SG.TO_SECTIONS); the editor
+     only rewrites the slide and carries the user's styling across. Nothing here
+     runs on load — promotion is always an explicit action, so an untouched deck
+     never changes shape behind the user's back.
+     ===================================================================== */
+  /* Rewrite override keys through a {oldPrefix: newPrefix} map, LONGEST PREFIX
+     FIRST so `title` can never swallow `timeline`. A key that matches nothing is
+     left as-is; the orphan GC in commit() drops it if the promoted slide has no
+     such element (agenda's `rail` is the one case where that happens by
+     design). Whole thing is one mutation inside one F.do, so one undo restores
+     the classic slide exactly. */
+  function remapPrefixes(ov,keymap){
+    var pres=Object.keys(keymap).sort(function(a,b){ return b.length-a.length; }), out={};
+    Object.keys(ov).forEach(function(k){
+      for(var i=0;i<pres.length;i++){ var p=pres[i];
+        if(k===p||k.indexOf(p+'.')===0){ out[keymap[p]+k.slice(p.length)]=ov[k]; return; } }
+      out[k]=ov[k]; });
+    return out; }
+  F.canPromote=function(slideIdx){ var s=(SG.data.slides||[])[slideIdx];
+    return !!(s&&SG.canPromote&&SG.canPromote(s.layout)); };
+  F.promoteSlide=function(slideIdx){
+    var s=(SG.data.slides||[])[slideIdx]; if(!s) return false;
+    if(s.layout==='composed') return true;                  /* already there */
+    var to=SG.TO_SECTIONS&&SG.TO_SECTIONS[s.layout]; if(!to) return false;
+    clearSel();
+    F.do('convert to composed',function(data){
+      var sl=data.slides[slideIdx], r=to(sl.content||{});
+      sl.layout='composed';
+      sl.content={sections:r.sections};
+      if(sl.overrides) sl.overrides=remapPrefixes(sl.overrides,r.keymap); });
+    return true; };
+
+  /* =====================================================================
      ALIGN & DISTRIBUTE — multi-select verbs, slide-space math.
      ===================================================================== */
   function shiftSel(x,dx,dy){ var d=elData(x); d.x=Math.round((d.x||0)+dx); d.y=Math.round((d.y||0)+dy);
@@ -1019,6 +1054,13 @@
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem('▲ Bring forward',null,function(){ F.zNudge(1); }));
     ctxMenu.appendChild(ctxItem('▼ Send back',null,function(){ F.zNudge(-1); }));
+    /* Convert to composed — offered on any decomposable classic slide. It is
+       what unlocks inserting a section into the flow, so it belongs on the
+       slide's own menu and not buried in a panel. */
+    if(!isFree&&F.canPromote(slideIdxOf(node))){
+      ctxMenu.appendChild(el('div','forge-ctx-sep'));
+      var pi=slideIdxOf(node);
+      ctxMenu.appendChild(ctxItem('⧉ Convert to composed',null,function(){ F.promoteSlide(pi); })); }
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem(isFree?'🗑 Delete object':'↺ Reset element','warn',function(){ F.deleteSel(); }));
     ctxMenu.classList.add('on');

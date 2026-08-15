@@ -472,6 +472,84 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
      'media-split keys stay flat at base=""');
 }
 
+// =====================================================================
+// PROMOTION (composer plan §D) — classic slide -> composed, on user action.
+// The user's styling has to survive the key rewrite, and ONE undo has to put
+// the classic slide back exactly as it was.
+// =====================================================================
+{
+  const PD={meta:{title:'Promote',seed:7},slides:[
+    {layout:'stat-grid',content:{kicker:'K',title:'T',stats:[{value:'1',label:'a'},{value:'2',label:'b'},{value:'3',label:'c'}]},
+     overrides:{'title':{color:'var(--mint)'},'stats.2':{w:250},'stats.2.label':{fs:22}}},
+    {layout:'media-split',content:{title:'MS',side:'right',body:'b',items:['i0'],image:''}},
+    {layout:'agenda',content:{title:'A',items:[{title:'one'}]},overrides:{'rail':{color:'#f00'}}},
+    {layout:'cover',content:{title:'C'}} ]};
+  const dP=boot(NEW,PD); await new Promise(r=>setTimeout(r,400));
+  const wP=dP.window, dd=wP.document, SGP=wP.SG, FP=wP.Forge;
+  const sl=n=>SGP.data.slides[n], sec=n=>dd.querySelectorAll('#deck .slide')[n];
+  const before=JSON.stringify(sl(0));
+
+  ok(FP.canPromote(0)&&FP.canPromote(1)&&FP.canPromote(2),'decomposable classics offer promotion');
+  ok(!FP.canPromote(3),'a bespoke layout (cover) does not');
+
+  ok(FP.promoteSlide(0),'promoteSlide reports success');
+  ok(sl(0).layout==='composed','slide became composed');
+  ok(sl(0).content.sections.length===2&&sl(0).content.sections[0].type==='titleband'
+     &&sl(0).content.sections[1].type==='stats','stat-grid decomposed into titleband + stats');
+  ok(SGP.getPath(sl(0).content,'sections.1.content.stats').length===3,'content carried over intact');
+  const ov=sl(0).overrides||{};
+  ok(!!ov['sections.0.content.title']&&ov['sections.0.content.title'].color==='var(--mint)','title override remapped');
+  ok(!!ov['sections.1.content.stats.2']&&ov['sections.1.content.stats.2'].w===250,'item override remapped');
+  ok(!!ov['sections.1.content.stats.2.label'],'DEEP item override remapped via the same prefix');
+  ok(!Object.keys(ov).some(k=>!/^sections\./.test(k)),'no classic-shaped override key survives');
+  // the styles are not just stored under new keys — they actually land on nodes
+  ok(sec(0).querySelector('[data-el="sections.1.content.stats.2"]').style.width==='250px',
+     'the remapped override styles the right node after promotion');
+  // one undo, exactly
+  FP.undoOp();
+  ok(JSON.stringify(sl(0))===before,'ONE undo restores the classic slide byte-identically');
+
+  // media-split promotes to a row, and side:right flips which item is which
+  FP.promoteSlide(1);
+  const r=sl(1).content.sections[0];
+  ok(r.type==='row'&&r.items.length===2,'media-split promotes to a row of two sections');
+  ok(r.items[0].type==='bullets'&&r.items[1].type==='media','side:"right" puts the text first');
+  ok(r.items[1].content.image===''&&r.items[0].content.items[0]==='i0','both halves keep their own fields');
+
+  // agenda's rail has no home in the composed slide; GC drops it (documented)
+  FP.promoteSlide(2);
+  ok(!(sl(2).overrides||{})['rail'],'agenda rail override is GCed, not silently re-keyed');
+  ok(sl(2).content.sections[1].content.items.length===1,'agenda items still carried over');
+
+  // promoting an already-composed slide must not wrap it in itself
+  const depth=FP.undo.length, snap=JSON.stringify(sl(2));
+  FP.promoteSlide(2);
+  ok(JSON.stringify(sl(2))===snap&&FP.undo.length===depth,
+     'promoting a composed slide is a no-op — no re-nesting, no undo entry');
+
+  // promotion NEVER fires on load
+  const fresh=boot(NEW,JSON.parse(JSON.stringify(PD)));
+  await new Promise(r=>setTimeout(r,300));
+  ok(fresh.window.SG.data.slides[0].layout==='stat-grid','loading a deck never promotes anything');
+
+  // ---------- bind write-back at row depth (plan test 7) ----------
+  // A leaf inside a row item must write to sections.N.items.M.content.… —
+  // the deepest path the model produces, and the one most likely to be
+  // mis-routed by a scopeOf/partOf shortcut.
+  dd.body.classList.add('forge-edit');
+  const leaf=sec(1).querySelector('[data-bind="sections.0.items.0.content.items.0"]');
+  ok(!!leaf,'a bullets leaf inside a row item is bound to its full path');
+  if(leaf){
+    leaf.dispatchEvent(new wP.MouseEvent('dblclick',{bubbles:true}));
+    ok(FP.editing===leaf,'double-click starts an edit at row depth');
+    leaf.textContent='rewritten'; FP.endEdit();
+    ok(SGP.getPath(sl(1).content,'sections.0.items.0.content.items.0')==='rewritten',
+       'endEdit writes through to the row item’s own content');
+    ok(!((sl(1).overrides||{})['sections.0.items.0.content.items.0']||{}).html,
+       '…and leaves no html shadow override behind'); }
+  dd.body.classList.remove('forge-edit');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

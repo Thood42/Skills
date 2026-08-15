@@ -294,4 +294,83 @@
   /* the vocabulary as data — the editor's gallery and the Python validator
      both need the list, and it should have exactly one source */
   SG.SECTION_TYPES = Object.keys(S);
+
+  /* =====================================================================
+     PROMOTION  —  classic slide -> composed slide, on explicit user action.
+
+     TO_SECTIONS[layout](content) -> {sections, keymap}
+
+     `sections` is the same decomposition the layout function itself uses, so
+     a promoted slide renders identically to the classic it came from.
+
+     `keymap` maps the layout's TOP-LEVEL authored keys to where they end up.
+     The editor applies it longest-prefix-first, which is all that is needed:
+     every section builder prefixes EVERY key it authors, so an override on
+     `stats.2.label` follows `stats` -> `sections.1.content.stats` and lands on
+     `sections.1.content.stats.2.label` with no per-key enumeration. Structural
+     keys (`cmp`, `timeline`, `split`) are listed alongside content ones because
+     a user can perfectly well have styled a container.
+
+     Keys that map NOWHERE are left alone and the existing orphan-override GC
+     drops them on the next commit. That happens on purpose in exactly one
+     place: agenda's `rail` is slide chrome, not part of the agenda section, so
+     converting an agenda slide loses a styled rail. One undo brings it back.
+
+     Promotion NEVER happens on load — only when the user asks for it — so an
+     untouched deck stays byte-identical forever.
+     ===================================================================== */
+  var TO_SECTIONS = SG.TO_SECTIONS = {};
+  function band(c){ return {type:'titleband',content:{kicker:c.kicker,title:c.title}}; }
+  var BAND_KEYS={kicker:'sections.0.content.kicker', title:'sections.0.content.title'};
+  /* a headed layout: titleband at 0, the body at 1. `keys` are the body's own
+     top-level authored keys. */
+  function headed(type, keys, pick){
+    return function(c){
+      var km={}; Object.keys(BAND_KEYS).forEach(function(k){ km[k]=BAND_KEYS[k]; });
+      keys.forEach(function(k){ km[k]='sections.1.content.'+k; });
+      return {sections:[band(c),{type:type,size:1,content:pick(c)}], keymap:km}; }; }
+
+  TO_SECTIONS['stat-grid'] = headed('stats', ['stats'],
+    function(c){ return {stats:c.stats}; });
+  TO_SECTIONS.table = headed('table', ['table','tnote','columns','rows','options','note'],
+    function(c){ return {columns:c.columns,rows:c.rows,options:c.options,note:c.note}; });
+  TO_SECTIONS.comparison = headed('comparison', ['cmp','vs','badge','left','right'],
+    function(c){ return {left:c.left,right:c.right,badge:c.badge}; });
+  TO_SECTIONS.timeline = headed('timeline', ['timeline','items'],
+    function(c){ return {items:c.items}; });
+  TO_SECTIONS.agenda = headed('agenda', ['items'],
+    function(c){ return {items:c.items}; });
+  /* bignum + editorial open with a kicker and no title, so their titleband
+     carries only the kicker — but the mapping is the same shape */
+  TO_SECTIONS.bignum = headed('bignum', ['num','subtitle','value','count','fmt'],
+    function(c){ return {value:c.value,count:c.count,fmt:c.fmt,subtitle:c.subtitle}; });
+  TO_SECTIONS.editorial = headed('prose', ['editorial','lead','columns'],
+    function(c){ return {lead:c.lead,columns:c.columns}; });
+
+  /* chart carries its own head, so it is ONE section and every key just gains
+     the prefix — the simplest possible map */
+  function whole(type, keys, pick){
+    return function(c){
+      var km={}; keys.forEach(function(k){ km[k]='sections.0.content.'+k; });
+      return {sections:[{type:type,size:1,content:pick(c)}], keymap:km}; }; }
+  TO_SECTIONS.chart = whole('chart', ['head','note','chart','kicker','title','type','data','options','svg','body'],
+    function(c){ return {kicker:c.kicker,title:c.title,note:c.note,type:c.type,data:c.data,
+                         options:c.options,svg:c.svg,body:c.body}; });
+  TO_SECTIONS.quote = whole('quote', ['mark','quote','by','subtitle'],
+    function(c){ return {quote:c.quote,by:c.by,subtitle:c.subtitle}; });
+
+  /* media-split promotes to a ROW, which is the arrangement it already draws.
+     `split` (the grid wrapper) has no counterpart and is dropped. */
+  TO_SECTIONS['media-split'] = function(c){
+    var right = c.side==='right';
+    var media = {type:'media',size:1,content:{image:c.image,fit:c.fit,focal:c.focal}};
+    var text  = {type:'bullets',size:1,content:{kicker:c.kicker,title:c.title,body:c.body,items:c.items}};
+    var mi = right?1:0, ti = right?0:1;
+    var km={};
+    ['image','fit','focal'].forEach(function(k){ km[k]='sections.0.items.'+mi+'.content.'+k; });
+    ['text','kicker','title','body','items'].forEach(function(k){ km[k]='sections.0.items.'+ti+'.content.'+k; });
+    return {sections:[{type:'row',size:1,items:right?[text,media]:[media,text]}], keymap:km}; };
+
+  /* "can this slide be converted?" — the editor asks before offering the verb */
+  SG.canPromote = function(layout){ return !!TO_SECTIONS[layout]; };
 })();
