@@ -25,7 +25,21 @@
       "Bash(npm install *)",
       "Bash(node editor-ops.mjs)",
       "Bash(node parity.mjs)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(python -c \"import ast,sys; ast.parse\\(open\\('scripts/validate.py',encoding='utf-8'\\).read\\(\\)\\); print\\('validate.py parses OK'\\)\")",
+      "Bash(python scripts/validate.py src/deck-data.json)",
+      "Bash(python slide-forge/scripts/validate.py slide-forge/src/deck-data.json)",
+      "Bash(python -)",
+      "Bash(echo \"sync=$?\")",
+      "PowerShell(foreach \\($c in 'node','npm','npx','nvm','winget','choco','scoop','fnm','volta'\\) { $g = Get-Command $c -ErrorAction SilentlyContinue; if \\($g\\) { \"{0,-8} {1}\" -f $c, $g.Source } else { \"{0,-8} \\(not found\\)\" -f $c } })",
+      "PowerShell($paths = @\\(\"$env:ProgramFiles\\\\nodejs\",\"${env:ProgramFiles\\(x86\\)}\\\\nodejs\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\",\"$env:APPDATA\\\\nvm\",\"$env:LOCALAPPDATA\\\\fnm\",\"$env:USERPROFILE\\\\scoop\\\\apps\\\\nodejs\"\\); foreach \\($p in $paths\\) { \"{0,-55} {1}\" -f $p, \\(Test-Path $p\\) })",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(Set-Location \"C:\\\\Sandbox\\\\Development\\\\Claude\\\\Skills\\\\.claude\\\\worktrees\\\\duplicated-objects-missing-fields-e0dd4f\"; Copy-Item \"$env:TEMP\\\\parity-mine.html\" slide-forge\\\\editor-template.html -Force; Remove-Item \"$env:TEMP\\\\parity-base.html\",\"$env:TEMP\\\\parity-mine.html\"; python slide-forge\\\\scripts\\\\build.py --check; \"sync exit=$LASTEXITCODE\")",
+      "Bash(git check-ignore *)",
+      "PowerShell(Set-Location \"C:\\\\Sandbox\\\\Development\\\\Claude\\\\Skills\\\\.claude\\\\worktrees\\\\duplicated-objects-missing-fields-e0dd4f\\\\slide-forge\"; python scripts/build.py --check; \"sync=$LASTEXITCODE\"; python scripts/validate.py src/deck-data.json 2>&1 | Select-Object -Last 1; node --check src/editor.js; \"editor.js syntax=$LASTEXITCODE\"; Set-Location tests; node parity.mjs 2>&1 | Select-Object -Last 1; node editor-ops.mjs 2>&1 | Select-Object -Last 1)",
+      "PowerShell(foreach \\($c in 'gh','git'\\) { $g = Get-Command $c -ErrorAction SilentlyContinue; if \\($g\\) { \"{0,-4} {1}\" -f $c, $g.Source } else { \"{0,-4} \\(not found\\)\" -f $c } }; \"--- env tokens ---\"; foreach \\($v in 'GH_TOKEN','GITHUB_TOKEN'\\) { if \\(Test-Path \"env:$v\"\\) { \"$v is set\" } else { \"$v not set\" } })",
+      "Bash(git commit -q -m 'chore: record tool permissions used during the v5 editor work *)"
     ]
   }
 }
