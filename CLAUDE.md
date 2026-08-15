@@ -6,13 +6,12 @@ file that opens in any browser offline, with no install/server/build step.
 ## Layout
 
 ```
-Slides/                 base "slides" skill — data-driven HTML deck generator (present only)
-slide-forge/            advanced variant — same engine + an in-deck EDITOR (present + edit)  ← active project
+slide-forge/            HTML deck generator + in-deck EDITOR (present + edit)  ← active project
 slides-editor-plan.md   architecture & decision record — READ §1.2, §3.2, §8, §10, §11 before editor work
 slide-forge-design-critique.md  2026-07-06 design review that led to the v3 engine (§10 ADR)
 slide-forge-media-plan.md  images/diagrams/links/sandboxed embeds — READ before touching media (§11 ADR)
 slide-forge-editor-ux-plan.md  2026-07-31 design handoff behind the v4 editor UX — READ before editor-UI work
-README.md               short index (both skills + plan doc); this file is the source of truth
+README.md               short index (the skill + plan docs); this file is the source of truth
 *.skill                 gitignored build artifacts (zips); rebuilt separately, not tracked
 ```
 

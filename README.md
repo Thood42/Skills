@@ -7,8 +7,7 @@ presentations** — one `.html` file, opens offline in any browser, no install.
 
 ```
 Skills/
-├── Slides/                         base skill: data-driven HTML deck generator (present only)
-├── slide-forge/                    advanced skill: same engine + an in-deck EDITOR  ← active
+├── slide-forge/                    HTML deck generator + in-deck EDITOR  ← active
 │   ├── SKILL.md                    authoring workflow (copy template, replace deck-data JSON)
 │   ├── editor-template.html        the deliverable: deck + editor in one file (BUILT — edit src/)
 │   ├── src/                        engine/editor source; scripts/build.py assembles the template
