@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mockup — deck personality, same theme</title>
+<style>
+  body{margin:0;padding:40px;background:#08090f;color:#e8ecf4;font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+  h1{font-size:20px;font-weight:600} p.note{color:#8b93a7;max-width:75ch}
+  .pair{display:flex;gap:32px;flex-wrap:wrap;margin-top:24px}
+  .col h2{font-size:13px;font-weight:600;margin:0 0 10px;color:#8b93a7}
+  .col h2 b{color:#57e6c8}
+  .slide{width:560px;height:315px;border:1px solid #232838;border-radius:10px;overflow:hidden;
+         box-sizing:border-box;background:radial-gradient(120% 140% at 80% -20%,#131a2e 0%,#0a0d18 60%)}
+  .cap{color:#565f75;font-size:12px;margin-top:8px;max-width:560px}
+
+  /* Personality A — "Editorial": serif display, airy, hairline rules, left posture */
+  .ed{padding:40px 46px;display:flex;flex-direction:column}
+  .ed .kick{font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:#57e6c8}
+  .ed .ttl{font-family:Georgia,"Times New Roman",serif;font-size:31px;font-weight:400;line-height:1.15;
+           margin:10px 0 0;max-width:12em;letter-spacing:0}
+  .ed .ttl i{font-style:italic;color:#57e6c8}
+  .ed hr{border:0;border-top:1px solid #232838;margin:22px 0 18px;width:64px}
+  .ed .cols{display:flex;gap:30px}
+  .ed .c{flex:1}
+  .ed .c h4{font-family:Georgia,serif;font-size:14px;font-weight:400;font-style:italic;margin:0 0 6px;color:#dfe5f2}
+  .ed .c p{margin:0;font-size:11.5px;color:#8b93a7;line-height:1.6}
+
+  /* Personality B — "Blueprint": mono accents, dense, boxed, grid texture */
+  .bp{padding:26px 30px;display:flex;flex-direction:column;
+      background-image:radial-gradient(120% 140% at 80% -20%,#131a2e 0%,#0a0d18 60%),
+        repeating-linear-gradient(0deg,transparent 0 23px,#1a2033 23px 24px),
+        repeating-linear-gradient(90deg,transparent 0 23px,#1a2033 23px 24px)}
+  .bp .kick{font-family:Consolas,monospace;font-size:10.5px;color:#57e6c8}
+  .bp .kick::before{content:"// "}
+  .bp .ttl{font-size:24px;font-weight:800;letter-spacing:-.02em;text-transform:uppercase;margin:6px 0 16px}
+  .bp .cols{display:flex;gap:12px;flex:1}
+  .bp .c{flex:1;border:1px solid #2b3350;background:#0c1020cc;padding:12px 14px}
+  .bp .c h4{font-family:Consolas,monospace;font-size:11px;margin:0 0 6px;color:#57e6c8;text-transform:uppercase}
+  .bp .c h4::before{content:"[ "}.bp .c h4::after{content:" ]"}
+  .bp .c p{margin:0;font-size:11px;color:#a7b0c6;line-height:1.55}
+</style>
+<h1>Mockup 3 — one slide, one color theme, two personalities</h1>
+<p class="note">Identical content and identical palette (midnight-neon). Only the <em>personality</em>
+differs: type voice, density, alignment posture, and decorative motif. This is the axis that stops
+same-theme decks from being twins — and it's switchable deck-wide, like themes are today.</p>
+
+<div class="pair">
+  <div class="col">
+    <h2>Personality: <b>Editorial</b> — serif voice, airy, hairline rules</h2>
+    <div class="slide ed">
+      <span class="kick">Field Notes · Q3</span>
+      <h3 class="ttl">Three things the pilot cohort <i>taught us</i></h3>
+      <hr>
+      <div class="cols">
+        <div class="c"><h4>Onboarding carries the day</h4><p>Teams that finished setup in week one stayed. Nothing else predicted retention as strongly.</p></div>
+        <div class="c"><h4>Docs beat demos</h4><p>Self-serve material was read twice as often as the walkthrough video was watched.</p></div>
+        <div class="c"><h4>Champions emerge, unasked</h4><p>Every retained team had one person who taught the rest. Find them early.</p></div>
+      </div>
+    </div>
+    <p class="cap">Georgia display face, lowercase warmth, generous margins, a single hairline motif.</p>
+  </div>
+
+  <div class="col">
+    <h2>Personality: <b>Blueprint</b> — mono accents, dense, boxed sections</h2>
+    <div class="slide bp">
+      <span class="kick">FIELD NOTES / Q3</span>
+      <h3 class="ttl">Three things the pilot cohort taught us</h3>
+      <div class="cols">
+        <div class="c"><h4>Onboarding</h4><p>Teams that finished setup in week one stayed. Nothing else predicted retention as strongly.</p></div>
+        <div class="c"><h4>Docs &gt; demos</h4><p>Self-serve material was read twice as often as the walkthrough video was watched.</p></div>
+        <div class="c"><h4>Champions</h4><p>Every retained team had one person who taught the rest. Find them early.</p></div>
+      </div>
+    </div>
+    <p class="cap">Uppercase compressed display, mono labels, boxed panels on a faint drafting grid.</p>
+  </div>
+</div>

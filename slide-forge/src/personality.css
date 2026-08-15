@@ -1,0 +1,102 @@
+/* =====================================================================
+   DECK PERSONALITY — the second design axis (composer plan §E).
+
+   Themes own COLOUR. Personalities own TYPE, SPACE, SHAPE and MOTIF. Two decks
+   on the same palette should still not read as twins, and that is the whole
+   job of this file.
+
+   Mechanism: `data.personality` -> `data-personality="<name>"` on <html>, and
+   everything below hangs off that attribute. A deck with no personality gets
+   NO attribute and therefore NO rule in this file — the tokens are declared
+   with their present-day values so the default rendering is unchanged.
+
+   Every `--p-*` token is consumed as `var(--p-x, <today's value>)` at its use
+   site, so this file can never be the reason something disappears: drop it and
+   the deck still renders exactly as it does now.
+
+   Fonts are the one thing that cannot be done with a stylesheet alone. Themes
+   write their font variables as INLINE styles on <html>, which beat any rule
+   here, so each personality declares `--p-font-*` and engine.js copies those
+   onto `--font-*` inline right after the theme is applied (and before the
+   brand kit, which is meant to win over both).
+   ===================================================================== */
+
+/* ---------- the token surface, at its default values ---------- */
+:root{
+  --p-title:        62px;      /* .title                                  */
+  --p-cover-title:  96px;      /* .cover .title                           */
+  --p-sub:          21px;      /* .subtitle                               */
+  --p-track:        -.02em;    /* display letter-spacing                  */
+  --p-kick-track:   .34em;     /* kicker letter-spacing                   */
+  --p-kick-case:    uppercase; /* kicker text-transform                   */
+  --p-radius:       16px;      /* panels, cards                           */
+  --p-radius-sm:    10px;      /* small chrome                            */
+  --p-sec-gap:      34px;      /* gap between sections across a row       */
+  --p-dot-op:       .30;       /* the slide's dot-grid texture            */
+  --p-orb-op:       .5;        /* cover/closing ambient orbs              */
+  --p-rule:         0px;       /* motif: hairline rule under a title band */
+}
+
+/* =====================================================================
+   EDITORIAL — a magazine feature. Serif display, tight tracking, generous
+   air, hairline rules, no ambient glow. Says "considered", not "launched".
+   ===================================================================== */
+[data-personality="editorial"]{
+  --p-font-display: 'Fraunces','Newsreader','Georgia','DejaVu Serif',serif;
+  --p-font-body:    'Spectral','Source Serif 4','Georgia','DejaVu Serif',serif;
+  --p-font-mono:    'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace;
+  --pad:            84px 104px;
+  --p-title:        58px;
+  --p-cover-title:  88px;
+  --p-sub:          20px;
+  --p-track:        -.012em;
+  --p-kick-track:   .22em;
+  --p-radius:       4px;
+  --p-radius-sm:    3px;
+  --p-sec-gap:      44px;
+  --p-dot-op:       0;         /* no texture — paper, not a screen */
+  --p-orb-op:       .16;
+  --p-rule:         1px;
+}
+/* the motif: a hairline under every title band, the way a feature opens */
+[data-personality="editorial"] .sec-titleband,
+[data-personality="editorial"] .chart-head{
+  padding-bottom:18px; border-bottom:var(--p-rule) solid var(--brd); }
+[data-personality="editorial"] .title{ font-weight:600; }
+[data-personality="editorial"] .kicker{ font-family:var(--font-body); font-style:italic;
+  text-transform:none; letter-spacing:.02em; font-size:15px; }
+[data-personality="editorial"] .kicker::before{ width:34px; }
+
+/* =====================================================================
+   BLUEPRINT — a technical drawing. Everything on a visible grid, square
+   corners, monospaced labels, tight and dense. Says "engineering".
+   ===================================================================== */
+[data-personality="blueprint"]{
+  --p-font-display: 'Archivo','Sora','DejaVu Sans',system-ui,sans-serif;
+  --p-font-body:    'IBM Plex Sans','DejaVu Sans',system-ui,sans-serif;
+  --p-font-mono:    'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace;
+  --pad:            56px 68px;
+  --p-title:        54px;
+  --p-cover-title:  84px;
+  --p-sub:          19px;
+  --p-track:        -.035em;
+  --p-kick-track:   .30em;
+  --p-radius:       0px;       /* nothing is rounded on a drawing */
+  --p-radius-sm:    0px;
+  --p-sec-gap:      26px;
+  --p-dot-op:       .55;       /* the grid is the point */
+  --p-orb-op:       .22;
+}
+/* the motif: corner ticks on every panel, and a ruled measure under the title */
+[data-personality="blueprint"] .stat,
+[data-personality="blueprint"] .cmp-col,
+[data-personality="blueprint"] .take div{ position:relative; }
+[data-personality="blueprint"] .stat::after,
+[data-personality="blueprint"] .cmp-col::after,
+[data-personality="blueprint"] .take div::after{
+  content:""; position:absolute; right:0; bottom:0; width:12px; height:12px;
+  border-right:1px solid var(--cyan); border-bottom:1px solid var(--cyan); opacity:.55; }
+[data-personality="blueprint"] .title{ font-weight:800; text-transform:none; }
+[data-personality="blueprint"] .kicker{ font-size:12px; }
+[data-personality="blueprint"] .sec-titleband{ padding-bottom:12px;
+  background:linear-gradient(90deg,var(--cyan),transparent 42%) bottom left / 100% 1px no-repeat; }

@@ -62,6 +62,37 @@ from PowerShell (a Git-Bash shell may not have it on PATH).
   non-compositing tab — the transition itself is a cosmetic nicety, not
   something correctness needs.
 
+- `make-demo.py` + `composed-demo.json` — **no Node required.** Rebuilds the
+  template with a hand-authored deck so composed slides can be eyeballed in a
+  real browser beside their classic originals (the "proof" step each composer
+  slice ends with). `python tests/make-demo.py` writes `composed-demo.html`
+  (gitignored — it's a build product of the template + the JSON), then serve
+  the repo root and open it. jsdom can assert the section KEYS but not that a
+  weighted row actually lands where it should, which is the whole question a
+  composition feature has to answer. What to look for: **no element's bounding
+  box may cross the 1280×720 frame**, row children must share one top edge, and
+  the weights must read as literal width proportions (`size` 2 beside 1 = 713 /
+  357 px with the 34px gap). The composed slides are followed by their classic
+  originals so the two can be compared directly.
+
+  The sizing rules this checks are the subtle part and jsdom returns zeros for
+  all of them: a section keeps flexbox's automatic minimum height so it is never
+  handed less room than it draws, while the elastic types (`chart`, `table`,
+  `timeline`, `media`) opt out with `min-height:0` and absorb an over-full
+  slide. A chart's SVG carries ~600px of intrinsic height, so without that split
+  every section shrinks proportionally and the rigid ones spill off the bottom.
+
+- `rack-test.json` — the composer plan's **Gate-1 success metric**, kept as a
+  fixture so it can be re-run. Ten slides taken from the shapes real decks
+  actually use (keynote opener, board review, product launch, strategy offset,
+  incident review, research readout, all-hands, sales QBR, design review,
+  closing line), rebuilt with slide-forge. The bar: **at least 8 of 10 rebuild
+  faithfully with no escape hatch and no compromise a presenter would notice.**
+  Build it with `python tests/make-demo.py tests/rack-test.json` and check three
+  things in a browser: no `raw` slides, no bounding box crossing 1280×720, and
+  no element whose `scrollHeight` exceeds its `clientHeight` (text clipped
+  inside its own box). Result on 2026-08-15: **10/10, zero `raw` slides.**
+
 Run:  `node tests/parity.mjs && node tests/editor-ops.mjs`
 (with jsdom resolvable, e.g. `NODE_PATH=/path/to/node_modules`)
 

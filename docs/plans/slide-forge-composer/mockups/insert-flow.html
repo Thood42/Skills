@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mockup — integrated insert (before / after)</title>
+<style>
+  body{margin:0;padding:40px;background:#08090f;color:#e8ecf4;font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+  h1{font-size:20px;font-weight:600} p.note{color:#8b93a7;max-width:75ch}
+  .pair{display:flex;gap:32px;flex-wrap:wrap;margin-top:24px}
+  .col h2{font-size:14px;font-weight:600;margin:0 0 10px}
+  .col.bad h2{color:#ff7a90}.col.good h2{color:#57e6c8}
+  .slide{position:relative;width:560px;height:315px;border:1px solid #232838;border-radius:10px;
+         background:radial-gradient(120% 140% at 80% -20%,#131a2e 0%,#0a0d18 60%);overflow:hidden;
+         padding:26px 30px;box-sizing:border-box;display:flex;flex-direction:column}
+  .title{font-size:19px;font-weight:700;margin:0 0 14px}
+  .split{display:flex;gap:16px;flex:1;min-height:0}
+  .img{flex:1;border-radius:8px;background:linear-gradient(135deg,#1d2742,#0f1524);border:1px solid #222a3f;
+       display:flex;align-items:center;justify-content:center;color:#565f75;font-size:12px}
+  .pts{flex:1;display:flex;flex-direction:column;justify-content:center;gap:9px}
+  .pts div{font-size:12.5px;color:#c9d1e2;padding-left:14px;position:relative}
+  .pts div::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#57e6c8}
+  .stats{display:flex;gap:12px;margin-top:14px}
+  .stat{flex:1;border-top:1px solid #232838;padding-top:7px}
+  .stat b{font-size:16px;color:#57e6c8}.stat span{display:block;color:#8b93a7;font-size:10.5px}
+  .float{position:absolute;left:130px;top:110px;width:250px;background:#0d1120;border:1.5px dashed #ff7a90;
+         border-radius:8px;padding:10px 12px;box-shadow:0 12px 30px #000c;transform:rotate(-1.2deg)}
+  .float .stats{margin-top:0}
+  .float em{position:absolute;top:-20px;left:0;color:#ff7a90;font-size:10.5px;font-style:normal}
+  .ghost{outline:2px solid #57e6c8;outline-offset:3px;border-radius:6px}
+  .cap{color:#565f75;font-size:12px;margin-top:8px;max-width:560px}
+</style>
+<h1>Mockup 2 — adding a stat row to an existing media slide</h1>
+<p class="note">Same action — “Insert → Stat row” on a picture-plus-bullets slide. Today the row
+arrives as a free-floating box the user must rescue. Proposed: it joins the slide's arrangement
+as a new section; the neighbors make room, the theme and column grid apply automatically.</p>
+
+<div class="pair">
+  <div class="col bad">
+    <h2>TODAY — floats on top, pasted-on</h2>
+    <div class="slide">
+      <h3 class="title">What changed in the rollout</h3>
+      <div class="split">
+        <div class="img">screenshot.png</div>
+        <div class="pts"><div>Faster cold start</div><div>Smaller install bundle</div><div>Zero-config defaults</div></div>
+      </div>
+      <div class="float"><em>free object — wrong size, covers content</em>
+        <div class="stats">
+          <div class="stat"><b>−61%</b><span>tickets</span></div>
+          <div class="stat"><b>11d</b><span>to value</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Arrives at an arbitrary position and size; overlaps the bullets; resizing and
+    aligning it by hand is the user's problem.</p>
+  </div>
+
+  <div class="col good">
+    <h2>PROPOSED — joins the arrangement</h2>
+    <div class="slide">
+      <h3 class="title">What changed in the rollout</h3>
+      <div class="split">
+        <div class="img">screenshot.png</div>
+        <div class="pts"><div>Faster cold start</div><div>Smaller install bundle</div><div>Zero-config defaults</div></div>
+      </div>
+      <div class="stats ghost">
+        <div class="stat"><b>−61%</b><span>setup tickets</span></div>
+        <div class="stat"><b>11 days</b><span>time-to-value</span></div>
+        <div class="stat"><b>+38%</b><span>active teams</span></div>
+      </div>
+    </div>
+    <p class="cap">The row slots in as a section below the split; the split shrinks to make room.
+    Green outline = the just-inserted section, already themed and on-grid. Dragging its handle
+    reorders it among the sections; “float it” remains a right-click choice.</p>
+  </div>
+</div>

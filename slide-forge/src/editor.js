@@ -147,9 +147,10 @@
     url:"Link",poster:"Poster image",left:"Left side",right:"Right side",before:"Before side",after:"After side",
     ring:"Metric ring",mark:"Quote mark",rail:"Rail",text:"Text",desc:"Description"};
   var ITEM_LABEL={stats:"Stat",items:"Item",nodes:"Step",takeaways:"Takeaway",columns:"Column",rows:"Row",
-    cells:"Cell",bands:"Band",quotes:"Quote",tiles:"Tile",meta:"Detail",series:"Series"};
+    cells:"Cell",bands:"Band",quotes:"Quote",tiles:"Tile",meta:"Detail",series:"Series",sections:"Section"};
   var ARRAY_LABEL={stats:"Stat cards",items:"Items",nodes:"Pipeline steps",takeaways:"Takeaways",
-    columns:"Columns",rows:"Rows",cells:"Cells",bands:"Bands",quotes:"Quotes",tiles:"Tiles",meta:"Details"};
+    columns:"Columns",rows:"Rows",cells:"Cells",bands:"Bands",quotes:"Quotes",tiles:"Tiles",meta:"Details",
+    sections:"Sections"};
   function singular(k){ return ITEM_LABEL[k]||pretty(String(k).replace(/ies$/,'y').replace(/s$/,'')); }
   function arrayName(path){ var last=String(path).split('.').pop(); return ARRAY_LABEL[last]||pretty(last); }
   function fieldName(k){ return FIELD_LABEL[k]||pretty(k); }
@@ -162,6 +163,12 @@
      rendered */
   function plainText(s){ return String(s==null?'':s)
       .replace(/\[\[(.+?)\]\]/g,'$1').replace(/\*\*(.+?)\*\*/g,'$1').replace(/`(.+?)`/g,'$1'); }
+  /* the section type a `.sec-<type>` wrapper carries, or null. Read off the DOM
+     rather than the data so it works from anywhere a node is in hand. */
+  function secTypeOf(node){ if(!node||!node.classList) return null;
+    for(var i=0;i<node.classList.length;i++){ var c=node.classList[i];
+      if(c.indexOf('sec-')===0&&c!=='sec-row'&&c!=='sec-unknown') return c.slice(4); }
+    return null; }
   /* {icon,name} for any keyed element — the one place a key becomes English */
   function elName(node,key){
     if(node&&node.hasAttribute&&node.hasAttribute('data-free')){
@@ -171,6 +178,12 @@
         :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram'
         :node.classList.contains('embed')?'Embed':'Text';
       return {icon:'★',name:t}; }
+    /* a composed slide's sections name themselves after what they ARE ("Stat
+       row", "Title band"), not "Section 3" — the number is already in the
+       panel heading and the type is the thing you are looking for */
+    var st=secTypeOf(node);
+    if(st) return {icon:'▤',name:(SG.S&&SG.S[st]&&SG.S[st].label)||pretty(st)};
+    if(node&&node.classList&&node.classList.contains('sec-row')) return {icon:'▥',name:'Row of sections'};
     var seg=String(deNs(key)||'').split('.'), last=seg[seg.length-1];
     if(/^\d+$/.test(last)) return {icon:'№',name:singular(seg[seg.length-2])+' '+(+last+1)};
     if(node&&node.getAttribute&&node.getAttribute('data-arr'))
@@ -891,6 +904,150 @@
       remapItemOverrides(sc.host,sc.key,it.idx,-1); }); return true; };
 
   /* =====================================================================
+     PROMOTION — turn a classic slide into a composed one (composer plan §D).
+
+     The decomposition itself lives in sections.js (SG.TO_SECTIONS); the editor
+     only rewrites the slide and carries the user's styling across. Nothing here
+     runs on load — promotion is always an explicit action, so an untouched deck
+     never changes shape behind the user's back.
+     ===================================================================== */
+  /* Rewrite override keys through a {oldPrefix: newPrefix} map, LONGEST PREFIX
+     FIRST so `title` can never swallow `timeline`. A key that matches nothing is
+     left as-is; the orphan GC in commit() drops it if the promoted slide has no
+     such element (agenda's `rail` is the one case where that happens by
+     design). Whole thing is one mutation inside one F.do, so one undo restores
+     the classic slide exactly. */
+  function remapPrefixes(ov,keymap){
+    var pres=Object.keys(keymap).sort(function(a,b){ return b.length-a.length; }), out={};
+    Object.keys(ov).forEach(function(k){
+      for(var i=0;i<pres.length;i++){ var p=pres[i];
+        if(k===p||k.indexOf(p+'.')===0){ out[keymap[p]+k.slice(p.length)]=ov[k]; return; } }
+      out[k]=ov[k]; });
+    return out; }
+  F.canPromote=function(slideIdx){ var s=(SG.data.slides||[])[slideIdx];
+    return !!(s&&SG.canPromote&&SG.canPromote(s.layout)); };
+  /* the mutation on its own, so promote-then-insert can be ONE undo step */
+  function promoteMutate(sl){
+    var to=SG.TO_SECTIONS&&SG.TO_SECTIONS[sl.layout]; if(!to) return false;
+    var r=to(sl.content||{});
+    sl.layout='composed';
+    sl.content={sections:r.sections};
+    if(sl.overrides) sl.overrides=remapPrefixes(sl.overrides,r.keymap);
+    return true; }
+  F.promoteSlide=function(slideIdx){
+    var s=(SG.data.slides||[])[slideIdx]; if(!s) return false;
+    if(s.layout==='composed') return true;                  /* already there */
+    if(!(SG.TO_SECTIONS&&SG.TO_SECTIONS[s.layout])) return false;
+    clearSel();
+    F.do('convert to composed',function(data){ promoteMutate(data.slides[slideIdx]); });
+    return true; };
+
+  /* =====================================================================
+     SECTION VERBS — insert into the flow, reorder, remove, resize.
+
+     This is the answer to the founding complaint: a component added to a slide
+     should JOIN the slide, not float on top of it. Everything below works on
+     `content.sections`, and every one of them remaps override keys the same way
+     the item verbs do (`sections` is just another array path), so a section's
+     styling travels with the section.
+     ===================================================================== */
+  function sectionsOf(slideIdx){ var s=(SG.data.slides||[])[slideIdx];
+    return (s&&s.layout==='composed'&&s.content&&Array.isArray(s.content.sections))?s.content.sections:null; }
+  /* the TOP-LEVEL section a key belongs to (`sections.2.content.stats.0` -> 2).
+     A row's items are addressed one level deeper; moving WITHIN a row is a v2
+     verb, so ▲/▼ act on the whole row. */
+  function sectionIndexOf(key){ var m=/^sections\.(\d+)(?:$|\.)/.exec(deNs(key)||''); return m?+m[1]:-1; }
+  F.sectionIndexOf=sectionIndexOf;
+  /* lift one section's overrides out of the bag, keyed by their suffix, so a
+     move can put them back at the destination index after the shift */
+  function takeSectionOverrides(s,idx){ if(!s.overrides) return {};
+    var pre='sections.'+idx, out={};
+    Object.keys(s.overrides).forEach(function(k){
+      if(k===pre||k.indexOf(pre+'.')===0){ out[k.slice(pre.length)]=s.overrides[k]; delete s.overrides[k]; } });
+    return out; }
+  function putSectionOverrides(s,idx,bag){ var ks=Object.keys(bag); if(!ks.length) return;
+    s.overrides=s.overrides||{};
+    ks.forEach(function(sfx){ s.overrides['sections.'+idx+sfx]=bag[sfx]; }); }
+
+  /* Insert a section into the slide's flow.
+     composed slide     -> splice it in
+     decomposable class -> promote first, in the SAME undo step
+     anything else      -> false; the caller offers a floating object instead */
+  F.insertIntoFlow=function(slideIdx,secType,content,atIdx){
+    if(!(SG.S&&SG.S[secType])) return false;
+    var s=(SG.data.slides||[])[slideIdx]; if(!s) return false;
+    if(s.layout!=='composed'&&!(SG.TO_SECTIONS&&SG.TO_SECTIONS[s.layout])) return false;
+    var at=null;
+    clearSel();
+    F.do('insert section',function(data){ var sl=data.slides[slideIdx];
+      if(sl.layout!=='composed'&&!promoteMutate(sl)) return;
+      var secs=sl.content.sections=sl.content.sections||[];
+      at=(atIdx==null||atIdx<0||atIdx>secs.length)?secs.length:atIdx;
+      if(at<secs.length) remapItemOverrides(sl,'sections',at,+1);   /* later sections shift down */
+      secs.splice(at,0,{type:secType,content:clone(content||(SG.S[secType].defaults)||{})}); });
+    if(at!=null) reselectKey(slideIdx,'sections.'+at);
+    return true; };
+
+  F.moveSection=function(slideIdx,from,to){
+    var secs=sectionsOf(slideIdx); if(!secs) return false;
+    if(from<0||from>=secs.length) return false;
+    to=clamp(to,0,secs.length-1); if(to===from) return false;
+    clearSel();
+    F.do('move section',function(data){ var sl=data.slides[slideIdx], a=sl.content.sections;
+      var moved=takeSectionOverrides(sl,from);     /* out of the way BEFORE the shift */
+      var it=a.splice(from,1)[0];
+      remapItemOverrides(sl,'sections',from,-1);
+      a.splice(to,0,it);
+      remapItemOverrides(sl,'sections',to,+1);
+      putSectionOverrides(sl,to,moved); });
+    reselectKey(slideIdx,'sections.'+to);
+    return true; };
+
+  F.removeSection=function(slideIdx,idx){
+    var secs=sectionsOf(slideIdx); if(!secs||idx<0||idx>=secs.length) return false;
+    clearSel();
+    F.do('remove section',function(data){ var sl=data.slides[slideIdx];
+      sl.content.sections.splice(idx,1);
+      remapItemOverrides(sl,'sections',idx,-1); });      /* the removed one's overrides go with it */
+    return true; };
+
+  /* `size` is a flex weight, not a pixel height. 0/blank clears it back to
+     "take your natural height", which is why this deletes rather than stores 0. */
+  F.resizeSection=function(slideIdx,idx,size){
+    var secs=sectionsOf(slideIdx); if(!secs||!secs[idx]) return false;
+    F.do('resize section',function(data){ var e=data.slides[slideIdx].content.sections[idx];
+      var n=parseFloat(size);
+      if(!n||n<=0) delete e.size; else e.size=n; });
+    return true; };
+
+  /* ---- one-line self-dismissing status line ----------------------------
+     Used only where an action's OUTCOME differs from what was asked for (a
+     section insert that had to fall back to a floating object). Silence there
+     is how "it landed on top again" becomes a mystery instead of a message. */
+  F.toast=function(msg){
+    var t=D.getElementById('forge-toast');
+    if(!t){ t=el('div','forge-chrome'); t.id='forge-toast'; D.body.appendChild(t); }
+    t.textContent=msg; t.classList.add('on');
+    clearTimeout(F._toastT); F._toastT=setTimeout(function(){ t.classList.remove('on'); },5200); };
+
+  /* ---- two-choice confirm ----------------------------------------------
+     Deliberately NOT an OK/Cancel: both outcomes are legitimate here, so both
+     get a named button and neither is "cancel". */
+  F.confirmDo=function(title,body,okLabel,ok,altLabel,alt){
+    var o=el('div','forge-chrome'); o.id='forge-confirm';
+    var card=el('div','forge-struct-card'); card.style.width='min(460px,94vw)';
+    card.appendChild(el('h3',null,title));
+    card.appendChild(el('div','forge-hint',body));
+    var btns=el('div','forge-struct-btns');
+    function b(lab,cls,fn){ var x=el('button','forge-btn '+(cls||''),lab);
+      x.onclick=function(){ o.remove(); fn&&fn(); }; btns.appendChild(x); return x; }
+    if(altLabel) b(altLabel,'',alt);
+    var okb=b(okLabel,'primary',ok); okb.style.marginLeft='auto';
+    card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
+    okb.focus(); };
+
+  /* =====================================================================
      ALIGN & DISTRIBUTE — multi-select verbs, slide-space math.
      ===================================================================== */
   function shiftSel(x,dx,dy){ var d=elData(x); d.x=Math.round((d.x||0)+dx); d.y=Math.round((d.y||0)+dy);
@@ -1019,6 +1176,13 @@
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem('▲ Bring forward',null,function(){ F.zNudge(1); }));
     ctxMenu.appendChild(ctxItem('▼ Send back',null,function(){ F.zNudge(-1); }));
+    /* Convert to composed — offered on any decomposable classic slide. It is
+       what unlocks inserting a section into the flow, so it belongs on the
+       slide's own menu and not buried in a panel. */
+    if(!isFree&&F.canPromote(slideIdxOf(node))){
+      ctxMenu.appendChild(el('div','forge-ctx-sep'));
+      var pi=slideIdxOf(node);
+      ctxMenu.appendChild(ctxItem('⧉ Convert to composed',null,function(){ F.promoteSlide(pi); })); }
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem(isFree?'🗑 Delete object':'↺ Reset element','warn',function(){ F.deleteSel(); }));
     ctxMenu.classList.add('on');
@@ -1924,16 +2088,24 @@
     if(hasOv){ var rb=el('button','forge-btn warn','↺ Reset all element overrides');
       rb.onclick=function(){ F.do('reset overrides',function(data){ delete data.slides[i].overrides; }); };
       s.appendChild(rb); }
-    /* masters: store this hand-tuned slide as a reusable layout (insert menu lists it) */
+    /* masters: store this hand-tuned slide as a reusable layout — it shows up
+       in the insert menu AND, with a thumbnail, on the gallery's "From this
+       deck" tab. A master may now hold a composed slide; `base` records the
+       layout, so nothing about the shape needed to change. */
     var sv=el('button','forge-btn','★ Save as layout'); sv.style.marginTop='8px';
-    sv.onclick=function(){ var name=prompt('Name this layout'); if(!name) return;
-      F.do('save master',function(data){ data.masters=data.masters||{};
-        data.masters[name]={base:slide.layout,content:clone(slide.content||{}),
-          ambient:slide.ambient,theme:clone(slide.theme||null)||undefined,
-          overrides:clone(slide.overrides||null)||undefined,
-          freeObjects:clone(slide.freeObjects||null)||undefined};
-        Object.keys(data.masters[name]).forEach(function(k){ if(data.masters[name][k]==null) delete data.masters[name][k]; }); }); };
+    sv.onclick=function(){ var name=prompt('Name this layout'); if(name) F.saveMaster(name,i); };
     s.appendChild(sv); }
+  F.saveMaster=function(name,slideIdx){
+    if(!name) return false;
+    var i=slideIdx==null?curSlide():slideIdx, slide=(SG.data.slides||[])[i]; if(!slide) return false;
+    F.do('save master',function(data){ var sl=data.slides[i];
+      data.masters=data.masters||{};
+      data.masters[name]={base:sl.layout,content:clone(sl.content||{}),
+        ambient:sl.ambient,theme:clone(sl.theme||null)||undefined,
+        overrides:clone(sl.overrides||null)||undefined,
+        freeObjects:clone(sl.freeObjects||null)||undefined};
+      Object.keys(data.masters[name]).forEach(function(k){ if(data.masters[name][k]==null) delete data.masters[name][k]; }); });
+    return true; };
 
   function deckPanel(body){ deckSettings(body); themeSection(body); brandPanel(body); }
   /* deck-wide settings — rendered into the sidebar AND into the ⚙ Deck modal */
@@ -1964,7 +2136,26 @@
         SG.data.theme[tk]=v; F.renderLive(); }));
       lab.appendChild(el('span',null,tk)); grid.appendChild(lab); });
     s.appendChild(grid);
-    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.')); }
+    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.'));
+    personalityField(s); }
+
+  /* ---- personality: the second design axis, beside Theme on purpose ----
+     Colour and character are the two things you pick for a deck, so they are
+     one decision made in one place. */
+  var PERSONALITIES=[['— default —',''],['Editorial','editorial'],['Blueprint','blueprint']];
+  F.personalities=PERSONALITIES;
+  F.setPersonality=function(name){
+    if(name&&!PERSONALITIES.some(function(p){ return p[1]===name; })) return false;
+    F.do('personality',function(data){
+      if(name) data.personality=name; else delete data.personality; });
+    return true; };
+  function personalityField(s){
+    var cur=SG.data.personality||'';
+    s.appendChild(field('Personality',selectInput(PERSONALITIES.map(function(p){ return p[0]; }),
+      (PERSONALITIES.filter(function(p){ return p[1]===cur; })[0]||PERSONALITIES[0])[0],
+      function(v){ var hit=PERSONALITIES.filter(function(p){ return p[0]===v; })[0];
+        F.setPersonality(hit?hit[1]:''); })));
+    s.appendChild(el('div','forge-hint','The theme picks the <b>colours</b>; the personality picks the <b>character</b> — type scale, spacing, corners and the decorative motif. Two decks on the same palette still look designed rather than generated.')); }
 
   /* ---- Brand kit (v2 phase 4): colors -> accent slots, fonts, inlined logo ---- */
   var BRAND_FONTS=['','Sora','Unbounded','Exo 2','Archivo','Syne','Epilogue','Bricolage Grotesque',
@@ -2177,6 +2368,27 @@
       sf.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
         d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
       sf.appendChild(el('div','forge-hint','Swatches write theme tokens (var(--cyan)), so re-theming and brand kits keep working. "Exact color" pins one literal color.')); }
+
+    /* ---- section verbs (composed slides) ----
+       Offered whenever the selection sits inside a top-level section, at any
+       depth — you should be able to move the stat row you are looking at
+       without first hunting for its wrapper. */
+    var secIdx=(!isFree&&sectionsOf(sel.slideIdx))?sectionIndexOf(sel.key):-1;
+    if(secIdx>=0){ var nsec=sectionsOf(sel.slideIdx).length;
+      var sv=el('div','forge-verbs');
+      function sverb(lab,title,fn,cls,dis){ var b=el('button','forge-chip '+(cls||''),lab); b.title=title;
+        if(dis) b.disabled=true; b.onclick=fn; sv.appendChild(b); }
+      sverb('▲','Move this section up',function(){ F.moveSection(sel.slideIdx,secIdx,secIdx-1); },'',secIdx===0);
+      sverb('▼','Move this section down',function(){ F.moveSection(sel.slideIdx,secIdx,secIdx+1); },'',secIdx===nsec-1);
+      sverb('✕ Remove section','Remove this whole section from the slide',
+        function(){ F.removeSection(sel.slideIdx,secIdx); },'warn');
+      var sec4=sec(body,'Section '+(secIdx+1)+' of '+nsec);
+      sec4.appendChild(sv);
+      var wn=el('input'); wn.type='number'; wn.min='0'; wn.step='1';
+      wn.value=(sectionsOf(sel.slideIdx)[secIdx]||{}).size||'';
+      wn.onchange=function(){ F.resizeSection(sel.slideIdx,secIdx,wn.value); };
+      sec4.appendChild(fieldRow('Space weight',wn));
+      sec4.appendChild(el('div','forge-hint','A <b>weight</b>, not a height: a section with weight 2 takes twice the leftover room of one with weight 1. Blank = just as tall as its own content.')); }
 
     /* ---- list verbs for an item ---- */
     if(isItem){ var verbs=el('div','forge-verbs');
@@ -2424,19 +2636,53 @@
      carries the layout + content it was built from, so it keeps its fields
      and list verbs instead of freezing into markup.
      Entries whose key is missing (a layout changed) are skipped silently. */
+  /* [name, layout, pick, extra?, sectionType?]
+     The 5th field is what makes an entry INTEGRATED-insertable: when the target
+     slide is composed (or can be converted), the card adds a section of that
+     type to the slide's flow instead of dropping a floating copy on top.
+     Entries without one have no section counterpart yet and stay floating —
+     that is the honest state of the v1 vocabulary, not an oversight. */
   var GALLERY=[
-    ['Stat card','stat-grid','stats.0'], ['Agenda item','agenda','items.0'],
-    ['Timeline event','timeline','items.0'], ['Pipeline step','pipeline','nodes.0'],
-    ['Quote','quote','quote'], ['Big number','bignum','num'],
-    ['Comparison column','comparison','left'], ['Metric ring','metric-dash','ring'],
+    ['Stat card','stat-grid','stats.0',null,'stats'], ['Agenda item','agenda','items.0',null,'agenda'],
+    ['Timeline event','timeline','items.0',null,'timeline'], ['Pipeline step','pipeline','nodes.0'],
+    ['Quote','quote','quote',null,'quote'], ['Big number','bignum','num',null,'bignum'],
+    ['Comparison column','comparison','left',null,'comparison'], ['Metric ring','metric-dash','ring'],
     ['Metric tile','metric-dash','tiles.0'], ['Leaderboard row','leaderboard','rows.0'],
     ['Matrix cell','matrix','cells.0'], ['Stack band','stack','bands.0'],
     ['Takeaway card','closing','takeaways.0'], ['Code block','code','panel'],
-    ['Editorial column','editorial','columns.0'], ['Index card','index-mosaic','items.0'],
+    ['Editorial column','editorial','columns.0',null,'prose'], ['Index card','index-mosaic','items.0'],
     ['Quote card','quote-mosaic','quotes.0'], ['Hero row','hero-asym','rows.0'],
     ['Section number','divider','index'], ['Statement','manifesto','statement'],
-    ['Kicker','stat-grid','kicker',{kicker:'Section label'}], ['Title','stat-grid','title']
+    ['Kicker','stat-grid','kicker',{kicker:'Section label'},'titleband'],
+    ['Title','stat-grid','title',null,'titleband'],
+    ['Chart','chart','chart',null,'chart'], ['Table','table','table',null,'table'],
+    ['Bullets','media-split','text',null,'bullets'], ['Picture','media-split','image',null,'media']
   ];
+  /* The section content a gallery card inserts. A card that picks ONE item of a
+     list ("Stat card" -> stats.0) becomes a section holding one item, not a bare
+     card — so the list verbs work on it immediately. That is mildly surprising
+     ("I asked for one card, I got a row of one") but the alternative is a
+     parallel vocabulary of single-item section types. */
+  function sectionContentFor(g){
+    var type=g[4], def=clone((SG.S&&SG.S[type]&&SG.S[type].defaults)||{});
+    var m=/^([A-Za-z_][\w-]*)\.0$/.exec(g[2]);
+    if(m&&Array.isArray(def[m[1]])) def[m[1]]=def[m[1]].slice(0,1);
+    if(g[3]) Object.keys(g[3]).forEach(function(k){ if(k in def) def[k]=g[3][k]; });
+    return def; }
+  /* One click, three possible outcomes — and the user is told which they got. */
+  function insertFromGallery(g){
+    var i=curSlide(), type=g[4], s=(SG.data.slides||[])[i];
+    function floating(why){ F.insertElement(g[1],g[2],g[3],g[0]); if(why) F.toast(why); }
+    if(!type||!s) return floating(null);
+    if(s.layout==='composed'){ F.insertIntoFlow(i,type,sectionContentFor(g)); return; }
+    if(F.canPromote(i)){
+      F.confirmDo('Add “'+g[0]+'” to this slide’s layout?',
+        'It will take its place in the arrangement — spaced, sized and themed like the rest of the slide — '+
+        'instead of floating on top. This converts the slide to a composed slide; one undo puts it back.',
+        'Add to the layout',function(){ F.insertIntoFlow(i,type,sectionContentFor(g)); },
+        'Add floating on top',function(){ floating(null); });
+      return; }
+    floating('Added as a floating object — a “'+(s.layout||'')+'” slide has no flow to join.'); }
   /* render one layout's DEFAULTS into a detached, styled section and hand back
      the element carrying `key`. The section is attached to the deck (hidden)
      so the deck's CSS cascade applies and the node has real measured size. */
@@ -2486,16 +2732,162 @@
     var sc=deckEl().querySelectorAll('.slide')[i], n=sc&&sc.querySelector('[data-free="'+id+'"]');
     if(n) selectNode(n,false);
     return id; };
+  /* ---- whole-slide presets (composer plan §F) ---------------------------
+     A preset is just a slide object. Most are `composed`, because the point is
+     to show arrangements the 29 fixed layouts cannot make — the classics are
+     already one click away in the layout menu. Content is real placeholder
+     text, not lorem: what you insert should read like a slide you could keep.
+     "From this deck" is the existing `data.masters`, unchanged on disk. */
+  var PRESETS=[
+    {name:'Title + stat row',desc:'A headline over the numbers that back it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{kicker:'Where we are',title:'The year in three numbers'}},
+       {type:'stats',size:1,content:{stats:[
+         {value:'84%',label:'Something worth measuring'},
+         {value:'3.1x',label:'Something worth measuring'},
+         {value:'12',label:'Something worth measuring'}]}} ]}}},
+    {name:'Chart + takeaway',desc:'A chart with the conclusion under it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'What the data says'}},
+       {type:'chart',size:3,content:{type:'bar',note:'by quarter',
+         data:{labels:['Q1','Q2','Q3','Q4'],series:[{name:'Series',values:[12,19,17,26]}]}}},
+       {type:'stats',content:{stats:[{value:'+53%',label:'Year on year'}]}} ]}}},
+    {name:'Picture beside points',desc:'Image one side, the argument the other',
+     slide:{layout:'composed',content:{sections:[
+       {type:'row',size:1,items:[
+         {type:'media',size:1,content:{image:''}},
+         {type:'bullets',size:1,content:{kicker:'The idea',title:'What you are looking at',
+           items:['First point','Second point','Third point']}} ]} ]}}},
+    {name:'Stats beside a quote',desc:'The numbers, and someone saying what they mean',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Evidence and opinion'}},
+       {type:'row',size:1,items:[
+         {type:'stats',size:2,content:{stats:[
+           {value:'84%',label:'Something worth measuring'},
+           {value:'3.1x',label:'Something worth measuring'}]}},
+         {type:'quote',size:1,content:{quote:'A line worth putting on a slide.',by:'Attribution'}} ]} ]}}},
+    {name:'Two charts',desc:'Side by side, same scale, one story',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Before and after'}},
+       {type:'row',size:1,items:[
+         {type:'chart',size:1,content:{type:'bar',title:'Before',
+           data:{labels:['A','B','C'],series:[{name:'S',values:[8,5,3]}]}}},
+         {type:'chart',size:1,content:{type:'bar',title:'After',
+           data:{labels:['A','B','C'],series:[{name:'S',values:[4,9,14]}]}}} ]} ]}}},
+    {name:'Agenda beside a big number',desc:'What we will cover, and the one figure behind it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{kicker:'Today',title:'What we will cover'}},
+       {type:'row',size:1,items:[
+         {type:'bignum',size:1,content:{value:'3',subtitle:'things that matter'}},
+         {type:'agenda',size:2,content:{items:[
+           {title:'First thing',desc:'One line about it'},
+           {title:'Second thing',desc:'One line about it'},
+           {title:'Third thing',desc:'One line about it'}]}} ]} ]}}},
+    {name:'Timeline over a comparison',desc:'How we got here, then the choice ahead',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Where we have been, where we go'}},
+       {type:'timeline',size:1,content:{items:[
+         {year:'2024',title:'Then'},{year:'2025',title:'Since'},{year:'2026',title:'Now',now:true}]}},
+       {type:'comparison',size:2,content:{
+         left:{tag:'Option A',title:'This way',items:['Point one','Point two']},
+         right:{tag:'Option B',title:'That way',items:['Point one','Point two']},badge:'VS'}} ]}}},
+    {name:'Table with a lead',desc:'A paragraph of context above the detail',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'The detail'}},
+       {type:'prose',content:{lead:'One sentence saying what the table below is for.',columns:[]}},
+       {type:'table',size:1,content:{columns:['','Before','After'],
+         rows:[['First row','–','–'],['Second row','–','–'],['Third row','–','–']],
+         options:{highlightCol:2}}} ]}}},
+    {name:'Quote, full slide',desc:'One line, nothing else',badge:'classic',
+     slide:{layout:'quote',content:{quote:'A line worth putting on a slide.',by:'Attribution'}}},
+    {name:'Section divider',desc:'A numbered break between chapters',badge:'classic',
+     slide:{layout:'divider',content:{index:'02',title:'Next section',subtitle:''}}}
+  ];
+  F.presets=PRESETS;
+  F.insertPreset=function(preset){ if(!preset||!preset.slide) return false;
+    var i=curSlide();
+    /* deep clone, always: mutating an inserted slide must never reach back and
+       edit the built-in preset for the rest of the session */
+    F.do('insert slide preset',function(data){ data.slides.splice(i+1,0,clone(preset.slide)); });
+    location.hash='#'+(i+2); F.buildNav(); F.buildInspect();
+    return true; };
+
+  /* A WHOLE slide rendered into the off-screen ghost, for the Slides tab's
+     miniatures. Same technique as galleryNode one level up: real render, real
+     CSS cascade, real measurements — so a preview is the deck's own theme and
+     personality rather than a drawing of them. */
+  function gallerySlideThumb(slide){
+    var lay=slide.layout||'raw', fn=SG.layouts[lay]; if(!fn) return null;
+    var secCls=(SG.SECTION_LAYOUTS&&SG.SECTION_LAYOUTS[lay])?(' '+lay):'';
+    var host=el('section','slide active'+secCls+' lyt-'+lay+' forge-ghost');
+    var out; try{ out=fn(clone(slide.content||{}),{index:0,total:1}); }catch(e){ return null; }
+    if(out&&!Array.isArray(out)&&out.raw!=null) host.insertAdjacentHTML('beforeend',out.raw);
+    else (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      host.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
+    deckEl().appendChild(host);
+    return host; }
+
   F.insertGallery=function(){ var old=D.getElementById('forge-gallery'); if(old){ old.remove(); return; }
     var o=el('div','forge-chrome'); o.id='forge-gallery';
     var card=el('div','forge-struct-card'); card.style.width='min(680px,94vw)';
     var head=el('div','forge-struct-head');
-    head.appendChild(el('h3',null,'Insert an element'));
+    head.appendChild(el('h3',null,'Insert'));
     var q=el('input'); q.type='text'; q.className='forge-gal-search';
     q.placeholder='Search elements… (e.g. quote, timeline, stat)';
     head.appendChild(q); card.appendChild(head);
-    var grid=el('div','forge-gal-grid'); card.appendChild(grid);
-    var made=[];
+    /* --- tabs: pieces of a slide | whole slides | this deck's own --- */
+    var tabs=el('div','forge-gal-tabs'), panes={};
+    var TABS=[['elements','Elements'],['slides','Slides'],['deck','From this deck']];
+    var made=[], slideMade=[], builtSlides=false, builtDeck=false;
+    function show(which){
+      TABS.forEach(function(t){ panes[t[0]].style.display=(t[0]===which)?'':'none';
+        tabs.children[TABS.indexOf(t)].classList.toggle('on',t[0]===which); });
+      q.style.visibility=(which==='elements')?'':'hidden';
+      if(which==='slides'&&!builtSlides){ builtSlides=true; buildSlides(); }
+      if(which==='deck'&&!builtDeck){ builtDeck=true; buildDeck(); } }
+    TABS.forEach(function(t){ var b=el('button','forge-gal-tab',t[1]);
+      b.onclick=function(){ show(t[0]); }; tabs.appendChild(b);
+      panes[t[0]]=el('div','forge-gal-pane'); });
+    card.appendChild(tabs);
+    var grid=el('div','forge-gal-grid'); panes.elements.appendChild(grid);
+    TABS.forEach(function(t){ card.appendChild(panes[t[0]]); });
+    /* Slide miniatures are built ON TAB OPEN, never at editor boot: each one is
+       a full slide render, and nobody should pay for that to click ⊞. */
+    function slideCard(host,name,desc,badge,onclick){
+      var c=el('div','forge-gal-card whole'); c.onclick=onclick;
+      var prev=el('div','forge-gal-prev whole');
+      var inner=el('div','forge-gal-inner');
+      var cl=host.cloneNode(true); cl.classList.remove('forge-ghost');
+      cl.style.cssText='position:relative;width:1280px;height:720px;left:0;top:0;opacity:1;visibility:visible';
+      inner.appendChild(cl); prev.appendChild(inner); c.appendChild(prev);
+      var nm=el('div','forge-gal-nm'); nm.textContent=name; c.appendChild(nm);
+      var fr=el('div','forge-gal-from'); fr.textContent=desc||''; c.appendChild(fr);
+      if(badge) c.appendChild(el('div','forge-gal-tag',badge));
+      slideMade.push({inner:inner,prev:prev,host:host});
+      return c; }
+    function scaleSlides(){ slideMade.forEach(function(m){
+        var pw=m.prev.clientWidth||150, ph=m.prev.clientHeight||84;
+        var s=Math.min(pw/1280,ph/720);
+        m.inner.style.width='1280px'; m.inner.style.height='720px';
+        m.inner.style.transform='translate(-50%,-50%) scale('+s.toFixed(4)+')';
+        m.host.remove(); });                       /* ghosts must NEVER survive a render */
+      slideMade.length=0; }
+    function buildSlides(){ var g=el('div','forge-gal-grid whole');
+      PRESETS.forEach(function(p){ var host=gallerySlideThumb(p.slide); if(!host) return;
+        g.appendChild(slideCard(host,p.name,p.desc,p.badge||'composed',
+          function(){ o.remove(); F.insertPreset(p); })); });
+      panes.slides.appendChild(g); scaleSlides(); }
+    function buildDeck(){ var masters=SG.data.masters||{}, names=Object.keys(masters);
+      if(!names.length){ panes.deck.appendChild(el('div','forge-hint',
+        'Nothing saved yet. Tune a slide the way you want it, then press <b>★ Save as layout</b> in the Slide panel — it will show up here, thumbnail and all, ready to reuse.')); return; }
+      var g=el('div','forge-gal-grid whole');
+      names.forEach(function(nm){ var m=masters[nm];
+        var sl={layout:m.base||'divider',content:m.content||{},overrides:m.overrides,freeObjects:m.freeObjects};
+        var host=gallerySlideThumb(sl); if(!host) return;
+        g.appendChild(slideCard(host,nm,'saved from this deck','★ mine',
+          function(){ o.remove(); F.addSlide(null,nm); })); });
+      panes.deck.appendChild(g); scaleSlides(); }
     GALLERY.forEach(function(g){ var got=galleryNode(g[1],g[2],g[3]); if(!got) return;
       var c=el('div','forge-gal-card'); c.dataset.q=(g[0]+' '+g[1]).toLowerCase();
       var prev=el('div','forge-gal-prev');
@@ -2503,10 +2895,14 @@
       prev.appendChild(inner); c.appendChild(prev);
       var nm=el('div','forge-gal-nm'); nm.textContent=g[0]; c.appendChild(nm);
       var fr=el('div','forge-gal-from'); fr.textContent='from '+g[1]; c.appendChild(fr);
-      c.onclick=function(){ o.remove(); F.insertElement(g[1],g[2],g[3],g[0]); };
+      if(g[4]){ var tag=el('div','forge-gal-tag','joins the layout');
+        tag.title='On a composed slide (or one that can be converted) this takes its place in the arrangement instead of floating on top.';
+        c.appendChild(tag); }
+      c.onclick=function(){ o.remove(); insertFromGallery(g); };
       grid.appendChild(c);
       made.push({node:got.node,host:got.host,inner:inner,prev:prev}); });
-    card.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. It arrives themed and keeps its own fields — drag, resize, restyle, edit its text or add items to it exactly as if it had come with the layout.'));
+    panes.elements.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. On a composed slide the tagged ones take their place in the arrangement; the rest arrive as floating objects. Either way they keep their own fields — drag, resize, restyle, edit their text or add items exactly as if they had come with the layout.'));
+    panes.slides.appendChild(el('div','forge-hint','Whole slide designs, previewed in <b>this deck’s</b> theme and personality. Most are arrangements the fixed layouts cannot make. Inserting one adds a new slide after the current one, with placeholder text to replace.'));
     var btns=el('div','forge-struct-btns');
     var close=el('button','forge-btn','Close'); close.style.marginLeft='auto';
     close.onclick=function(){ o.remove(); }; btns.appendChild(close);
@@ -2523,7 +2919,14 @@
       [].slice.call(grid.children).forEach(function(c){
         c.style.display=(!v||c.dataset.q.indexOf(v)>=0)?'':'none'; }); };
     o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
-    q.focus(); };
+    /* whatever happens, no ghost may outlive this modal: a stray .forge-ghost
+       inside #deck shifts every .slide index and quietly breaks navigation */
+    o.addEventListener('remove',function(){});
+    var mo=new W.MutationObserver(function(){ if(!o.isConnected){
+      [].slice.call(deckEl().querySelectorAll('.forge-ghost')).forEach(function(n){ n.remove(); });
+      mo.disconnect(); } });
+    mo.observe(D.body,{childList:true});
+    show('elements'); q.focus(); };
 
   /* =====================================================================
      SAVE — download a fresh self-contained .html with edits baked in.

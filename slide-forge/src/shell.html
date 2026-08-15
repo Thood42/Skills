@@ -59,6 +59,10 @@
 <style>
 %ENGINE_CSS%
 </style>
+<!-- deck personality: the type/space/shape/motif axis, layered over the theme's colour -->
+<style id="deck-personality">
+%PERSONALITY_CSS%
+</style>
 <!-- chart renderer: data -> theme-token SVG (v2 phase 3) -->
 <script id="deck-charts">
 %CHARTS_JS%
@@ -66,6 +70,10 @@
 <!-- deck engine: data-driven rendering, theming, export/import -->
 <script id="deck-engine">
 %ENGINE_JS%
+</script>
+<!-- section registry: the composition vocabulary + the `composed` layout -->
+<script id="deck-sections">
+%SECTIONS_JS%
 </script>
 <style id="forge-css">
 %EDITOR_CSS%

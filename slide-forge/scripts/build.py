@@ -26,8 +26,10 @@ PARTS = {                       # marker -> src file
     '%ANIM_CSS%':    'anim.css',
     '%ANIM_JS%':     'anim.js',
     '%ENGINE_CSS%':  'engine.css',
+    '%PERSONALITY_CSS%': 'personality.css',
     '%CHARTS_JS%':   'charts.js',
     '%ENGINE_JS%':   'engine.js',
+    '%SECTIONS_JS%': 'sections.js',
     '%EDITOR_CSS%':  'editor.css',
     '%EDITOR_JS%':   'editor.js',
     '%MEDIA_JS%':    'media.js',
@@ -59,8 +61,8 @@ def main():
     # stamp is hash-only so rebuilds of unchanged src are byte-identical (no date noise)
     html = html.replace('%BUILD%', 'v3 build %s' % h)
 
-    leftover = [m for m in ('%SG_JS%','%DECK_CSS%','%ANIM_CSS%','%ANIM_JS%','%ENGINE_CSS%','%CHARTS_JS%',
-                            '%ENGINE_JS%','%EDITOR_CSS%','%EDITOR_JS%','%MEDIA_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
+    leftover = [m for m in ('%SG_JS%','%DECK_CSS%','%ANIM_CSS%','%ANIM_JS%','%ENGINE_CSS%','%PERSONALITY_CSS%','%CHARTS_JS%',
+                            '%ENGINE_JS%','%SECTIONS_JS%','%EDITOR_CSS%','%EDITOR_JS%','%MEDIA_JS%','%DECK_DATA%','%DECK_ASSETS%','%TITLE%','%BUILD%')
                 if m in html]
     if leftover:
         sys.exit('unresolved markers: %s' % leftover)

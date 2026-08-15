@@ -58,7 +58,7 @@ body{
 .slide::after{
   content:""; position:absolute; inset:0; pointer-events:none;
   background-image:radial-gradient(var(--dot, rgba(124,140,255,.10)) 1px, transparent 1.4px);
-  background-size:34px 34px; opacity:.30; mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent); z-index:1;
+  background-size:34px 34px; opacity:var(--p-dot-op,.30); mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent); z-index:1;
 }
 /* content sits above decorative layers; chrome sits above content */
 .slide > *{position:relative; z-index:2}
@@ -68,8 +68,8 @@ body{
 
 /* ---- shared chrome (kicker + pager + progress) ---- */
 .kicker{
-  font-family:var(--font-mono); font-size:13px; letter-spacing:.34em;
-  text-transform:uppercase; color:var(--cyan);
+  font-family:var(--font-mono); font-size:13px; letter-spacing:var(--p-kick-track,.34em);
+  text-transform:var(--p-kick-case,uppercase); color:var(--cyan);
   display:inline-flex; align-items:center; gap:12px;
 }
 .kicker::before{content:""; width:26px; height:2px; background:linear-gradient(90deg,var(--cyan),transparent)}
@@ -83,8 +83,8 @@ body{
 
 h1,h2,h3{font-family:var(--font-display); font-weight:700; margin:0; line-height:1.04}
 p{margin:0; color:var(--muted)}
-.title{font-size:62px; letter-spacing:-.02em}
-.subtitle{font-size:21px; line-height:1.5; color:var(--muted); max-width:62ch}
+.title{font-size:var(--p-title,62px); letter-spacing:var(--p-track,-.02em)}
+.subtitle{font-size:var(--p-sub,21px); line-height:1.5; color:var(--muted); max-width:62ch}
 .eyebrow-row{display:flex; align-items:center; gap:18px; margin-bottom:30px}
 
 /* glow text helper */
@@ -95,6 +95,14 @@ p{margin:0; color:var(--muted)}
   border-radius:5px; background:color-mix(in srgb, var(--ink) 12%, transparent);
   border:1px solid color-mix(in srgb, var(--ink) 14%, transparent)}
 
+/* An orb's SHAPE is not motion. These four declarations must apply whatever the
+   user's motion preference is — only the drift belongs in the media query below.
+   They used to live inside it, so a reduced-motion visitor got orbs with no
+   `position:absolute`: three in-flow blocks at the top of every cover/closing
+   slide, pushing the centred content down onto the absolutely-pinned .meta strip.
+   Invisible in normal-motion testing, which is exactly why it survived so long. */
+.orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:var(--p-orb-op,.5)}
+
 /* =====================================================================
    AMBIENT ANIMATIONS  (one per slide; calm + slow; disabled if user
    prefers reduced motion)
@@ -102,7 +110,7 @@ p{margin:0; color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){
   /* 1 cover: drifting orbs */
   @keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
-  .orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:.5; animation:drift 16s ease-in-out infinite}
+  .orb{animation:drift 16s ease-in-out infinite}
   /* 2 agenda: rail sheen */
   @keyframes sheen{0%{background-position:0 -200px}100%{background-position:0 400px}}
   /* 3 divider: breathing glow */
@@ -148,7 +156,7 @@ p{margin:0; color:var(--muted)}
 
 /* 1 COVER */
 .cover{justify-content:center}
-.cover .title{font-size:96px; font-weight:800; letter-spacing:-.03em; line-height:.98}
+.cover .title{font-size:var(--p-cover-title,96px); font-weight:800; letter-spacing:-.03em; line-height:.98}
 .cover .title .glow{display:block}
 .cover .subtitle{margin-top:26px; font-size:23px}
 .cover .meta{position:absolute; left:88px; bottom:56px; display:flex; gap:26px;
@@ -180,7 +188,7 @@ p{margin:0; color:var(--muted)}
 
 /* 4 STAT GRID */
 .stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px; margin-top:42px; flex:1}
-.stat{background:var(--panel); border:1px solid var(--brd); border-radius:16px;
+.stat{background:var(--panel); border:1px solid var(--brd); border-radius:var(--p-radius,16px);
   padding:30px 32px; display:flex; flex-direction:column; justify-content:center; position:relative; overflow:hidden}
 .stat::before{content:""; position:absolute; left:0; top:0; width:4px; height:100%;
   background:linear-gradient(180deg,var(--cyan),var(--indigo))}
@@ -188,11 +196,15 @@ p{margin:0; color:var(--muted)}
 .stat .num small{font-size:26px; color:var(--cyan); font-weight:700}
 .stat .lbl{margin-top:8px; font-size:16px; color:var(--muted); line-height:1.45}
 
-/* 5 BIG NUMBER */
-.bignum{justify-content:center; align-items:flex-start; text-align:left}
+/* 5 BIG NUMBER — DUAL-SCOPED (see QUOTE below): `.bignum` is the classic
+   <section>, `.sec-bignum` the same content as one section of a composed slide.
+   The section copy shrinks the hero, since 118px is sized for a whole slide. */
+.bignum,.sec-bignum{justify-content:center; align-items:flex-start; text-align:left}
 .hero-num{font-family:var(--font-mono); font-weight:700; font-size:118px; letter-spacing:-.03em;
   color:var(--cyan); line-height:1; margin:14px 0 0}
-.bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .hero-num{font-size:76px}
+.bignum .subtitle,.sec-bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .subtitle{margin-top:16px; font-size:18px}
 
 /* 6 CHART */
 .chart-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px}
@@ -202,8 +214,8 @@ p{margin:0; color:var(--muted)}
 /* 7 COMPARISON */
 .cmp{display:grid; grid-template-columns:1fr 64px 1fr; gap:0; flex:1; margin-top:40px}
 .cmp-col{padding:34px 36px; background:var(--panel); border:1px solid var(--brd)}
-.cmp-col:first-child{border-radius:16px 0 0 16px}
-.cmp-col:last-child{border-radius:0 16px 16px 0}
+.cmp-col:first-child{border-radius:var(--p-radius,16px) 0 0 var(--p-radius,16px)}
+.cmp-col:last-child{border-radius:0 var(--p-radius,16px) var(--p-radius,16px) 0}
 .cmp-col h3{font-size:30px; margin-bottom:6px}
 .cmp-col .tag{font-family:var(--font-mono); font-size:12px; letter-spacing:.2em; text-transform:uppercase}
 .cmp-col.sup .tag{color:var(--cyan)} .cmp-col.uns .tag{color:var(--mint)}
@@ -216,15 +228,24 @@ p{margin:0; color:var(--muted)}
   width:54px; height:54px; border-radius:50%; background:var(--bg-2); border:1px solid var(--brd-2);
   display:grid; place-items:center; font-family:var(--font-mono); font-size:14px; letter-spacing:.1em; color:var(--ink); z-index:2}
 
-/* 8 QUOTE */
-.quote{justify-content:center}
+/* 8 QUOTE — DUAL-SCOPED. `.quote` is the classic layout's <section> (one of the
+   SECTION_LAYOUTS whose CSS targets the section itself); `.sec-quote` is the same
+   content rendered as one section of a composed slide. Every rule below has to
+   match both or the composed copy renders unstyled (composer plan, risk #1).
+   The section copy is smaller and its oversized quote mark is reined in, because
+   it lives in a fraction of a slide rather than the whole of one. */
+.quote,.sec-quote{justify-content:center}
+.sec-quote{overflow:hidden}
 .quote-mark{position:absolute; top:40px; left:64px; font-family:var(--font-display);
   font-size:380px; line-height:1; color:var(--indigo); opacity:.12; pointer-events:none}
-.quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
+.sec-quote .quote-mark{top:-52px; left:-8px; font-size:200px}
+.quote blockquote,.sec-quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
   font-size:52px; line-height:1.22; letter-spacing:-.015em; max-width:20ch; position:relative}
-.quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
-.quote .by .line{width:48px; height:2px; background:var(--cyan)}
-.quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
+.sec-quote blockquote{font-size:34px; max-width:26ch}
+.quote .by,.sec-quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
+.sec-quote .by{margin-top:22px}
+.quote .by .line,.sec-quote .by .line{width:48px; height:2px; background:var(--cyan)}
+.quote .by span,.sec-quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
 
 /* 9 CODE */
 .code-stage{flex:1; margin-top:36px; display:flex; flex-direction:column; min-height:0}
@@ -280,7 +301,7 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
 .closing{justify-content:center}
 .closing .title{font-size:72px; font-weight:800}
 .take{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:46px}
-.take div{background:var(--panel); border:1px solid var(--brd); border-radius:14px; padding:24px 26px}
+.take div{background:var(--panel); border:1px solid var(--brd); border-radius:var(--p-radius,14px); padding:24px 26px}
 .take .n{font-family:var(--font-mono); color:var(--cyan); font-size:14px; letter-spacing:.2em}
 .take h3{font-size:19px; font-weight:600; margin:12px 0 8px}
 .take p{font-size:14px; line-height:1.5}

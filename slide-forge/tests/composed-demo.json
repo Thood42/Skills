@@ -1,0 +1,133 @@
+{
+  "meta": {"title": "Composed — section vocabulary demo", "seed": 7, "schemaVersion": 3},
+  "slides": [
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"kicker": "Composed slide", "title": "A shape no classic layout makes"}},
+          {"type": "row", "size": 1, "items": [
+            {"type": "stats", "size": 2, "content": {"stats": [
+              {"count": 84, "unit": "%", "label": "Rebuilt without an escape hatch"},
+              {"value": "3x", "label": "Arrangements per layout"},
+              {"count": 12, "label": "Section types in the vocabulary"},
+              {"value": "1", "unit": " file", "label": "Still ships as one .html"}
+            ]}},
+            {"type": "quote", "size": 1, "content": {"quote": "It looks designed-in, not pasted on.", "by": "The point of the exercise"}}
+          ]}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"kicker": "Chart + stat row", "title": "Two bodies, one slide"}},
+          {"type": "chart", "size": 3, "content": {
+            "type": "bar",
+            "note": "quarterly",
+            "data": {"labels": ["Q1", "Q2", "Q3", "Q4"], "series": [{"name": "Revenue", "values": [12, 19, 17, 26]}]}
+          }},
+          {"type": "stats", "size": 1, "content": {"stats": [
+            {"value": "+53%", "label": "Year on year"},
+            {"value": "26", "unit": "M", "label": "Q4 exit"}
+          ]}}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "row", "size": 1, "items": [
+            {"type": "media", "size": 1, "content": {"image": "missing-on-purpose"}},
+            {"type": "bullets", "size": 1, "content": {
+              "kicker": "media + bullets",
+              "title": "media-split, taken apart",
+              "body": "The same two builders the classic layout uses — now separable, so the picture can sit anywhere.",
+              "items": ["Picture is its own section", "Text is its own section", "A row puts them side by side"]
+            }}
+          ]}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"kicker": "Everything else", "title": "The rest of the vocabulary"}},
+          {"type": "row", "size": 1, "items": [
+            {"type": "bignum", "size": 1, "content": {"count": 12, "subtitle": "section types"}},
+            {"type": "agenda", "size": 2, "content": {"items": [
+              {"title": "Agenda as a section", "desc": "Numbered, two columns"},
+              {"title": "Not a whole slide", "desc": "Just a band of one"}
+            ]}}
+          ]}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"title": "Timeline, table, comparison, prose"}},
+          {"type": "timeline", "size": 1, "content": {"items": [
+            {"year": "2024", "title": "29 fixed layouts"},
+            {"year": "2026", "title": "Composed", "now": true}
+          ]}},
+          {"type": "row", "size": 2, "items": [
+            {"type": "table", "size": 1, "content": {
+              "columns": ["", "Before", "After"],
+              "rows": [["Shapes", "29", "any"], ["Escape hatches", "often", "rare"]],
+              "options": {"highlightCol": 2}
+            }},
+            {"type": "comparison", "size": 1, "content": {
+              "left": {"tag": "Classic", "title": "One mold", "items": ["Pick the closest", "Force the fit"]},
+              "right": {"tag": "Composed", "title": "Your shape", "items": ["Pick the pieces", "Arrange them"]},
+              "badge": "VS"
+            }}
+          ]}
+        ]
+      }
+    },
+    {
+      "layout": "composed",
+      "content": {
+        "sections": [
+          {"type": "titleband", "content": {"kicker": "prose", "title": "Editorial columns as a section"}},
+          {"type": "prose", "size": 1, "content": {
+            "lead": "A section is the classic layout's own body, extracted and given a key prefix.",
+            "columns": [
+              {"head": "One implementation", "body": "The classic layout and the composed slide call the same builder."},
+              {"head": "Two callers", "body": "base='' keeps classic decks byte-identical; the composer passes a path."},
+              {"head": "No new identity", "body": "Keys stay literal content paths, so every editor verb still works."}
+            ]
+          }}
+        ]
+      }
+    },
+    {"layout": "stat-grid", "content": {"kicker": "Parity canary", "title": "The classic stat-grid, unchanged", "stats": [
+      {"count": 84, "unit": "%", "label": "Rebuilt without an escape hatch"},
+      {"value": "3x", "label": "Arrangements per layout"},
+      {"count": 12, "label": "Section types in the vocabulary"},
+      {"value": "1", "unit": " file", "label": "Still ships as one .html"}
+    ]}},
+    {"layout": "quote", "content": {"quote": "It looks designed-in, not pasted on.", "by": "The classic quote, unchanged"}},
+    {"layout": "bignum", "content": {"kicker": "Classic", "count": 12, "subtitle": "The classic bignum, unchanged"}},
+    {"layout": "media-split", "content": {
+      "kicker": "Classic", "title": "The classic media-split, unchanged",
+      "body": "Still one grid with the picture on the left.",
+      "items": ["Same builders", "Same wrapper", "Same output"],
+      "image": "missing-on-purpose"
+    }},
+    {"layout": "editorial", "content": {"kicker": "Classic", "lead": "The classic editorial, unchanged.", "columns": [
+      {"head": "First", "body": "A short paragraph."},
+      {"head": "Second", "body": "A short paragraph."},
+      {"head": "Third", "body": "A short paragraph."}
+    ]}},
+    {"layout": "agenda", "content": {"kicker": "Classic", "title": "The classic agenda, unchanged", "items": [
+      {"title": "Rail on the left", "desc": "Slide chrome, not part of the section"},
+      {"title": "Two columns", "desc": "Numbered"}
+    ]}}
+  ]
+}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 8e0e0c4581 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 67ce8cbf23 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -160,7 +160,7 @@ body{
 .slide::after{
   content:""; position:absolute; inset:0; pointer-events:none;
   background-image:radial-gradient(var(--dot, rgba(124,140,255,.10)) 1px, transparent 1.4px);
-  background-size:34px 34px; opacity:.30; mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent); z-index:1;
+  background-size:34px 34px; opacity:var(--p-dot-op,.30); mask-image:linear-gradient(transparent,#000 30%,#000 75%,transparent); z-index:1;
 }
 /* content sits above decorative layers; chrome sits above content */
 .slide > *{position:relative; z-index:2}
@@ -170,8 +170,8 @@ body{
 
 /* ---- shared chrome (kicker + pager + progress) ---- */
 .kicker{
-  font-family:var(--font-mono); font-size:13px; letter-spacing:.34em;
-  text-transform:uppercase; color:var(--cyan);
+  font-family:var(--font-mono); font-size:13px; letter-spacing:var(--p-kick-track,.34em);
+  text-transform:var(--p-kick-case,uppercase); color:var(--cyan);
   display:inline-flex; align-items:center; gap:12px;
 }
 .kicker::before{content:""; width:26px; height:2px; background:linear-gradient(90deg,var(--cyan),transparent)}
@@ -185,8 +185,8 @@ body{
 
 h1,h2,h3{font-family:var(--font-display); font-weight:700; margin:0; line-height:1.04}
 p{margin:0; color:var(--muted)}
-.title{font-size:62px; letter-spacing:-.02em}
-.subtitle{font-size:21px; line-height:1.5; color:var(--muted); max-width:62ch}
+.title{font-size:var(--p-title,62px); letter-spacing:var(--p-track,-.02em)}
+.subtitle{font-size:var(--p-sub,21px); line-height:1.5; color:var(--muted); max-width:62ch}
 .eyebrow-row{display:flex; align-items:center; gap:18px; margin-bottom:30px}
 
 /* glow text helper */
@@ -197,6 +197,14 @@ p{margin:0; color:var(--muted)}
   border-radius:5px; background:color-mix(in srgb, var(--ink) 12%, transparent);
   border:1px solid color-mix(in srgb, var(--ink) 14%, transparent)}
 
+/* An orb's SHAPE is not motion. These four declarations must apply whatever the
+   user's motion preference is — only the drift belongs in the media query below.
+   They used to live inside it, so a reduced-motion visitor got orbs with no
+   `position:absolute`: three in-flow blocks at the top of every cover/closing
+   slide, pushing the centred content down onto the absolutely-pinned .meta strip.
+   Invisible in normal-motion testing, which is exactly why it survived so long. */
+.orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:var(--p-orb-op,.5)}
+
 /* =====================================================================
    AMBIENT ANIMATIONS  (one per slide; calm + slow; disabled if user
    prefers reduced motion)
@@ -204,7 +212,7 @@ p{margin:0; color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){
   /* 1 cover: drifting orbs */
   @keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
-  .orb{position:absolute; border-radius:50%; filter:blur(60px); opacity:.5; animation:drift 16s ease-in-out infinite}
+  .orb{animation:drift 16s ease-in-out infinite}
   /* 2 agenda: rail sheen */
   @keyframes sheen{0%{background-position:0 -200px}100%{background-position:0 400px}}
   /* 3 divider: breathing glow */
@@ -250,7 +258,7 @@ p{margin:0; color:var(--muted)}
 
 /* 1 COVER */
 .cover{justify-content:center}
-.cover .title{font-size:96px; font-weight:800; letter-spacing:-.03em; line-height:.98}
+.cover .title{font-size:var(--p-cover-title,96px); font-weight:800; letter-spacing:-.03em; line-height:.98}
 .cover .title .glow{display:block}
 .cover .subtitle{margin-top:26px; font-size:23px}
 .cover .meta{position:absolute; left:88px; bottom:56px; display:flex; gap:26px;
@@ -282,7 +290,7 @@ p{margin:0; color:var(--muted)}
 
 /* 4 STAT GRID */
 .stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:22px; margin-top:42px; flex:1}
-.stat{background:var(--panel); border:1px solid var(--brd); border-radius:16px;
+.stat{background:var(--panel); border:1px solid var(--brd); border-radius:var(--p-radius,16px);
   padding:30px 32px; display:flex; flex-direction:column; justify-content:center; position:relative; overflow:hidden}
 .stat::before{content:""; position:absolute; left:0; top:0; width:4px; height:100%;
   background:linear-gradient(180deg,var(--cyan),var(--indigo))}
@@ -290,11 +298,15 @@ p{margin:0; color:var(--muted)}
 .stat .num small{font-size:26px; color:var(--cyan); font-weight:700}
 .stat .lbl{margin-top:8px; font-size:16px; color:var(--muted); line-height:1.45}
 
-/* 5 BIG NUMBER */
-.bignum{justify-content:center; align-items:flex-start; text-align:left}
+/* 5 BIG NUMBER — DUAL-SCOPED (see QUOTE below): `.bignum` is the classic
+   <section>, `.sec-bignum` the same content as one section of a composed slide.
+   The section copy shrinks the hero, since 118px is sized for a whole slide. */
+.bignum,.sec-bignum{justify-content:center; align-items:flex-start; text-align:left}
 .hero-num{font-family:var(--font-mono); font-weight:700; font-size:118px; letter-spacing:-.03em;
   color:var(--cyan); line-height:1; margin:14px 0 0}
-.bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .hero-num{font-size:76px}
+.bignum .subtitle,.sec-bignum .subtitle{margin-top:26px; font-size:22px}
+.sec-bignum .subtitle{margin-top:16px; font-size:18px}
 
 /* 6 CHART */
 .chart-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px}
@@ -304,8 +316,8 @@ p{margin:0; color:var(--muted)}
 /* 7 COMPARISON */
 .cmp{display:grid; grid-template-columns:1fr 64px 1fr; gap:0; flex:1; margin-top:40px}
 .cmp-col{padding:34px 36px; background:var(--panel); border:1px solid var(--brd)}
-.cmp-col:first-child{border-radius:16px 0 0 16px}
-.cmp-col:last-child{border-radius:0 16px 16px 0}
+.cmp-col:first-child{border-radius:var(--p-radius,16px) 0 0 var(--p-radius,16px)}
+.cmp-col:last-child{border-radius:0 var(--p-radius,16px) var(--p-radius,16px) 0}
 .cmp-col h3{font-size:30px; margin-bottom:6px}
 .cmp-col .tag{font-family:var(--font-mono); font-size:12px; letter-spacing:.2em; text-transform:uppercase}
 .cmp-col.sup .tag{color:var(--cyan)} .cmp-col.uns .tag{color:var(--mint)}
@@ -318,15 +330,24 @@ p{margin:0; color:var(--muted)}
   width:54px; height:54px; border-radius:50%; background:var(--bg-2); border:1px solid var(--brd-2);
   display:grid; place-items:center; font-family:var(--font-mono); font-size:14px; letter-spacing:.1em; color:var(--ink); z-index:2}
 
-/* 8 QUOTE */
-.quote{justify-content:center}
+/* 8 QUOTE — DUAL-SCOPED. `.quote` is the classic layout's <section> (one of the
+   SECTION_LAYOUTS whose CSS targets the section itself); `.sec-quote` is the same
+   content rendered as one section of a composed slide. Every rule below has to
+   match both or the composed copy renders unstyled (composer plan, risk #1).
+   The section copy is smaller and its oversized quote mark is reined in, because
+   it lives in a fraction of a slide rather than the whole of one. */
+.quote,.sec-quote{justify-content:center}
+.sec-quote{overflow:hidden}
 .quote-mark{position:absolute; top:40px; left:64px; font-family:var(--font-display);
   font-size:380px; line-height:1; color:var(--indigo); opacity:.12; pointer-events:none}
-.quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
+.sec-quote .quote-mark{top:-52px; left:-8px; font-size:200px}
+.quote blockquote,.sec-quote blockquote{margin:0; font-family:var(--font-display); font-weight:600;
   font-size:52px; line-height:1.22; letter-spacing:-.015em; max-width:20ch; position:relative}
-.quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
-.quote .by .line{width:48px; height:2px; background:var(--cyan)}
-.quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
+.sec-quote blockquote{font-size:34px; max-width:26ch}
+.quote .by,.sec-quote .by{margin-top:34px; display:flex; align-items:center; gap:16px}
+.sec-quote .by{margin-top:22px}
+.quote .by .line,.sec-quote .by .line{width:48px; height:2px; background:var(--cyan)}
+.quote .by span,.sec-quote .by span{font-family:var(--font-mono); font-size:15px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
 
 /* 9 CODE */
 .code-stage{flex:1; margin-top:36px; display:flex; flex-direction:column; min-height:0}
@@ -382,7 +403,7 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
 .closing{justify-content:center}
 .closing .title{font-size:72px; font-weight:800}
 .take{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:46px}
-.take div{background:var(--panel); border:1px solid var(--brd); border-radius:14px; padding:24px 26px}
+.take div{background:var(--panel); border:1px solid var(--brd); border-radius:var(--p-radius,14px); padding:24px 26px}
 .take .n{font-family:var(--font-mono); color:var(--cyan); font-size:14px; letter-spacing:.2em}
 .take h3{font-size:19px; font-weight:600; margin:12px 0 8px}
 .take p{font-size:14px; line-height:1.5}
@@ -652,6 +673,55 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    so it themes globally and honours per-slide overrides.
    ===================================================================== */
 
+/* =====================================================================
+   COMPOSED SLIDES — section arrangement (composer plan §C).
+   `.slide` is already display:flex/column, so a section is just a flex child
+   and the whole arrangement is a handful of rules. `size` in the deck JSON
+   becomes an inline `flex-grow:N` — grow only. The BASIS lives here, and it
+   differs by axis on purpose:
+     • in a ROW, basis 0, so the weights read as literal width proportions
+       (size 2 next to size 1 really is two-thirds of the row);
+     • in the COLUMN, basis auto, so a weight distributes the LEFTOVER height
+       and can never squeeze a section below its own content — basis 0 there
+       pushes tall content straight off the bottom of the slide.
+   When a slide asks for more than 720px, SOMETHING has to give, and which
+   section gives is the one real decision here. A section keeps flexbox's
+   automatic minimum height by default, so it is never handed less room than the
+   content it draws. The genuinely ELASTIC types opt out with `min-height:0` and
+   absorb the whole overflow — a chart, a table, a timeline or an image renders
+   at whatever height it is given, whereas a stat card is 163px of padding and
+   type no matter what. Without this split, an over-full slide shrinks every
+   section proportionally and the rigid ones quietly spill off the bottom.
+   `min-width:0` is unconditional: across a row, text should re-wrap.
+   ===================================================================== */
+.sec{position:relative; display:flex; flex-direction:column; min-width:0}
+.sec-chart,.sec-table,.sec-timeline,.sec-media{min-height:0}
+/* Layout bodies all declare `flex:1` (= grow 1, basis 0), because as a direct
+   child of `.slide` each is meant to eat the whole slide. Inside a section that
+   basis of 0 erases the block from its section's intrinsic height, so a RIGID
+   section would measure at nothing and be handed nothing. Same split, one level
+   down: only the rigid bodies get their content height back. */
+.sec > .stat-grid, .sec > .cmp, .sec > .editorial, .sec > .agenda-grid,
+.sec > .take, .sec > .gallery{flex-basis:auto}
+.sec-row{position:relative; display:flex; align-items:stretch; gap:var(--p-sec-gap,34px); min-height:0; min-width:0}
+.sec-row > .sec{flex:1 1 0}
+/* Section bodies carry the leading margin their classic layout used to separate
+   them from the title above (.stat-grid 42px, .cmp 40px, .timeline 64px …).
+   Mid-column that IS the spacing, and it comes for free. It is wrong in exactly
+   two places: inside a row, where two sections must align at the row's top, and
+   at the very top of the slide, where there is nothing to be spaced from. */
+.sec-row > .sec > :first-child,
+.lyt-composed > .sec:first-child > :first-child,
+.lyt-composed > .sec-row:first-child > .sec > :first-child{margin-top:0}
+.sec-unknown{padding:18px 22px; border:1px dashed var(--brd-2); border-radius:12px}
+
+/* Refugee rules: these are scoped to the classic layout's own wrapper
+   (`.media-split .ms-media`), which does not exist when the same builder runs
+   as a standalone section. Match the section wrapper too, or the composed copy
+   renders unstyled. */
+.sec-media .ms-media{border-radius:var(--p-radius,18px); min-height:0; flex:1}
+.sec-bullets .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1}
+
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
 .ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
 .ico-wrap svg{width:1em; height:1em; display:block; fill:none; stroke:currentColor}
@@ -740,7 +810,7 @@ body.presenting{cursor:none}
 
 /* MEDIA-SPLIT — picture one side, prose/bullets the other */
 .media-split{display:grid; grid-template-columns:1fr 1fr; gap:40px; flex:1; min-height:0; align-items:stretch}
-.media-split .ms-media{border-radius:18px; min-height:0}
+.media-split .ms-media{border-radius:var(--p-radius,18px); min-height:0}
 .media-split .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0}
 .ms-body{margin-top:16px; font-size:17px; line-height:1.6; color:var(--muted); max-width:48ch}
 .ms-items{margin-top:16px; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px}
@@ -1109,6 +1179,111 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   .sf-unavail-open{ display:none; } /* dead link in a static document */
 }
 </style>
+<!-- deck personality: the type/space/shape/motif axis, layered over the theme's colour -->
+<style id="deck-personality">
+/* =====================================================================
+   DECK PERSONALITY — the second design axis (composer plan §E).
+
+   Themes own COLOUR. Personalities own TYPE, SPACE, SHAPE and MOTIF. Two decks
+   on the same palette should still not read as twins, and that is the whole
+   job of this file.
+
+   Mechanism: `data.personality` -> `data-personality="<name>"` on <html>, and
+   everything below hangs off that attribute. A deck with no personality gets
+   NO attribute and therefore NO rule in this file — the tokens are declared
+   with their present-day values so the default rendering is unchanged.
+
+   Every `--p-*` token is consumed as `var(--p-x, <today's value>)` at its use
+   site, so this file can never be the reason something disappears: drop it and
+   the deck still renders exactly as it does now.
+
+   Fonts are the one thing that cannot be done with a stylesheet alone. Themes
+   write their font variables as INLINE styles on <html>, which beat any rule
+   here, so each personality declares `--p-font-*` and engine.js copies those
+   onto `--font-*` inline right after the theme is applied (and before the
+   brand kit, which is meant to win over both).
+   ===================================================================== */
+
+/* ---------- the token surface, at its default values ---------- */
+:root{
+  --p-title:        62px;      /* .title                                  */
+  --p-cover-title:  96px;      /* .cover .title                           */
+  --p-sub:          21px;      /* .subtitle                               */
+  --p-track:        -.02em;    /* display letter-spacing                  */
+  --p-kick-track:   .34em;     /* kicker letter-spacing                   */
+  --p-kick-case:    uppercase; /* kicker text-transform                   */
+  --p-radius:       16px;      /* panels, cards                           */
+  --p-radius-sm:    10px;      /* small chrome                            */
+  --p-sec-gap:      34px;      /* gap between sections across a row       */
+  --p-dot-op:       .30;       /* the slide's dot-grid texture            */
+  --p-orb-op:       .5;        /* cover/closing ambient orbs              */
+  --p-rule:         0px;       /* motif: hairline rule under a title band */
+}
+
+/* =====================================================================
+   EDITORIAL — a magazine feature. Serif display, tight tracking, generous
+   air, hairline rules, no ambient glow. Says "considered", not "launched".
+   ===================================================================== */
+[data-personality="editorial"]{
+  --p-font-display: 'Fraunces','Newsreader','Georgia','DejaVu Serif',serif;
+  --p-font-body:    'Spectral','Source Serif 4','Georgia','DejaVu Serif',serif;
+  --p-font-mono:    'IBM Plex Mono','DejaVu Sans Mono',ui-monospace,monospace;
+  --pad:            84px 104px;
+  --p-title:        58px;
+  --p-cover-title:  88px;
+  --p-sub:          20px;
+  --p-track:        -.012em;
+  --p-kick-track:   .22em;
+  --p-radius:       4px;
+  --p-radius-sm:    3px;
+  --p-sec-gap:      44px;
+  --p-dot-op:       0;         /* no texture — paper, not a screen */
+  --p-orb-op:       .16;
+  --p-rule:         1px;
+}
+/* the motif: a hairline under every title band, the way a feature opens */
+[data-personality="editorial"] .sec-titleband,
+[data-personality="editorial"] .chart-head{
+  padding-bottom:18px; border-bottom:var(--p-rule) solid var(--brd); }
+[data-personality="editorial"] .title{ font-weight:600; }
+[data-personality="editorial"] .kicker{ font-family:var(--font-body); font-style:italic;
+  text-transform:none; letter-spacing:.02em; font-size:15px; }
+[data-personality="editorial"] .kicker::before{ width:34px; }
+
+/* =====================================================================
+   BLUEPRINT — a technical drawing. Everything on a visible grid, square
+   corners, monospaced labels, tight and dense. Says "engineering".
+   ===================================================================== */
+[data-personality="blueprint"]{
+  --p-font-display: 'Archivo','Sora','DejaVu Sans',system-ui,sans-serif;
+  --p-font-body:    'IBM Plex Sans','DejaVu Sans',system-ui,sans-serif;
+  --p-font-mono:    'JetBrains Mono','DejaVu Sans Mono',ui-monospace,monospace;
+  --pad:            56px 68px;
+  --p-title:        54px;
+  --p-cover-title:  84px;
+  --p-sub:          19px;
+  --p-track:        -.035em;
+  --p-kick-track:   .30em;
+  --p-radius:       0px;       /* nothing is rounded on a drawing */
+  --p-radius-sm:    0px;
+  --p-sec-gap:      26px;
+  --p-dot-op:       .55;       /* the grid is the point */
+  --p-orb-op:       .22;
+}
+/* the motif: corner ticks on every panel, and a ruled measure under the title */
+[data-personality="blueprint"] .stat,
+[data-personality="blueprint"] .cmp-col,
+[data-personality="blueprint"] .take div{ position:relative; }
+[data-personality="blueprint"] .stat::after,
+[data-personality="blueprint"] .cmp-col::after,
+[data-personality="blueprint"] .take div::after{
+  content:""; position:absolute; right:0; bottom:0; width:12px; height:12px;
+  border-right:1px solid var(--cyan); border-bottom:1px solid var(--cyan); opacity:.55; }
+[data-personality="blueprint"] .title{ font-weight:800; text-transform:none; }
+[data-personality="blueprint"] .kicker{ font-size:12px; }
+[data-personality="blueprint"] .sec-titleband{ padding-bottom:12px;
+  background:linear-gradient(90deg,var(--cyan),transparent 42%) bottom left / 100% 1px no-repeat; }
+</style>
 <!-- chart renderer: data -> theme-token SVG (v2 phase 3) -->
 <script id="deck-charts">
 /* =====================================================================
@@ -1381,9 +1556,13 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   function H(s){ var t=D.createElement('template'); t.innerHTML=s==null?'':String(s); return t.content; }
   SG.N=N; SG.H=H;
 
-  function kickerN(t){ return t?N('div.eyebrow-row',{key:'kicker'},
-    N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
-  function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
+  /* The optional `b` (base) prefix is what lets one builder serve two callers:
+     '' for a classic layout (keys stay "kicker"/"title", byte-identical to v3)
+     and 'sections.N.content.' when the same nodes are built inside a composed
+     slide (composer plan §A). Every helper that authors a key takes it. */
+  function kickerN(t,b){ b=b||''; return t?N('div.eyebrow-row',{key:b+'kicker'},
+    N('span.kicker',{key:b+'kicker.text',bind:b+'kicker',html:rich(t)})):null; }
+  function titleN(t,b){ b=b||''; return t?N('h1.title',{bind:b+'title',html:rich(t)}):null; }
 
   /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
      v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
@@ -1560,11 +1739,22 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       iframe.src=url; }
     return {shield:shield,wrap:wrap,poster:poster}; };
 
+  /* ---------- helper surface for src/sections.js (composer plan §"Types") ----------
+     sections.js is a separate module so the engine stays a kernel (node builder,
+     render loop, assets, embeds) and the composition vocabulary is one readable
+     file. It needs the same tiny helpers the layouts use; this is the whole
+     widening of the internal API. */
+  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad,
+          emRich:emRich, icon:icon, mediaImgWrap:mediaImgWrap, fitStyle:fitStyle};
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
      Keys are authored: named blocks ("title","rail"), array items by content
      path ("stats.2"), leaves bound to the field they render ("stats.2.label").
+     Layouts that decompose into sections are registered in src/sections.js
+     instead (they become thin S[...] compositions); their entries are absent
+     here on purpose.
      ===================================================================== */
   var L = SG.layouts = {};
 
@@ -1582,15 +1772,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           ? N('span',{key:'meta.'+i},N('b',null,t))
           : N('span',{bind:'meta.'+i,text:t}); })):null ]; };
 
-  L.agenda=function(c){
-    return [ N('div.rail',{key:'rail'}), kickerN(c.kicker), titleN(c.title),
-      N('div.agenda-grid.sg-stagger.sg-onenter',{key:'items',arr:'items'},
-        arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.ag-item',{key:P},[
-            N('div.ag-num',{key:P+'.num'},pad(i+1)),
-            N('div.ag-body',{key:P+'.body'},[
-              N('h3',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; };
+  /* agenda -> sections.js (rail + titleband + agenda) */
 
   L.divider=function(c){
     return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
@@ -1598,64 +1780,14 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
-  L['stat-grid']=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.stat-grid',{key:'stats',arr:'stats'},arr(c.stats).map(function(s,i){ var P='stats.'+i;
-        var num = s.count!=null
-          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
-              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
-          : esc(s.value);
-        return N('div.stat',{key:P},[
-          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
-          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; };
+  /* stat-grid -> sections.js (titleband + stats) */
 
-  L.bignum=function(c){
-    var hero = c.count!=null
-      ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
-      : esc(c.value);
-    return [ kickerN(c.kicker), N('div.hero-num',{key:'num',html:hero}),
-      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
-
-  L.chart=function(c){
-    /* v2+: author charts as data (type + data.labels/series); SG.charts renders
-       theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
-    var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
-    return [ N('div.chart-head',{key:'head'},[
-        N('div',null,[kickerN(c.kicker),titleN(c.title)]),
-        c.note?N('p',{key:'note',bind:'note',text:c.note,
-          style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
-      N('div.chart-wrap',{key:'chart',html:body}) ]; };
-
-  L.table=function(c){
-    var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:'table'},[
-        N('table.tbl'+(o.compact?'.compact':''),null,[
-          N('thead',null,N('tr',null,cols.map(function(h,j){
-            return N('th'+(j===hi?'.hi':''),{bind:'columns.'+j,html:rich(h)}); }))),
-          N('tbody',null,arr(c.rows).map(function(r,i){
-            return N('tr',null,arr(r).map(function(cell,j){
-              return N('td'+(j===hi?'.hi':''),{bind:'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
-        c.note?N('p.tbl-note',{key:'tnote',bind:'note',text:c.note}):null ]) ]; };
-
-  L.comparison=function(c){
-    function col(side,cls,base){ if(!side) return null;
-      return N('div.cmp-col.'+cls,{key:base},[
-        side.tag?N('div.tag',{bind:base+'.tag',html:rich(side.tag)}):null,
-        N('h3',{bind:base+'.title',html:rich(side.title)}),
-        N('ul',{key:base+'.items',arr:base+'.items'},arr(side.items).map(function(x,i){
-          return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.cmp',{key:'cmp'},[ col(c.left,'sup','left'),
-        N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
-        col(c.right,'uns','right') ]) ]; };
-
-  L.quote=function(c){
-    return [ N('div.quote-mark',{key:'mark',html:'&ldquo;'}),
-      N('blockquote.sg-reveal-wipe.sg-onenter',{bind:'quote',html:rich(c.quote)}),
-      c.by?N('div.by',{key:'by'},[N('div.line'),
-        N('span',{key:'by.text',bind:'by',html:rich(c.by)})]):null,
-      c.subtitle?N('p.subtitle',{bind:'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; };
+  /* bignum     -> sections.js (kicker + bignum; a CSS refugee, dual-scoped
+                   `.bignum, .sec-bignum`)
+     chart      -> sections.js (chart, which carries its own head)
+     table      -> sections.js (titleband + table)
+     comparison -> sections.js (titleband + comparison)
+     quote      -> sections.js (a CSS refugee, dual-scoped `.quote, .sec-quote`) */
 
   L.code=function(c){
     return [ kickerN(c.kicker), titleN(c.title),
@@ -1666,17 +1798,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
         c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
-  L.timeline=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.timeline',{key:'timeline'},[
-        N('div.tl-track'), N('div.tl-spark'),
-        N('div.tl-items',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.tl-item',{key:P},[
-            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
-            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
-            N('div.ev',{key:P+'.ev'},[
-              N('b',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; };
+  /* timeline -> sections.js (titleband + timeline) */
 
   L.pipeline=function(c){
     var nodes=arr(c.nodes), kids=[];
@@ -1716,15 +1838,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       N('div.statement.sg-glow-pulse-box',{bind:'statement',html:emRich(c.statement||'')}),
       c.lead?N('p.lead',{bind:'lead',html:rich(c.lead)}):null ]; };
 
-  L.editorial=function(c){
-    return [ kickerN(c.kicker),
-      N('div.editorial',{key:'editorial'},[
-        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:'lead',html:rich(c.lead)}),
-        N('div.ed-cols.sg-stagger.sg-onenter',{key:'columns',arr:'columns'},
-          arr(c.columns).map(function(col,i){ var P='columns.'+i;
-            return N('div.ed-col',{key:P},[
-              N('h3',{bind:P+'.head',html:rich(col.head)}),
-              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; };
+  /* editorial -> sections.js (kicker + prose) */
 
   L['hero-asym']=function(c){
     return [ N('div.hero-asym',{key:'hero'},[
@@ -1759,16 +1873,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
       c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
 
-  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
-  L['media-split']=function(c){
-    var side=c.side==='right'?'right':'left';
-    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
-    img.classList.add('ms-media');
-    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
-      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
-      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
-        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
-    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+  /* media-split -> sections.js (the `media` + `bullets` sections, wrapped in
+     the .media-split grid; both halves are CSS refugees, dual-scoped) */
 
   /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
   L.gallery=function(c){
@@ -1902,6 +2008,34 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     if(brand.fonts){
       if(brand.fonts.display) root.style.setProperty('--font-display',"'"+brand.fonts.display+"','DejaVu Sans',system-ui,sans-serif");
       if(brand.fonts.body) root.style.setProperty('--font-body',"'"+brand.fonts.body+"','DejaVu Sans',system-ui,sans-serif"); } }
+  /* ---------- deck personality (composer plan §E) ----------
+     The second design axis: themes own colour, personalities own type, space,
+     shape and motif. `data.personality` becomes an attribute on <html> and
+     src/personality.css does the rest — EXCEPT the font pairing, which a
+     stylesheet cannot win: applyGlobalTheme writes the theme's font variables
+     as INLINE styles, and inline beats any rule. So each personality declares
+     `--p-font-*`, and we read those back off the cascade and re-apply them
+     inline here — after the theme, before the brand kit, which is meant to
+     override both.
+
+     The clearing is a SEPARATE step that has to run BEFORE applyGlobalTheme,
+     not inside applyPersonality: the two write the same inline properties, so
+     clearing afterwards would strip the font the theme had just set and a deck
+     that turned its personality off would lose its theme's typeface too. */
+  var P_FONTS=['display','body','mono'];
+  function clearPersonalityFonts(){ var root=D.documentElement;
+    (SG._pFonts||[]).forEach(function(p){ root.style.removeProperty(p); });
+    SG._pFonts=[]; }
+  function applyPersonality(name){ var root=D.documentElement;
+    if(name) root.setAttribute('data-personality',String(name));
+    else { root.removeAttribute('data-personality'); return; }
+    var cs=W.getComputedStyle(root);
+    P_FONTS.forEach(function(k){
+      var v=(cs.getPropertyValue('--p-font-'+k)||'').trim(); if(!v) return;
+      root.style.setProperty('--font-'+k,v); SG._pFonts.push('--font-'+k); }); }
+  SG.applyPersonality=applyPersonality;
+  SG.clearPersonalityFonts=clearPersonalityFonts;
+
   function brandMark(brand,lay){ if(!brand||!brand.logo) return null;
     if(lay!=='cover'&&lay!=='closing') return null;
     var url=imageURL(brand.logo); if(!url) return null;
@@ -1953,7 +2087,9 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     data=data||SG.data; SG.data=data;
     var slides=arr(data.slides), total=slides.length;
     var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
+    clearPersonalityFonts();              /* BEFORE the theme — see the note above */
     applyGlobalTheme(data.theme);
+    applyPersonality(data.personality);   /* after the theme, before the brand */
     applyBrand(data.brand);
     if(data.meta){ if(data.meta.title) D.title=data.meta.title;
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);
@@ -2175,6 +2311,390 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     var inp=D.getElementById('deck-import');
     if(inp) inp.addEventListener('change',function(){ if(inp.files&&inp.files[0]) onImportFile(inp.files[0]); inp.value=''; });
   };
+})();
+</script>
+<!-- section registry: the composition vocabulary + the `composed` layout -->
+<script id="deck-sections">
+/* =====================================================================
+   SECTION REGISTRY  —  the composition vocabulary (composer plan §A–§C).
+
+   A slide used to be exactly one of 29 fixed layouts. A SECTION is the piece
+   a layout is made of — a title band, a stat row, a quote — extracted from
+   the layout's own body and parameterized by ONE thing: a key prefix.
+
+     S[type].build(content, base) -> Node[]
+
+   `base` is '' for a classic caller, so `L['stat-grid']` is now literally
+   `S.titleband.build(c,'').concat(S.stats.build(c,''))` and renders
+   byte-identically to v3 (tests/parity.mjs is the guard). The `composed`
+   layout calls the SAME builders with base='sections.N.content.', so every
+   authored data-el/data-bind/data-arr key stays a literal content path and
+   the entire v3 identity machinery (overrides, bind write-back, hide/fs,
+   item verbs, GC) works at section depth with no new machinery.
+
+   Composed slide content:
+     content.sections = [ Section | Row ]
+     Section = {type:<name in S>, size?:<flex weight>, content:{…}}
+     Row     = {type:'row', size?:<flex weight>, items:[Section]}
+   Rows are the only nesting — rows cannot contain rows. That ceiling is
+   deliberate: it keeps the editor's mental model and the validator sane.
+
+   The v1 vocabulary is 12 types, each lifted from the layout named in
+   parentheses, and each keeping that layout's field names verbatim:
+
+     titleband (every headed layout)  stats (stat-grid)   bignum (bignum)
+     chart (chart)     table (table)      comparison (comparison)
+     quote (quote)     agenda (agenda)    timeline (timeline)
+     prose (editorial) media (media-split picture side)
+     bullets (media-split text side)
+
+   Ten classic layouts are now compositions of these; the rest stay monolithic
+   because they are genuinely bespoke (cover, divider, closing, figure, image,
+   diptych, hero-asym, manifesto, embed, raw) or are simply deferred to a later
+   wave (pipeline, code, metric-dash, leaderboard, matrix, stack, the mosaics,
+   before-after). A non-decomposable layout is not broken — it just can't have
+   a section inserted into its flow, and the editor falls back to a floating
+   object there.
+
+   Loads AFTER engine.js (consumes SG.N / SG.h / SG.layouts) and BEFORE
+   editor.js.
+   ===================================================================== */
+(function(){
+  var W=window, SG=W.SG=W.SG||{}, N=SG.N, L=SG.layouts, h=SG.h||{};
+  var rich=h.rich, esc=h.esc, arr=h.arr, pad=h.pad, kickerN=h.kickerN, titleN=h.titleN;
+  var mediaImgWrap=h.mediaImgWrap, fitStyle=h.fitStyle;
+
+  var S = SG.S = {};
+
+  /* ---------- titleband — the kicker + title every headed layout opens with ---------- */
+  S.titleband = {
+    label:'Title band',
+    fields:['kicker','title'],
+    defaults:{kicker:'Kicker', title:'Section title'},
+    build:function(c,b){ b=b||'';
+      return [ kickerN(c.kicker,b), titleN(c.title,b) ]; }
+  };
+
+  /* ---------- stats — the stat-grid card row ---------- */
+  S.stats = {
+    label:'Stat row',
+    fields:['stats'],
+    defaults:{stats:[{value:'42',unit:'%',label:'What it measures'},
+                     {value:'3x',label:'What it measures'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.stat-grid',{key:b+'stats',arr:b+'stats'},arr(c.stats).map(function(s,i){ var P=b+'stats.'+i;
+        var num = s.count!=null
+          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
+              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
+          : esc(s.value);
+        return N('div.stat',{key:P},[
+          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
+          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; }
+  };
+
+  /* ---------- quote — a SECTION_LAYOUTS refugee: its CSS targets the <section>
+       itself, so deck.css dual-scopes those rules `.quote, .sec-quote` ---------- */
+  S.quote = {
+    label:'Quote',
+    fields:['quote','by','subtitle'],
+    defaults:{quote:'A line worth putting on a slide.', by:'Attribution'},
+    build:function(c,b){ b=b||'';
+      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;'}),
+        N('blockquote.sg-reveal-wipe.sg-onenter',{bind:b+'quote',html:rich(c.quote)}),
+        c.by?N('div.by',{key:b+'by'},[N('div.line'),
+          N('span',{key:b+'by.text',bind:b+'by',html:rich(c.by)})]):null,
+        c.subtitle?N('p.subtitle',{bind:b+'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; }
+  };
+
+  /* ---------- bignum — one enormous number. A SECTION_LAYOUTS refugee
+       (`.bignum` centres the whole <section>), dual-scoped `.bignum, .sec-bignum`.
+       The kicker stays OUT so a bignum section can sit under a titleband without
+       two kickers; the classic layout adds its own. ---------- */
+  S.bignum = {
+    label:'Big number',
+    fields:['value','count','unit','fmt','subtitle'],
+    defaults:{value:'42', subtitle:'What the number means'},
+    build:function(c,b){ b=b||'';
+      var hero = c.count!=null
+        ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
+        : esc(c.value);
+      return [ N('div.hero-num',{key:b+'num',html:hero}),
+        c.subtitle?N('p.subtitle',{bind:b+'subtitle',html:rich(c.subtitle)}):null ]; }
+  };
+
+  /* ---------- chart — carries its own head (the note sits on the title's
+       baseline), so it does NOT want a titleband above it ---------- */
+  S.chart = {
+    label:'Chart',
+    fields:['kicker','title','note','type','data'],
+    defaults:{title:'Chart title', type:'bar',
+              data:{labels:['A','B','C'], series:[{name:'Series', values:[3,5,4]}]}},
+    build:function(c,b){ b=b||'';
+      /* v2+: author charts as data (type + data.labels/series); SG.charts renders
+         theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
+      var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
+      return [ N('div.chart-head',{key:b+'head'},[
+          N('div',null,[kickerN(c.kicker,b),titleN(c.title,b)]),
+          c.note?N('p',{key:b+'note',bind:b+'note',text:c.note,
+            style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
+        N('div.chart-wrap',{key:b+'chart',html:body}) ]; }
+  };
+
+  S.table = {
+    label:'Table',
+    fields:['columns','rows','options','note'],
+    defaults:{columns:['','A','B'], rows:[['Row 1','–','–'],['Row 2','–','–']]},
+    build:function(c,b){ b=b||'';
+      var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
+      return [ N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:b+'table'},[
+        N('table.tbl'+(o.compact?'.compact':''),null,[
+          N('thead',null,N('tr',null,cols.map(function(hd,j){
+            return N('th'+(j===hi?'.hi':''),{bind:b+'columns.'+j,html:rich(hd)}); }))),
+          N('tbody',null,arr(c.rows).map(function(r,i){
+            return N('tr',null,arr(r).map(function(cell,j){
+              return N('td'+(j===hi?'.hi':''),{bind:b+'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
+        c.note?N('p.tbl-note',{key:b+'tnote',bind:b+'note',text:c.note}):null ]) ]; }
+  };
+
+  S.comparison = {
+    label:'Comparison',
+    fields:['left','right','badge'],
+    defaults:{left:{tag:'Option A',title:'This way',items:['Point one','Point two']},
+              right:{tag:'Option B',title:'That way',items:['Point one','Point two']},
+              badge:'VS'},
+    build:function(c,b){ b=b||'';
+      function col(side,cls,base){ if(!side) return null;
+        return N('div.cmp-col.'+cls,{key:b+base},[
+          side.tag?N('div.tag',{bind:b+base+'.tag',html:rich(side.tag)}):null,
+          N('h3',{bind:b+base+'.title',html:rich(side.title)}),
+          N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
+            return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
+      return [ N('div.cmp',{key:b+'cmp'},[ col(c.left,'sup','left'),
+        N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
+        col(c.right,'uns','right') ]) ]; }
+  };
+
+  S.agenda = {
+    label:'Numbered agenda',
+    fields:['items'],
+    defaults:{items:[{title:'First thing',desc:'One line about it'},
+                     {title:'Second thing',desc:'One line about it'}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.agenda-grid.sg-stagger.sg-onenter',{key:b+'items',arr:b+'items'},
+        arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.ag-item',{key:P},[
+            N('div.ag-num',{key:P+'.num'},pad(i+1)),
+            N('div.ag-body',{key:P+'.body'},[
+              N('h3',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; }
+  };
+
+  S.timeline = {
+    label:'Timeline',
+    fields:['items'],
+    defaults:{items:[{year:'2024',title:'Then'},{year:'2026',title:'Now',now:true}]},
+    build:function(c,b){ b=b||'';
+      return [ N('div.timeline',{key:b+'timeline'},[
+        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(it,i){ var P=b+'items.'+i;
+          return N('div.tl-item',{key:P},[
+            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.ev',{key:P+'.ev'},[
+              N('b',{bind:P+'.title',html:rich(it.title)}),
+              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; }
+  };
+
+  /* ---------- prose — the editorial lead + rule-lined columns ---------- */
+  S.prose = {
+    label:'Prose columns',
+    fields:['lead','columns'],
+    defaults:{lead:'The one sentence this section is about.',
+              columns:[{head:'First',body:'A short paragraph.'},
+                       {head:'Second',body:'A short paragraph.'}]},
+    build:function(c,b){ b=b||'';
+      /* An EMPTY columns array used to still emit the .ed-cols grid, which
+         carries a 30px top margin and a rule line — 30-odd pixels of nothing,
+         enough to push a section past the bottom of a full slide. Caught by the
+         rack test on a prose section used for a lead with no columns. */
+      var cols=arr(c.columns);
+      return [ N('div.editorial',{key:b+'editorial'},[
+        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:b+'lead',html:rich(c.lead)}),
+        cols.length?N('div.ed-cols.sg-stagger.sg-onenter',{key:b+'columns',arr:b+'columns'},
+          cols.map(function(col,i){ var P=b+'columns.'+i;
+            return N('div.ed-col',{key:P},[
+              N('h3',{bind:P+'.head',html:rich(col.head)}),
+              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })):null ]) ]; }
+  };
+
+  /* ---------- media + bullets — the two halves of media-split, now separable.
+       Both are CSS refugees: their rules are scoped `.media-split .ms-media` /
+       `.media-split .ms-text`, so deck/engine.css dual-scopes them on
+       `.sec-media` / `.sec-bullets` too. ---------- */
+  S.media = {
+    label:'Image',
+    fields:['image','focal','fit'],
+    defaults:{image:''},
+    build:function(c,b){ b=b||'';
+      var img=mediaImgWrap(c.image,{key:b+'image'},fitStyle(c));
+      img.classList.add('ms-media');
+      return [img]; }
+  };
+
+  S.bullets = {
+    label:'Bullets',
+    fields:['kicker','title','body','items'],
+    defaults:{title:'What matters here', items:['First point','Second point','Third point']},
+    build:function(c,b){ b=b||'';
+      return [ N('div.ms-text',{key:b+'text'},[ kickerN(c.kicker,b), titleN(c.title,b),
+        c.body?N('p.ms-body',{bind:b+'body',html:rich(c.body)}):null,
+        arr(c.items).length?N('ul.ms-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(x,i){
+          return N('li',{bind:b+'items.'+i,html:rich(x)}); })):null ]) ]; }
+  };
+
+  /* =====================================================================
+     CLASSIC LAYOUTS, RE-EXPRESSED
+     One implementation, two callers. Byte-identical at base='' — that is
+     what tests/parity.mjs checks against the frozen v2 build.
+     ===================================================================== */
+  L['stat-grid']  = function(c){ return S.titleband.build(c,'').concat(S.stats.build(c,'')); };
+  L.quote         = function(c){ return S.quote.build(c,''); };
+  L.chart         = function(c){ return S.chart.build(c,''); };
+  L.table         = function(c){ return S.titleband.build(c,'').concat(S.table.build(c,'')); };
+  L.comparison    = function(c){ return S.titleband.build(c,'').concat(S.comparison.build(c,'')); };
+  L.timeline      = function(c){ return S.titleband.build(c,'').concat(S.timeline.build(c,'')); };
+  /* bignum + editorial open with a kicker but never a title, so they take
+     kickerN directly rather than a titleband that would render a stray <h1>
+     the moment someone typed a `title` into their content. */
+  L.bignum        = function(c){ return [kickerN(c.kicker,'')].concat(S.bignum.build(c,'')); };
+  L.editorial     = function(c){ return [kickerN(c.kicker,'')].concat(S.prose.build(c,'')); };
+  /* the rail is slide chrome (absolutely positioned against the section), not
+     part of the agenda section */
+  L.agenda        = function(c){ return [N('div.rail',{key:'rail'})]
+                                   .concat(S.titleband.build(c,''), S.agenda.build(c,'')); };
+  /* media-split is the one classic that is ALREADY two sections — it just wraps
+     them in a grid that decides which side the picture takes */
+  L['media-split']= function(c){
+    var side=c.side==='right'?'right':'left';
+    var img=S.media.build(c,'')[0], text=S.bullets.build(c,'')[0];
+    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+
+  /* =====================================================================
+     THE `composed` LAYOUT
+     Renders content.sections as flex children of the .slide column. A row is
+     a horizontal band of weighted sections. `size` is a flex weight; absent
+     means "take your natural height" (flex:0 1 auto, the CSS default).
+     ===================================================================== */
+  /* `size` writes flex-GROW only, never the shorthand. The flex-BASIS is the
+     stylesheet's job, and it differs by axis: a row's children get basis 0 so
+     the weights are literal width proportions, while a column's children keep
+     basis auto so a weight distributes the LEFTOVER height and can never force
+     a section shorter than its own content. Writing `flex:N` here would set
+     basis 0 in both, which silently pushed content off the bottom of the slide
+     whenever a weighted column section's content was taller than its share. */
+  function sizeStyle(sz){ return (sz==null||sz==='')?null:('flex-grow:'+(+sz||0)); }
+
+  function sectionNode(entry,key){
+    if(!entry||typeof entry!=='object') return null;
+    var def=S[entry.type];
+    if(!def) return N('div.sec.sec-unknown',{key:key},
+      N('p.subtitle',{text:'Unknown section type "'+String(entry.type||'')+'"'}));
+    return N('div.sec.sec-'+entry.type,{key:key,style:sizeStyle(entry.size)},
+      def.build(entry.content||{}, key+'.content.'));
+  }
+  SG.sectionNode=sectionNode;   /* exposed for the editor's insert/preview paths */
+
+  L.composed = function(c){
+    return arr(c.sections).map(function(entry,i){
+      var key='sections.'+i;
+      if(entry&&entry.type==='row')
+        return N('div.sec-row',{key:key,style:sizeStyle(entry.size)},
+          arr(entry.items).map(function(it,j){ return sectionNode(it,key+'.items.'+j); }));
+      return sectionNode(entry,key); });
+  };
+
+  /* the vocabulary as data — the editor's gallery and the Python validator
+     both need the list, and it should have exactly one source */
+  SG.SECTION_TYPES = Object.keys(S);
+
+  /* =====================================================================
+     PROMOTION  —  classic slide -> composed slide, on explicit user action.
+
+     TO_SECTIONS[layout](content) -> {sections, keymap}
+
+     `sections` is the same decomposition the layout function itself uses, so
+     a promoted slide renders identically to the classic it came from.
+
+     `keymap` maps the layout's TOP-LEVEL authored keys to where they end up.
+     The editor applies it longest-prefix-first, which is all that is needed:
+     every section builder prefixes EVERY key it authors, so an override on
+     `stats.2.label` follows `stats` -> `sections.1.content.stats` and lands on
+     `sections.1.content.stats.2.label` with no per-key enumeration. Structural
+     keys (`cmp`, `timeline`, `split`) are listed alongside content ones because
+     a user can perfectly well have styled a container.
+
+     Keys that map NOWHERE are left alone and the existing orphan-override GC
+     drops them on the next commit. That happens on purpose in exactly one
+     place: agenda's `rail` is slide chrome, not part of the agenda section, so
+     converting an agenda slide loses a styled rail. One undo brings it back.
+
+     Promotion NEVER happens on load — only when the user asks for it — so an
+     untouched deck stays byte-identical forever.
+     ===================================================================== */
+  var TO_SECTIONS = SG.TO_SECTIONS = {};
+  function band(c){ return {type:'titleband',content:{kicker:c.kicker,title:c.title}}; }
+  var BAND_KEYS={kicker:'sections.0.content.kicker', title:'sections.0.content.title'};
+  /* a headed layout: titleband at 0, the body at 1. `keys` are the body's own
+     top-level authored keys. */
+  function headed(type, keys, pick){
+    return function(c){
+      var km={}; Object.keys(BAND_KEYS).forEach(function(k){ km[k]=BAND_KEYS[k]; });
+      keys.forEach(function(k){ km[k]='sections.1.content.'+k; });
+      return {sections:[band(c),{type:type,size:1,content:pick(c)}], keymap:km}; }; }
+
+  TO_SECTIONS['stat-grid'] = headed('stats', ['stats'],
+    function(c){ return {stats:c.stats}; });
+  TO_SECTIONS.table = headed('table', ['table','tnote','columns','rows','options','note'],
+    function(c){ return {columns:c.columns,rows:c.rows,options:c.options,note:c.note}; });
+  TO_SECTIONS.comparison = headed('comparison', ['cmp','vs','badge','left','right'],
+    function(c){ return {left:c.left,right:c.right,badge:c.badge}; });
+  TO_SECTIONS.timeline = headed('timeline', ['timeline','items'],
+    function(c){ return {items:c.items}; });
+  TO_SECTIONS.agenda = headed('agenda', ['items'],
+    function(c){ return {items:c.items}; });
+  /* bignum + editorial open with a kicker and no title, so their titleband
+     carries only the kicker — but the mapping is the same shape */
+  TO_SECTIONS.bignum = headed('bignum', ['num','subtitle','value','count','fmt'],
+    function(c){ return {value:c.value,count:c.count,fmt:c.fmt,subtitle:c.subtitle}; });
+  TO_SECTIONS.editorial = headed('prose', ['editorial','lead','columns'],
+    function(c){ return {lead:c.lead,columns:c.columns}; });
+
+  /* chart carries its own head, so it is ONE section and every key just gains
+     the prefix — the simplest possible map */
+  function whole(type, keys, pick){
+    return function(c){
+      var km={}; keys.forEach(function(k){ km[k]='sections.0.content.'+k; });
+      return {sections:[{type:type,size:1,content:pick(c)}], keymap:km}; }; }
+  TO_SECTIONS.chart = whole('chart', ['head','note','chart','kicker','title','type','data','options','svg','body'],
+    function(c){ return {kicker:c.kicker,title:c.title,note:c.note,type:c.type,data:c.data,
+                         options:c.options,svg:c.svg,body:c.body}; });
+  TO_SECTIONS.quote = whole('quote', ['mark','quote','by','subtitle'],
+    function(c){ return {quote:c.quote,by:c.by,subtitle:c.subtitle}; });
+
+  /* media-split promotes to a ROW, which is the arrangement it already draws.
+     `split` (the grid wrapper) has no counterpart and is dropped. */
+  TO_SECTIONS['media-split'] = function(c){
+    var right = c.side==='right';
+    var media = {type:'media',size:1,content:{image:c.image,fit:c.fit,focal:c.focal}};
+    var text  = {type:'bullets',size:1,content:{kicker:c.kicker,title:c.title,body:c.body,items:c.items}};
+    var mi = right?1:0, ti = right?0:1;
+    var km={};
+    ['image','fit','focal'].forEach(function(k){ km[k]='sections.0.items.'+mi+'.content.'+k; });
+    ['text','kicker','title','body','items'].forEach(function(k){ km[k]='sections.0.items.'+ti+'.content.'+k; });
+    return {sections:[{type:'row',size:1,items:right?[text,media]:[media,text]}], keymap:km}; };
+
+  /* "can this slide be converted?" — the editor asks before offering the verb */
+  SG.canPromote = function(layout){ return !!TO_SECTIONS[layout]; };
 })();
 </script>
 <style id="forge-css">
@@ -2722,6 +3242,34 @@ body.forge-edit #forge-zoom{ display:flex; }
 .forge-gal-inner{ position:absolute; left:50%; top:50%; transform-origin:center center; pointer-events:none; }
 .forge-gal-nm{ font-size:11.5px; font-weight:700; color:#dbe3ef; }
 .forge-gal-from{ font-size:10px; color:#6f7c92; }
+/* ---- gallery tabs: Elements | Slides | From this deck ---- */
+.forge-gal-tabs{ display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,.10); }
+.forge-gal-tab{ appearance:none; background:none; border:none; border-bottom:2px solid transparent;
+  color:#8b98ad; font-size:12px; font-weight:600; padding:7px 12px; cursor:pointer; font-family:inherit; }
+.forge-gal-tab:hover{ color:#dbe3ef; }
+.forge-gal-tab.on{ color:#eaf1fb; border-bottom-color:#2a6df4; }
+.forge-gal-pane{ display:flex; flex-direction:column; min-height:0; flex:1; }
+/* whole-slide miniatures need a 16:9 well and fewer per row than element cards */
+.forge-gal-grid.whole{ grid-template-columns:repeat(3,1fr); }
+.forge-gal-prev.whole{ height:auto; aspect-ratio:16/9; background:#05080f; }
+.forge-gal-card.whole .forge-gal-inner{ transform-origin:center center; }
+
+/* marks the cards that can join a slide's arrangement instead of floating */
+.forge-gal-tag{ margin-top:5px; display:inline-block; font-size:9.5px; letter-spacing:.04em;
+  color:#7fd3a6; background:rgba(68,243,196,.10); border:1px solid rgba(68,243,196,.28);
+  border-radius:999px; padding:1px 7px; }
+
+/* ---- two-choice confirm (both outcomes are real choices, so neither is "cancel") ---- */
+#forge-confirm{ position:fixed; inset:0; z-index:9470; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,10,.66); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+#forge-confirm .forge-hint{ font-size:12px; line-height:1.5; color:#93a2bd; margin:0 0 4px; }
+
+/* ---- toast: says what actually happened when it differs from what was asked ---- */
+#forge-toast{ position:fixed; left:50%; bottom:64px; transform:translate(-50%,14px); z-index:9480;
+  max-width:min(560px,90vw); padding:10px 16px; border-radius:10px; font-size:12.5px; line-height:1.45;
+  color:#eaf1fb; background:#161c28; border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 14px 44px rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:opacity .18s, transform .18s; }
+#forge-toast.on{ opacity:1; transform:translate(-50%,0); }
 </style>
 </head>
 <body class="hide-docs">
@@ -3228,9 +3776,10 @@ body.forge-edit #forge-zoom{ display:flex; }
     url:"Link",poster:"Poster image",left:"Left side",right:"Right side",before:"Before side",after:"After side",
     ring:"Metric ring",mark:"Quote mark",rail:"Rail",text:"Text",desc:"Description"};
   var ITEM_LABEL={stats:"Stat",items:"Item",nodes:"Step",takeaways:"Takeaway",columns:"Column",rows:"Row",
-    cells:"Cell",bands:"Band",quotes:"Quote",tiles:"Tile",meta:"Detail",series:"Series"};
+    cells:"Cell",bands:"Band",quotes:"Quote",tiles:"Tile",meta:"Detail",series:"Series",sections:"Section"};
   var ARRAY_LABEL={stats:"Stat cards",items:"Items",nodes:"Pipeline steps",takeaways:"Takeaways",
-    columns:"Columns",rows:"Rows",cells:"Cells",bands:"Bands",quotes:"Quotes",tiles:"Tiles",meta:"Details"};
+    columns:"Columns",rows:"Rows",cells:"Cells",bands:"Bands",quotes:"Quotes",tiles:"Tiles",meta:"Details",
+    sections:"Sections"};
   function singular(k){ return ITEM_LABEL[k]||pretty(String(k).replace(/ies$/,'y').replace(/s$/,'')); }
   function arrayName(path){ var last=String(path).split('.').pop(); return ARRAY_LABEL[last]||pretty(last); }
   function fieldName(k){ return FIELD_LABEL[k]||pretty(k); }
@@ -3243,6 +3792,12 @@ body.forge-edit #forge-zoom{ display:flex; }
      rendered */
   function plainText(s){ return String(s==null?'':s)
       .replace(/\[\[(.+?)\]\]/g,'$1').replace(/\*\*(.+?)\*\*/g,'$1').replace(/`(.+?)`/g,'$1'); }
+  /* the section type a `.sec-<type>` wrapper carries, or null. Read off the DOM
+     rather than the data so it works from anywhere a node is in hand. */
+  function secTypeOf(node){ if(!node||!node.classList) return null;
+    for(var i=0;i<node.classList.length;i++){ var c=node.classList[i];
+      if(c.indexOf('sec-')===0&&c!=='sec-row'&&c!=='sec-unknown') return c.slice(4); }
+    return null; }
   /* {icon,name} for any keyed element — the one place a key becomes English */
   function elName(node,key){
     if(node&&node.hasAttribute&&node.hasAttribute('data-free')){
@@ -3252,6 +3807,12 @@ body.forge-edit #forge-zoom{ display:flex; }
         :node.classList.contains('image')?'Image':node.classList.contains('svg')?'Diagram'
         :node.classList.contains('embed')?'Embed':'Text';
       return {icon:'★',name:t}; }
+    /* a composed slide's sections name themselves after what they ARE ("Stat
+       row", "Title band"), not "Section 3" — the number is already in the
+       panel heading and the type is the thing you are looking for */
+    var st=secTypeOf(node);
+    if(st) return {icon:'▤',name:(SG.S&&SG.S[st]&&SG.S[st].label)||pretty(st)};
+    if(node&&node.classList&&node.classList.contains('sec-row')) return {icon:'▥',name:'Row of sections'};
     var seg=String(deNs(key)||'').split('.'), last=seg[seg.length-1];
     if(/^\d+$/.test(last)) return {icon:'№',name:singular(seg[seg.length-2])+' '+(+last+1)};
     if(node&&node.getAttribute&&node.getAttribute('data-arr'))
@@ -3972,6 +4533,150 @@ body.forge-edit #forge-zoom{ display:flex; }
       remapItemOverrides(sc.host,sc.key,it.idx,-1); }); return true; };
 
   /* =====================================================================
+     PROMOTION — turn a classic slide into a composed one (composer plan §D).
+
+     The decomposition itself lives in sections.js (SG.TO_SECTIONS); the editor
+     only rewrites the slide and carries the user's styling across. Nothing here
+     runs on load — promotion is always an explicit action, so an untouched deck
+     never changes shape behind the user's back.
+     ===================================================================== */
+  /* Rewrite override keys through a {oldPrefix: newPrefix} map, LONGEST PREFIX
+     FIRST so `title` can never swallow `timeline`. A key that matches nothing is
+     left as-is; the orphan GC in commit() drops it if the promoted slide has no
+     such element (agenda's `rail` is the one case where that happens by
+     design). Whole thing is one mutation inside one F.do, so one undo restores
+     the classic slide exactly. */
+  function remapPrefixes(ov,keymap){
+    var pres=Object.keys(keymap).sort(function(a,b){ return b.length-a.length; }), out={};
+    Object.keys(ov).forEach(function(k){
+      for(var i=0;i<pres.length;i++){ var p=pres[i];
+        if(k===p||k.indexOf(p+'.')===0){ out[keymap[p]+k.slice(p.length)]=ov[k]; return; } }
+      out[k]=ov[k]; });
+    return out; }
+  F.canPromote=function(slideIdx){ var s=(SG.data.slides||[])[slideIdx];
+    return !!(s&&SG.canPromote&&SG.canPromote(s.layout)); };
+  /* the mutation on its own, so promote-then-insert can be ONE undo step */
+  function promoteMutate(sl){
+    var to=SG.TO_SECTIONS&&SG.TO_SECTIONS[sl.layout]; if(!to) return false;
+    var r=to(sl.content||{});
+    sl.layout='composed';
+    sl.content={sections:r.sections};
+    if(sl.overrides) sl.overrides=remapPrefixes(sl.overrides,r.keymap);
+    return true; }
+  F.promoteSlide=function(slideIdx){
+    var s=(SG.data.slides||[])[slideIdx]; if(!s) return false;
+    if(s.layout==='composed') return true;                  /* already there */
+    if(!(SG.TO_SECTIONS&&SG.TO_SECTIONS[s.layout])) return false;
+    clearSel();
+    F.do('convert to composed',function(data){ promoteMutate(data.slides[slideIdx]); });
+    return true; };
+
+  /* =====================================================================
+     SECTION VERBS — insert into the flow, reorder, remove, resize.
+
+     This is the answer to the founding complaint: a component added to a slide
+     should JOIN the slide, not float on top of it. Everything below works on
+     `content.sections`, and every one of them remaps override keys the same way
+     the item verbs do (`sections` is just another array path), so a section's
+     styling travels with the section.
+     ===================================================================== */
+  function sectionsOf(slideIdx){ var s=(SG.data.slides||[])[slideIdx];
+    return (s&&s.layout==='composed'&&s.content&&Array.isArray(s.content.sections))?s.content.sections:null; }
+  /* the TOP-LEVEL section a key belongs to (`sections.2.content.stats.0` -> 2).
+     A row's items are addressed one level deeper; moving WITHIN a row is a v2
+     verb, so ▲/▼ act on the whole row. */
+  function sectionIndexOf(key){ var m=/^sections\.(\d+)(?:$|\.)/.exec(deNs(key)||''); return m?+m[1]:-1; }
+  F.sectionIndexOf=sectionIndexOf;
+  /* lift one section's overrides out of the bag, keyed by their suffix, so a
+     move can put them back at the destination index after the shift */
+  function takeSectionOverrides(s,idx){ if(!s.overrides) return {};
+    var pre='sections.'+idx, out={};
+    Object.keys(s.overrides).forEach(function(k){
+      if(k===pre||k.indexOf(pre+'.')===0){ out[k.slice(pre.length)]=s.overrides[k]; delete s.overrides[k]; } });
+    return out; }
+  function putSectionOverrides(s,idx,bag){ var ks=Object.keys(bag); if(!ks.length) return;
+    s.overrides=s.overrides||{};
+    ks.forEach(function(sfx){ s.overrides['sections.'+idx+sfx]=bag[sfx]; }); }
+
+  /* Insert a section into the slide's flow.
+     composed slide     -> splice it in
+     decomposable class -> promote first, in the SAME undo step
+     anything else      -> false; the caller offers a floating object instead */
+  F.insertIntoFlow=function(slideIdx,secType,content,atIdx){
+    if(!(SG.S&&SG.S[secType])) return false;
+    var s=(SG.data.slides||[])[slideIdx]; if(!s) return false;
+    if(s.layout!=='composed'&&!(SG.TO_SECTIONS&&SG.TO_SECTIONS[s.layout])) return false;
+    var at=null;
+    clearSel();
+    F.do('insert section',function(data){ var sl=data.slides[slideIdx];
+      if(sl.layout!=='composed'&&!promoteMutate(sl)) return;
+      var secs=sl.content.sections=sl.content.sections||[];
+      at=(atIdx==null||atIdx<0||atIdx>secs.length)?secs.length:atIdx;
+      if(at<secs.length) remapItemOverrides(sl,'sections',at,+1);   /* later sections shift down */
+      secs.splice(at,0,{type:secType,content:clone(content||(SG.S[secType].defaults)||{})}); });
+    if(at!=null) reselectKey(slideIdx,'sections.'+at);
+    return true; };
+
+  F.moveSection=function(slideIdx,from,to){
+    var secs=sectionsOf(slideIdx); if(!secs) return false;
+    if(from<0||from>=secs.length) return false;
+    to=clamp(to,0,secs.length-1); if(to===from) return false;
+    clearSel();
+    F.do('move section',function(data){ var sl=data.slides[slideIdx], a=sl.content.sections;
+      var moved=takeSectionOverrides(sl,from);     /* out of the way BEFORE the shift */
+      var it=a.splice(from,1)[0];
+      remapItemOverrides(sl,'sections',from,-1);
+      a.splice(to,0,it);
+      remapItemOverrides(sl,'sections',to,+1);
+      putSectionOverrides(sl,to,moved); });
+    reselectKey(slideIdx,'sections.'+to);
+    return true; };
+
+  F.removeSection=function(slideIdx,idx){
+    var secs=sectionsOf(slideIdx); if(!secs||idx<0||idx>=secs.length) return false;
+    clearSel();
+    F.do('remove section',function(data){ var sl=data.slides[slideIdx];
+      sl.content.sections.splice(idx,1);
+      remapItemOverrides(sl,'sections',idx,-1); });      /* the removed one's overrides go with it */
+    return true; };
+
+  /* `size` is a flex weight, not a pixel height. 0/blank clears it back to
+     "take your natural height", which is why this deletes rather than stores 0. */
+  F.resizeSection=function(slideIdx,idx,size){
+    var secs=sectionsOf(slideIdx); if(!secs||!secs[idx]) return false;
+    F.do('resize section',function(data){ var e=data.slides[slideIdx].content.sections[idx];
+      var n=parseFloat(size);
+      if(!n||n<=0) delete e.size; else e.size=n; });
+    return true; };
+
+  /* ---- one-line self-dismissing status line ----------------------------
+     Used only where an action's OUTCOME differs from what was asked for (a
+     section insert that had to fall back to a floating object). Silence there
+     is how "it landed on top again" becomes a mystery instead of a message. */
+  F.toast=function(msg){
+    var t=D.getElementById('forge-toast');
+    if(!t){ t=el('div','forge-chrome'); t.id='forge-toast'; D.body.appendChild(t); }
+    t.textContent=msg; t.classList.add('on');
+    clearTimeout(F._toastT); F._toastT=setTimeout(function(){ t.classList.remove('on'); },5200); };
+
+  /* ---- two-choice confirm ----------------------------------------------
+     Deliberately NOT an OK/Cancel: both outcomes are legitimate here, so both
+     get a named button and neither is "cancel". */
+  F.confirmDo=function(title,body,okLabel,ok,altLabel,alt){
+    var o=el('div','forge-chrome'); o.id='forge-confirm';
+    var card=el('div','forge-struct-card'); card.style.width='min(460px,94vw)';
+    card.appendChild(el('h3',null,title));
+    card.appendChild(el('div','forge-hint',body));
+    var btns=el('div','forge-struct-btns');
+    function b(lab,cls,fn){ var x=el('button','forge-btn '+(cls||''),lab);
+      x.onclick=function(){ o.remove(); fn&&fn(); }; btns.appendChild(x); return x; }
+    if(altLabel) b(altLabel,'',alt);
+    var okb=b(okLabel,'primary',ok); okb.style.marginLeft='auto';
+    card.appendChild(btns); o.appendChild(card); D.body.appendChild(o);
+    o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
+    okb.focus(); };
+
+  /* =====================================================================
      ALIGN & DISTRIBUTE — multi-select verbs, slide-space math.
      ===================================================================== */
   function shiftSel(x,dx,dy){ var d=elData(x); d.x=Math.round((d.x||0)+dx); d.y=Math.round((d.y||0)+dy);
@@ -4100,6 +4805,13 @@ body.forge-edit #forge-zoom{ display:flex; }
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem('▲ Bring forward',null,function(){ F.zNudge(1); }));
     ctxMenu.appendChild(ctxItem('▼ Send back',null,function(){ F.zNudge(-1); }));
+    /* Convert to composed — offered on any decomposable classic slide. It is
+       what unlocks inserting a section into the flow, so it belongs on the
+       slide's own menu and not buried in a panel. */
+    if(!isFree&&F.canPromote(slideIdxOf(node))){
+      ctxMenu.appendChild(el('div','forge-ctx-sep'));
+      var pi=slideIdxOf(node);
+      ctxMenu.appendChild(ctxItem('⧉ Convert to composed',null,function(){ F.promoteSlide(pi); })); }
     ctxMenu.appendChild(el('div','forge-ctx-sep'));
     ctxMenu.appendChild(ctxItem(isFree?'🗑 Delete object':'↺ Reset element','warn',function(){ F.deleteSel(); }));
     ctxMenu.classList.add('on');
@@ -5005,16 +5717,24 @@ body.forge-edit #forge-zoom{ display:flex; }
     if(hasOv){ var rb=el('button','forge-btn warn','↺ Reset all element overrides');
       rb.onclick=function(){ F.do('reset overrides',function(data){ delete data.slides[i].overrides; }); };
       s.appendChild(rb); }
-    /* masters: store this hand-tuned slide as a reusable layout (insert menu lists it) */
+    /* masters: store this hand-tuned slide as a reusable layout — it shows up
+       in the insert menu AND, with a thumbnail, on the gallery's "From this
+       deck" tab. A master may now hold a composed slide; `base` records the
+       layout, so nothing about the shape needed to change. */
     var sv=el('button','forge-btn','★ Save as layout'); sv.style.marginTop='8px';
-    sv.onclick=function(){ var name=prompt('Name this layout'); if(!name) return;
-      F.do('save master',function(data){ data.masters=data.masters||{};
-        data.masters[name]={base:slide.layout,content:clone(slide.content||{}),
-          ambient:slide.ambient,theme:clone(slide.theme||null)||undefined,
-          overrides:clone(slide.overrides||null)||undefined,
-          freeObjects:clone(slide.freeObjects||null)||undefined};
-        Object.keys(data.masters[name]).forEach(function(k){ if(data.masters[name][k]==null) delete data.masters[name][k]; }); }); };
+    sv.onclick=function(){ var name=prompt('Name this layout'); if(name) F.saveMaster(name,i); };
     s.appendChild(sv); }
+  F.saveMaster=function(name,slideIdx){
+    if(!name) return false;
+    var i=slideIdx==null?curSlide():slideIdx, slide=(SG.data.slides||[])[i]; if(!slide) return false;
+    F.do('save master',function(data){ var sl=data.slides[i];
+      data.masters=data.masters||{};
+      data.masters[name]={base:sl.layout,content:clone(sl.content||{}),
+        ambient:sl.ambient,theme:clone(sl.theme||null)||undefined,
+        overrides:clone(sl.overrides||null)||undefined,
+        freeObjects:clone(sl.freeObjects||null)||undefined};
+      Object.keys(data.masters[name]).forEach(function(k){ if(data.masters[name][k]==null) delete data.masters[name][k]; }); });
+    return true; };
 
   function deckPanel(body){ deckSettings(body); themeSection(body); brandPanel(body); }
   /* deck-wide settings — rendered into the sidebar AND into the ⚙ Deck modal */
@@ -5045,7 +5765,26 @@ body.forge-edit #forge-zoom{ display:flex; }
         SG.data.theme[tk]=v; F.renderLive(); }));
       lab.appendChild(el('span',null,tk)); grid.appendChild(lab); });
     s.appendChild(grid);
-    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.')); }
+    s.appendChild(el('div','forge-hint','Theme tokens recolor everything — layouts, charts, ambients — because nothing hard-codes color.'));
+    personalityField(s); }
+
+  /* ---- personality: the second design axis, beside Theme on purpose ----
+     Colour and character are the two things you pick for a deck, so they are
+     one decision made in one place. */
+  var PERSONALITIES=[['— default —',''],['Editorial','editorial'],['Blueprint','blueprint']];
+  F.personalities=PERSONALITIES;
+  F.setPersonality=function(name){
+    if(name&&!PERSONALITIES.some(function(p){ return p[1]===name; })) return false;
+    F.do('personality',function(data){
+      if(name) data.personality=name; else delete data.personality; });
+    return true; };
+  function personalityField(s){
+    var cur=SG.data.personality||'';
+    s.appendChild(field('Personality',selectInput(PERSONALITIES.map(function(p){ return p[0]; }),
+      (PERSONALITIES.filter(function(p){ return p[1]===cur; })[0]||PERSONALITIES[0])[0],
+      function(v){ var hit=PERSONALITIES.filter(function(p){ return p[0]===v; })[0];
+        F.setPersonality(hit?hit[1]:''); })));
+    s.appendChild(el('div','forge-hint','The theme picks the <b>colours</b>; the personality picks the <b>character</b> — type scale, spacing, corners and the decorative motif. Two decks on the same palette still look designed rather than generated.')); }
 
   /* ---- Brand kit (v2 phase 4): colors -> accent slots, fonts, inlined logo ---- */
   var BRAND_FONTS=['','Sora','Unbounded','Exo 2','Archivo','Syne','Epilogue','Bricolage Grotesque',
@@ -5258,6 +5997,27 @@ body.forge-edit #forge-zoom{ display:flex; }
       sf.appendChild(fieldRow('Surface',colorInput((d.theme&&d.theme['--panel'])||'',function(v){ F.pushUndoCoalesced('obj-surface');
         d.theme=d.theme||{}; d.theme['--panel']=v; isFree?applyFree(sel.node,d):applyOverride(sel.node,d); pulse(sel.node); F.saveDebounced(); })));
       sf.appendChild(el('div','forge-hint','Swatches write theme tokens (var(--cyan)), so re-theming and brand kits keep working. "Exact color" pins one literal color.')); }
+
+    /* ---- section verbs (composed slides) ----
+       Offered whenever the selection sits inside a top-level section, at any
+       depth — you should be able to move the stat row you are looking at
+       without first hunting for its wrapper. */
+    var secIdx=(!isFree&&sectionsOf(sel.slideIdx))?sectionIndexOf(sel.key):-1;
+    if(secIdx>=0){ var nsec=sectionsOf(sel.slideIdx).length;
+      var sv=el('div','forge-verbs');
+      function sverb(lab,title,fn,cls,dis){ var b=el('button','forge-chip '+(cls||''),lab); b.title=title;
+        if(dis) b.disabled=true; b.onclick=fn; sv.appendChild(b); }
+      sverb('▲','Move this section up',function(){ F.moveSection(sel.slideIdx,secIdx,secIdx-1); },'',secIdx===0);
+      sverb('▼','Move this section down',function(){ F.moveSection(sel.slideIdx,secIdx,secIdx+1); },'',secIdx===nsec-1);
+      sverb('✕ Remove section','Remove this whole section from the slide',
+        function(){ F.removeSection(sel.slideIdx,secIdx); },'warn');
+      var sec4=sec(body,'Section '+(secIdx+1)+' of '+nsec);
+      sec4.appendChild(sv);
+      var wn=el('input'); wn.type='number'; wn.min='0'; wn.step='1';
+      wn.value=(sectionsOf(sel.slideIdx)[secIdx]||{}).size||'';
+      wn.onchange=function(){ F.resizeSection(sel.slideIdx,secIdx,wn.value); };
+      sec4.appendChild(fieldRow('Space weight',wn));
+      sec4.appendChild(el('div','forge-hint','A <b>weight</b>, not a height: a section with weight 2 takes twice the leftover room of one with weight 1. Blank = just as tall as its own content.')); }
 
     /* ---- list verbs for an item ---- */
     if(isItem){ var verbs=el('div','forge-verbs');
@@ -5505,19 +6265,53 @@ body.forge-edit #forge-zoom{ display:flex; }
      carries the layout + content it was built from, so it keeps its fields
      and list verbs instead of freezing into markup.
      Entries whose key is missing (a layout changed) are skipped silently. */
+  /* [name, layout, pick, extra?, sectionType?]
+     The 5th field is what makes an entry INTEGRATED-insertable: when the target
+     slide is composed (or can be converted), the card adds a section of that
+     type to the slide's flow instead of dropping a floating copy on top.
+     Entries without one have no section counterpart yet and stay floating —
+     that is the honest state of the v1 vocabulary, not an oversight. */
   var GALLERY=[
-    ['Stat card','stat-grid','stats.0'], ['Agenda item','agenda','items.0'],
-    ['Timeline event','timeline','items.0'], ['Pipeline step','pipeline','nodes.0'],
-    ['Quote','quote','quote'], ['Big number','bignum','num'],
-    ['Comparison column','comparison','left'], ['Metric ring','metric-dash','ring'],
+    ['Stat card','stat-grid','stats.0',null,'stats'], ['Agenda item','agenda','items.0',null,'agenda'],
+    ['Timeline event','timeline','items.0',null,'timeline'], ['Pipeline step','pipeline','nodes.0'],
+    ['Quote','quote','quote',null,'quote'], ['Big number','bignum','num',null,'bignum'],
+    ['Comparison column','comparison','left',null,'comparison'], ['Metric ring','metric-dash','ring'],
     ['Metric tile','metric-dash','tiles.0'], ['Leaderboard row','leaderboard','rows.0'],
     ['Matrix cell','matrix','cells.0'], ['Stack band','stack','bands.0'],
     ['Takeaway card','closing','takeaways.0'], ['Code block','code','panel'],
-    ['Editorial column','editorial','columns.0'], ['Index card','index-mosaic','items.0'],
+    ['Editorial column','editorial','columns.0',null,'prose'], ['Index card','index-mosaic','items.0'],
     ['Quote card','quote-mosaic','quotes.0'], ['Hero row','hero-asym','rows.0'],
     ['Section number','divider','index'], ['Statement','manifesto','statement'],
-    ['Kicker','stat-grid','kicker',{kicker:'Section label'}], ['Title','stat-grid','title']
+    ['Kicker','stat-grid','kicker',{kicker:'Section label'},'titleband'],
+    ['Title','stat-grid','title',null,'titleband'],
+    ['Chart','chart','chart',null,'chart'], ['Table','table','table',null,'table'],
+    ['Bullets','media-split','text',null,'bullets'], ['Picture','media-split','image',null,'media']
   ];
+  /* The section content a gallery card inserts. A card that picks ONE item of a
+     list ("Stat card" -> stats.0) becomes a section holding one item, not a bare
+     card — so the list verbs work on it immediately. That is mildly surprising
+     ("I asked for one card, I got a row of one") but the alternative is a
+     parallel vocabulary of single-item section types. */
+  function sectionContentFor(g){
+    var type=g[4], def=clone((SG.S&&SG.S[type]&&SG.S[type].defaults)||{});
+    var m=/^([A-Za-z_][\w-]*)\.0$/.exec(g[2]);
+    if(m&&Array.isArray(def[m[1]])) def[m[1]]=def[m[1]].slice(0,1);
+    if(g[3]) Object.keys(g[3]).forEach(function(k){ if(k in def) def[k]=g[3][k]; });
+    return def; }
+  /* One click, three possible outcomes — and the user is told which they got. */
+  function insertFromGallery(g){
+    var i=curSlide(), type=g[4], s=(SG.data.slides||[])[i];
+    function floating(why){ F.insertElement(g[1],g[2],g[3],g[0]); if(why) F.toast(why); }
+    if(!type||!s) return floating(null);
+    if(s.layout==='composed'){ F.insertIntoFlow(i,type,sectionContentFor(g)); return; }
+    if(F.canPromote(i)){
+      F.confirmDo('Add “'+g[0]+'” to this slide’s layout?',
+        'It will take its place in the arrangement — spaced, sized and themed like the rest of the slide — '+
+        'instead of floating on top. This converts the slide to a composed slide; one undo puts it back.',
+        'Add to the layout',function(){ F.insertIntoFlow(i,type,sectionContentFor(g)); },
+        'Add floating on top',function(){ floating(null); });
+      return; }
+    floating('Added as a floating object — a “'+(s.layout||'')+'” slide has no flow to join.'); }
   /* render one layout's DEFAULTS into a detached, styled section and hand back
      the element carrying `key`. The section is attached to the deck (hidden)
      so the deck's CSS cascade applies and the node has real measured size. */
@@ -5567,16 +6361,162 @@ body.forge-edit #forge-zoom{ display:flex; }
     var sc=deckEl().querySelectorAll('.slide')[i], n=sc&&sc.querySelector('[data-free="'+id+'"]');
     if(n) selectNode(n,false);
     return id; };
+  /* ---- whole-slide presets (composer plan §F) ---------------------------
+     A preset is just a slide object. Most are `composed`, because the point is
+     to show arrangements the 29 fixed layouts cannot make — the classics are
+     already one click away in the layout menu. Content is real placeholder
+     text, not lorem: what you insert should read like a slide you could keep.
+     "From this deck" is the existing `data.masters`, unchanged on disk. */
+  var PRESETS=[
+    {name:'Title + stat row',desc:'A headline over the numbers that back it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{kicker:'Where we are',title:'The year in three numbers'}},
+       {type:'stats',size:1,content:{stats:[
+         {value:'84%',label:'Something worth measuring'},
+         {value:'3.1x',label:'Something worth measuring'},
+         {value:'12',label:'Something worth measuring'}]}} ]}}},
+    {name:'Chart + takeaway',desc:'A chart with the conclusion under it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'What the data says'}},
+       {type:'chart',size:3,content:{type:'bar',note:'by quarter',
+         data:{labels:['Q1','Q2','Q3','Q4'],series:[{name:'Series',values:[12,19,17,26]}]}}},
+       {type:'stats',content:{stats:[{value:'+53%',label:'Year on year'}]}} ]}}},
+    {name:'Picture beside points',desc:'Image one side, the argument the other',
+     slide:{layout:'composed',content:{sections:[
+       {type:'row',size:1,items:[
+         {type:'media',size:1,content:{image:''}},
+         {type:'bullets',size:1,content:{kicker:'The idea',title:'What you are looking at',
+           items:['First point','Second point','Third point']}} ]} ]}}},
+    {name:'Stats beside a quote',desc:'The numbers, and someone saying what they mean',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Evidence and opinion'}},
+       {type:'row',size:1,items:[
+         {type:'stats',size:2,content:{stats:[
+           {value:'84%',label:'Something worth measuring'},
+           {value:'3.1x',label:'Something worth measuring'}]}},
+         {type:'quote',size:1,content:{quote:'A line worth putting on a slide.',by:'Attribution'}} ]} ]}}},
+    {name:'Two charts',desc:'Side by side, same scale, one story',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Before and after'}},
+       {type:'row',size:1,items:[
+         {type:'chart',size:1,content:{type:'bar',title:'Before',
+           data:{labels:['A','B','C'],series:[{name:'S',values:[8,5,3]}]}}},
+         {type:'chart',size:1,content:{type:'bar',title:'After',
+           data:{labels:['A','B','C'],series:[{name:'S',values:[4,9,14]}]}}} ]} ]}}},
+    {name:'Agenda beside a big number',desc:'What we will cover, and the one figure behind it',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{kicker:'Today',title:'What we will cover'}},
+       {type:'row',size:1,items:[
+         {type:'bignum',size:1,content:{value:'3',subtitle:'things that matter'}},
+         {type:'agenda',size:2,content:{items:[
+           {title:'First thing',desc:'One line about it'},
+           {title:'Second thing',desc:'One line about it'},
+           {title:'Third thing',desc:'One line about it'}]}} ]} ]}}},
+    {name:'Timeline over a comparison',desc:'How we got here, then the choice ahead',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'Where we have been, where we go'}},
+       {type:'timeline',size:1,content:{items:[
+         {year:'2024',title:'Then'},{year:'2025',title:'Since'},{year:'2026',title:'Now',now:true}]}},
+       {type:'comparison',size:2,content:{
+         left:{tag:'Option A',title:'This way',items:['Point one','Point two']},
+         right:{tag:'Option B',title:'That way',items:['Point one','Point two']},badge:'VS'}} ]}}},
+    {name:'Table with a lead',desc:'A paragraph of context above the detail',
+     slide:{layout:'composed',content:{sections:[
+       {type:'titleband',content:{title:'The detail'}},
+       {type:'prose',content:{lead:'One sentence saying what the table below is for.',columns:[]}},
+       {type:'table',size:1,content:{columns:['','Before','After'],
+         rows:[['First row','–','–'],['Second row','–','–'],['Third row','–','–']],
+         options:{highlightCol:2}}} ]}}},
+    {name:'Quote, full slide',desc:'One line, nothing else',badge:'classic',
+     slide:{layout:'quote',content:{quote:'A line worth putting on a slide.',by:'Attribution'}}},
+    {name:'Section divider',desc:'A numbered break between chapters',badge:'classic',
+     slide:{layout:'divider',content:{index:'02',title:'Next section',subtitle:''}}}
+  ];
+  F.presets=PRESETS;
+  F.insertPreset=function(preset){ if(!preset||!preset.slide) return false;
+    var i=curSlide();
+    /* deep clone, always: mutating an inserted slide must never reach back and
+       edit the built-in preset for the rest of the session */
+    F.do('insert slide preset',function(data){ data.slides.splice(i+1,0,clone(preset.slide)); });
+    location.hash='#'+(i+2); F.buildNav(); F.buildInspect();
+    return true; };
+
+  /* A WHOLE slide rendered into the off-screen ghost, for the Slides tab's
+     miniatures. Same technique as galleryNode one level up: real render, real
+     CSS cascade, real measurements — so a preview is the deck's own theme and
+     personality rather than a drawing of them. */
+  function gallerySlideThumb(slide){
+    var lay=slide.layout||'raw', fn=SG.layouts[lay]; if(!fn) return null;
+    var secCls=(SG.SECTION_LAYOUTS&&SG.SECTION_LAYOUTS[lay])?(' '+lay):'';
+    var host=el('section','slide active'+secCls+' lyt-'+lay+' forge-ghost');
+    var out; try{ out=fn(clone(slide.content||{}),{index:0,total:1}); }catch(e){ return null; }
+    if(out&&!Array.isArray(out)&&out.raw!=null) host.insertAdjacentHTML('beforeend',out.raw);
+    else (function add(x){ if(x==null||x===false) return;
+      if(Array.isArray(x)){ x.forEach(add); return; }
+      host.appendChild(x.nodeType?x:D.createTextNode(String(x))); })(out);
+    deckEl().appendChild(host);
+    return host; }
+
   F.insertGallery=function(){ var old=D.getElementById('forge-gallery'); if(old){ old.remove(); return; }
     var o=el('div','forge-chrome'); o.id='forge-gallery';
     var card=el('div','forge-struct-card'); card.style.width='min(680px,94vw)';
     var head=el('div','forge-struct-head');
-    head.appendChild(el('h3',null,'Insert an element'));
+    head.appendChild(el('h3',null,'Insert'));
     var q=el('input'); q.type='text'; q.className='forge-gal-search';
     q.placeholder='Search elements… (e.g. quote, timeline, stat)';
     head.appendChild(q); card.appendChild(head);
-    var grid=el('div','forge-gal-grid'); card.appendChild(grid);
-    var made=[];
+    /* --- tabs: pieces of a slide | whole slides | this deck's own --- */
+    var tabs=el('div','forge-gal-tabs'), panes={};
+    var TABS=[['elements','Elements'],['slides','Slides'],['deck','From this deck']];
+    var made=[], slideMade=[], builtSlides=false, builtDeck=false;
+    function show(which){
+      TABS.forEach(function(t){ panes[t[0]].style.display=(t[0]===which)?'':'none';
+        tabs.children[TABS.indexOf(t)].classList.toggle('on',t[0]===which); });
+      q.style.visibility=(which==='elements')?'':'hidden';
+      if(which==='slides'&&!builtSlides){ builtSlides=true; buildSlides(); }
+      if(which==='deck'&&!builtDeck){ builtDeck=true; buildDeck(); } }
+    TABS.forEach(function(t){ var b=el('button','forge-gal-tab',t[1]);
+      b.onclick=function(){ show(t[0]); }; tabs.appendChild(b);
+      panes[t[0]]=el('div','forge-gal-pane'); });
+    card.appendChild(tabs);
+    var grid=el('div','forge-gal-grid'); panes.elements.appendChild(grid);
+    TABS.forEach(function(t){ card.appendChild(panes[t[0]]); });
+    /* Slide miniatures are built ON TAB OPEN, never at editor boot: each one is
+       a full slide render, and nobody should pay for that to click ⊞. */
+    function slideCard(host,name,desc,badge,onclick){
+      var c=el('div','forge-gal-card whole'); c.onclick=onclick;
+      var prev=el('div','forge-gal-prev whole');
+      var inner=el('div','forge-gal-inner');
+      var cl=host.cloneNode(true); cl.classList.remove('forge-ghost');
+      cl.style.cssText='position:relative;width:1280px;height:720px;left:0;top:0;opacity:1;visibility:visible';
+      inner.appendChild(cl); prev.appendChild(inner); c.appendChild(prev);
+      var nm=el('div','forge-gal-nm'); nm.textContent=name; c.appendChild(nm);
+      var fr=el('div','forge-gal-from'); fr.textContent=desc||''; c.appendChild(fr);
+      if(badge) c.appendChild(el('div','forge-gal-tag',badge));
+      slideMade.push({inner:inner,prev:prev,host:host});
+      return c; }
+    function scaleSlides(){ slideMade.forEach(function(m){
+        var pw=m.prev.clientWidth||150, ph=m.prev.clientHeight||84;
+        var s=Math.min(pw/1280,ph/720);
+        m.inner.style.width='1280px'; m.inner.style.height='720px';
+        m.inner.style.transform='translate(-50%,-50%) scale('+s.toFixed(4)+')';
+        m.host.remove(); });                       /* ghosts must NEVER survive a render */
+      slideMade.length=0; }
+    function buildSlides(){ var g=el('div','forge-gal-grid whole');
+      PRESETS.forEach(function(p){ var host=gallerySlideThumb(p.slide); if(!host) return;
+        g.appendChild(slideCard(host,p.name,p.desc,p.badge||'composed',
+          function(){ o.remove(); F.insertPreset(p); })); });
+      panes.slides.appendChild(g); scaleSlides(); }
+    function buildDeck(){ var masters=SG.data.masters||{}, names=Object.keys(masters);
+      if(!names.length){ panes.deck.appendChild(el('div','forge-hint',
+        'Nothing saved yet. Tune a slide the way you want it, then press <b>★ Save as layout</b> in the Slide panel — it will show up here, thumbnail and all, ready to reuse.')); return; }
+      var g=el('div','forge-gal-grid whole');
+      names.forEach(function(nm){ var m=masters[nm];
+        var sl={layout:m.base||'divider',content:m.content||{},overrides:m.overrides,freeObjects:m.freeObjects};
+        var host=gallerySlideThumb(sl); if(!host) return;
+        g.appendChild(slideCard(host,nm,'saved from this deck','★ mine',
+          function(){ o.remove(); F.addSlide(null,nm); })); });
+      panes.deck.appendChild(g); scaleSlides(); }
     GALLERY.forEach(function(g){ var got=galleryNode(g[1],g[2],g[3]); if(!got) return;
       var c=el('div','forge-gal-card'); c.dataset.q=(g[0]+' '+g[1]).toLowerCase();
       var prev=el('div','forge-gal-prev');
@@ -5584,10 +6524,14 @@ body.forge-edit #forge-zoom{ display:flex; }
       prev.appendChild(inner); c.appendChild(prev);
       var nm=el('div','forge-gal-nm'); nm.textContent=g[0]; c.appendChild(nm);
       var fr=el('div','forge-gal-from'); fr.textContent='from '+g[1]; c.appendChild(fr);
-      c.onclick=function(){ o.remove(); F.insertElement(g[1],g[2],g[3],g[0]); };
+      if(g[4]){ var tag=el('div','forge-gal-tag','joins the layout');
+        tag.title='On a composed slide (or one that can be converted) this takes its place in the arrangement instead of floating on top.';
+        c.appendChild(tag); }
+      c.onclick=function(){ o.remove(); insertFromGallery(g); };
       grid.appendChild(c);
       made.push({node:got.node,host:got.host,inner:inner,prev:prev}); });
-    card.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. It arrives themed and keeps its own fields — drag, resize, restyle, edit its text or add items to it exactly as if it had come with the layout.'));
+    panes.elements.appendChild(el('div','forge-hint','Any element from any layout can be dropped onto this slide. On a composed slide the tagged ones take their place in the arrangement; the rest arrive as floating objects. Either way they keep their own fields — drag, resize, restyle, edit their text or add items exactly as if they had come with the layout.'));
+    panes.slides.appendChild(el('div','forge-hint','Whole slide designs, previewed in <b>this deck’s</b> theme and personality. Most are arrangements the fixed layouts cannot make. Inserting one adds a new slide after the current one, with placeholder text to replace.'));
     var btns=el('div','forge-struct-btns');
     var close=el('button','forge-btn','Close'); close.style.marginLeft='auto';
     close.onclick=function(){ o.remove(); }; btns.appendChild(close);
@@ -5604,7 +6548,14 @@ body.forge-edit #forge-zoom{ display:flex; }
       [].slice.call(grid.children).forEach(function(c){
         c.style.display=(!v||c.dataset.q.indexOf(v)>=0)?'':'none'; }); };
     o.addEventListener('pointerdown',function(e){ if(e.target===o) o.remove(); });
-    q.focus(); };
+    /* whatever happens, no ghost may outlive this modal: a stray .forge-ghost
+       inside #deck shifts every .slide index and quietly breaks navigation */
+    o.addEventListener('remove',function(){});
+    var mo=new W.MutationObserver(function(){ if(!o.isConnected){
+      [].slice.call(deckEl().querySelectorAll('.forge-ghost')).forEach(function(n){ n.remove(); });
+      mo.disconnect(); } });
+    mo.observe(D.body,{childList:true});
+    show('elements'); q.focus(); };
 
   /* =====================================================================
      SAVE — download a fresh self-contained .html with edits baked in.

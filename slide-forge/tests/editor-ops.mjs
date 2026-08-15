@@ -392,6 +392,359 @@ F.setZoom(99); ok(F.zoom===3,'zoom clamps at 3x');
 F.setZoom(0.01); ok(F.zoom===0.25,'zoom clamps at 0.25x');
 F.zoomFit(); ok(F.zoom===1&&F.focus===false,'Fit resets zoom and turns Focus off');
 
+// =====================================================================
+// COMPOSED SLIDES (composer plan §C) — sections render with authored keys
+// that are literal content paths, so the whole v3 identity layer applies at
+// section depth with no new machinery.
+// =====================================================================
+const COMPOSED={meta:{title:'Composed',seed:7},slides:[
+  {layout:'composed',content:{sections:[
+    {type:'titleband',content:{kicker:'K',title:'Composed'}},
+    {type:'row',items:[
+      {type:'stats',size:2,content:{stats:[{value:'42',unit:'%',label:'L0'},{count:9,label:'L1'}]}},
+      {type:'quote',content:{quote:'Qq',by:'By'}} ]} ]}},
+  {layout:'stat-grid',content:{title:'Classic',stats:[{value:'1',label:'a'}]}} ]};
+const domC=boot(NEW,COMPOSED); await new Promise(r=>setTimeout(r,400));
+const wC=domC.window, dC=wC.document, SGC=wC.SG;
+const cs=()=>dC.querySelectorAll('#deck .slide')[0];
+ok(!!wC.SG.S&&!!wC.SG.S.titleband&&!!wC.SG.layouts.composed,'section registry + composed layout are exposed');
+ok(cs().classList.contains('lyt-composed'),'composed slide gets its lyt- hook');
+ok(cs().children.length>=2&&cs().querySelector('.sec-titleband')&&cs().querySelector('.sec-row'),'sections and the row mount as flex children');
+// keys are content paths, one prefix deeper per nesting level
+ok(!!cs().querySelector('[data-el="sections.0"]'),'section key sections.0');
+ok(!!cs().querySelector('[data-bind="sections.0.content.title"]'),'title bind is a literal content path');
+ok(!!cs().querySelector('[data-el="sections.1.items.0"]'),'row item key sections.1.items.0');
+ok(!!cs().querySelector('[data-el="sections.1.items.0.content.stats.1"]'),'array item key at row depth');
+ok(cs().querySelector('[data-arr="sections.1.items.0.content.stats"]')!==null,'data-arr survives the prefix');
+// every bound leaf resolves through the same getPath the editor writes back with
+const binds=[...cs().querySelectorAll('[data-bind]')].map(n=>n.getAttribute('data-bind'));
+ok(binds.length>0&&binds.every(b=>SGC.getPath(SGC.data.slides[0].content,b)!==undefined),
+   'every data-bind on a composed slide resolves via SG.getPath');
+// overrides key off those same paths
+SGC.data.slides[0].overrides={'sections.1.items.0.content.stats.0':{w:220}};
+SGC.renderSlide(dC.getElementById('deck'),0);
+ok(cs().querySelector('[data-el="sections.1.items.0.content.stats.0"]').style.width==='220px',
+   'an override keyed at section depth styles the right node');
+// size -> flex weight; absent size leaves the CSS default alone
+ok(cs().querySelector('[data-el="sections.1.items.0"]').style.flexGrow==='2','size becomes a flex weight');
+ok(!cs().querySelector('[data-el="sections.0"]').getAttribute('style'),'a section with no size carries no inline style');
+// an unknown type degrades to a visible placeholder rather than a blank slide
+SGC.data.slides[0].content.sections.push({type:'nope',content:{}});
+SGC.renderSlide(dC.getElementById('deck'),0);
+ok(!!cs().querySelector('.sec-unknown'),'an unknown section type renders a placeholder, not an exception');
+// the classic caller is untouched (base='' — parity.mjs is the real guard)
+ok(!!dC.querySelectorAll('#deck .slide')[1].querySelector('[data-el="stats.0"]'),
+   'the same builder at base="" still authors flat classic keys');
+
+// ---------- the full v1 vocabulary ----------
+// Every type builds, mounts under its own .sec-<type> wrapper, and prefixes
+// EVERY key it authors — a builder that forgets `base` on one leaf would leak a
+// flat key that collides across sections, so this walks all of them.
+const V1=['titleband','stats','bignum','chart','table','comparison','quote',
+          'bullets','media','agenda','timeline','prose'];
+ok(V1.every(t=>wC.SG.S[t]&&typeof wC.SG.S[t].build==='function'),'all 12 v1 section types are registered');
+ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===V1.length,
+   'SG.SECTION_TYPES is exactly the v1 vocabulary (the editor + validator read it)');
+{
+  const secs=V1.map(t=>({type:t,content:JSON.parse(JSON.stringify(wC.SG.S[t].defaults||{}))}));
+  SGC.data.slides[0]={layout:'composed',content:{sections:secs}};
+  SGC.render(dC.getElementById('deck'),SGC.data);
+  const bad=V1.filter(t=>!cs().querySelector('.sec-'+t));
+  ok(bad.length===0,'every section type mounts its own wrapper (missing: '+bad+')');
+  const flat=[...cs().querySelectorAll('[data-el],[data-bind],[data-arr]')]
+    .flatMap(n=>['data-el','data-bind','data-arr'].map(a=>n.getAttribute(a)).filter(Boolean))
+    .filter(k=>!/^sections\./.test(k));
+  ok(flat.length===0,'no section leaks an unprefixed key (leaked: '+flat.slice(0,4)+')');
+  ok(V1.every(t=>typeof wC.SG.S[t].label==='string'&&wC.SG.S[t].label),'every type carries a human label');
+  // each type's own defaults must satisfy its own required fields — that is what
+  // an editor insert will drop onto a slide, so a broken default ships broken
+  const empty=V1.filter(t=>{const w=cs().querySelector('.sec-'+t);return w&&!w.textContent.trim()&&!w.querySelector('img,svg,.media-img');});
+  ok(empty.length===0,'every type renders something from its own defaults (empty: '+empty+')');
+}
+// ---------- media/bullets keep media-split's output ----------
+{
+  SGC.data.slides[1]={layout:'media-split',content:{title:'MS',body:'b',items:['i0'],image:''}};
+  SGC.render(dC.getElementById('deck'),SGC.data);
+  const ms=dC.querySelectorAll('#deck .slide')[1];
+  ok(!!ms.querySelector('.media-split.side-left .ms-media')&&!!ms.querySelector('.media-split .ms-text'),
+     'media-split still wraps the media + bullets sections in its grid');
+  ok(!!ms.querySelector('[data-el="image"]')&&!!ms.querySelector('[data-bind="items.0"]'),
+     'media-split keys stay flat at base=""');
+}
+
+// =====================================================================
+// PROMOTION (composer plan §D) — classic slide -> composed, on user action.
+// The user's styling has to survive the key rewrite, and ONE undo has to put
+// the classic slide back exactly as it was.
+// =====================================================================
+{
+  const PD={meta:{title:'Promote',seed:7},slides:[
+    {layout:'stat-grid',content:{kicker:'K',title:'T',stats:[{value:'1',label:'a'},{value:'2',label:'b'},{value:'3',label:'c'}]},
+     overrides:{'title':{color:'var(--mint)'},'stats.2':{w:250},'stats.2.label':{fs:22}}},
+    {layout:'media-split',content:{title:'MS',side:'right',body:'b',items:['i0'],image:''}},
+    {layout:'agenda',content:{title:'A',items:[{title:'one'}]},overrides:{'rail':{color:'#f00'}}},
+    {layout:'cover',content:{title:'C'}} ]};
+  const dP=boot(NEW,PD); await new Promise(r=>setTimeout(r,400));
+  const wP=dP.window, dd=wP.document, SGP=wP.SG, FP=wP.Forge;
+  const sl=n=>SGP.data.slides[n], sec=n=>dd.querySelectorAll('#deck .slide')[n];
+  const before=JSON.stringify(sl(0));
+
+  ok(FP.canPromote(0)&&FP.canPromote(1)&&FP.canPromote(2),'decomposable classics offer promotion');
+  ok(!FP.canPromote(3),'a bespoke layout (cover) does not');
+
+  ok(FP.promoteSlide(0),'promoteSlide reports success');
+  ok(sl(0).layout==='composed','slide became composed');
+  ok(sl(0).content.sections.length===2&&sl(0).content.sections[0].type==='titleband'
+     &&sl(0).content.sections[1].type==='stats','stat-grid decomposed into titleband + stats');
+  ok(SGP.getPath(sl(0).content,'sections.1.content.stats').length===3,'content carried over intact');
+  const ov=sl(0).overrides||{};
+  ok(!!ov['sections.0.content.title']&&ov['sections.0.content.title'].color==='var(--mint)','title override remapped');
+  ok(!!ov['sections.1.content.stats.2']&&ov['sections.1.content.stats.2'].w===250,'item override remapped');
+  ok(!!ov['sections.1.content.stats.2.label'],'DEEP item override remapped via the same prefix');
+  ok(!Object.keys(ov).some(k=>!/^sections\./.test(k)),'no classic-shaped override key survives');
+  // the styles are not just stored under new keys — they actually land on nodes
+  ok(sec(0).querySelector('[data-el="sections.1.content.stats.2"]').style.width==='250px',
+     'the remapped override styles the right node after promotion');
+  // one undo, exactly
+  FP.undoOp();
+  ok(JSON.stringify(sl(0))===before,'ONE undo restores the classic slide byte-identically');
+
+  // media-split promotes to a row, and side:right flips which item is which
+  FP.promoteSlide(1);
+  const r=sl(1).content.sections[0];
+  ok(r.type==='row'&&r.items.length===2,'media-split promotes to a row of two sections');
+  ok(r.items[0].type==='bullets'&&r.items[1].type==='media','side:"right" puts the text first');
+  ok(r.items[1].content.image===''&&r.items[0].content.items[0]==='i0','both halves keep their own fields');
+
+  // agenda's rail has no home in the composed slide; GC drops it (documented)
+  FP.promoteSlide(2);
+  ok(!(sl(2).overrides||{})['rail'],'agenda rail override is GCed, not silently re-keyed');
+  ok(sl(2).content.sections[1].content.items.length===1,'agenda items still carried over');
+
+  // promoting an already-composed slide must not wrap it in itself
+  const depth=FP.undo.length, snap=JSON.stringify(sl(2));
+  FP.promoteSlide(2);
+  ok(JSON.stringify(sl(2))===snap&&FP.undo.length===depth,
+     'promoting a composed slide is a no-op — no re-nesting, no undo entry');
+
+  // promotion NEVER fires on load
+  const fresh=boot(NEW,JSON.parse(JSON.stringify(PD)));
+  await new Promise(r=>setTimeout(r,300));
+  ok(fresh.window.SG.data.slides[0].layout==='stat-grid','loading a deck never promotes anything');
+
+  // ---------- bind write-back at row depth (plan test 7) ----------
+  // A leaf inside a row item must write to sections.N.items.M.content.… —
+  // the deepest path the model produces, and the one most likely to be
+  // mis-routed by a scopeOf/partOf shortcut.
+  dd.body.classList.add('forge-edit');
+  const leaf=sec(1).querySelector('[data-bind="sections.0.items.0.content.items.0"]');
+  ok(!!leaf,'a bullets leaf inside a row item is bound to its full path');
+  if(leaf){
+    leaf.dispatchEvent(new wP.MouseEvent('dblclick',{bubbles:true}));
+    ok(FP.editing===leaf,'double-click starts an edit at row depth');
+    leaf.textContent='rewritten'; FP.endEdit();
+    ok(SGP.getPath(sl(1).content,'sections.0.items.0.content.items.0')==='rewritten',
+       'endEdit writes through to the row item’s own content');
+    ok(!((sl(1).overrides||{})['sections.0.items.0.content.items.0']||{}).html,
+       '…and leaves no html shadow override behind'); }
+  dd.body.classList.remove('forge-edit');
+}
+
+// =====================================================================
+// INTEGRATED INSERT + SECTION VERBS (composer plan capability 2).
+// The founding complaint: a component added to a slide floats on top instead
+// of joining it. These assert the joining, and that a section's styling
+// travels with the section through every reorder.
+// =====================================================================
+{
+  const ID={meta:{title:'Insert',seed:7},slides:[
+    {layout:'composed',content:{sections:[
+      {type:'titleband',content:{title:'T'}},
+      {type:'quote',content:{quote:'Q'}} ]},
+     overrides:{'sections.1.content.quote':{color:'#abc'}}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'cover',content:{title:'C'}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dI=boot(NEW,ID); await new Promise(r=>setTimeout(r,400));
+  const wI=dI.window, di=wI.document, SGI=wI.SG, FI=wI.Forge;
+  const sl=n=>SGI.data.slides[n], sec=n=>di.querySelectorAll('#deck .slide')[n];
+  di.body.classList.add('forge-edit');
+
+  // --- insert into a composed slide: it joins the flow ---
+  ok(FI.insertIntoFlow(0,'stats'),'insertIntoFlow succeeds on a composed slide');
+  ok(sl(0).content.sections.length===3&&sl(0).content.sections[2].type==='stats','section appended to the flow');
+  ok(sl(0).content.sections[2].content.stats.length>0,'the new section arrives with real placeholder content');
+  ok(!!sec(0).querySelector('[data-el="sections.2"] .stat-grid'),'…and renders inside the slide, not as a free object');
+  ok(!(sl(0).freeObjects||[]).length,'nothing was added as a floating object');
+
+  // inserting BEFORE an existing section shifts that section's overrides with it
+  ok(FI.insertIntoFlow(0,'titleband',null,0),'insert at an explicit index');
+  ok(sl(0).content.sections[0].type==='titleband'&&sl(0).content.sections.length===4,'spliced at 0');
+  ok(!!(sl(0).overrides||{})['sections.2.content.quote'],'the quote override shifted 1 -> 2 with its section');
+  ok(sec(0).querySelector('[data-el="sections.2.content.quote"]').style.color==='rgb(170, 187, 204)',
+     '…and still paints the right node');
+
+  // --- insert into a decomposable classic: promotes first, in ONE undo step ---
+  const depth=FI.undo.length;
+  ok(FI.insertIntoFlow(1,'quote'),'insertIntoFlow succeeds on a decomposable classic');
+  ok(sl(1).layout==='composed','the slide was promoted');
+  ok(sl(1).content.sections.some(s=>s.type==='quote'),'…and the new section is in it');
+  ok(FI.undo.length===depth+1,'promote + insert is ONE undo step');
+  FI.undoOp();
+  ok(sl(1).layout==='stat-grid','…which one undo fully reverses');
+
+  // --- a bespoke layout declines; the caller falls back to floating ---
+  ok(FI.insertIntoFlow(2,'stats')===false,'a cover slide declines a section');
+  ok(FI.insertIntoFlow(3,'stats')===false,'a divider slide declines a section');
+  ok(FI.insertIntoFlow(0,'nope')===false,'an unknown section type is refused');
+  ok(!FI.canPromote(2)&&!FI.canPromote(3),'…and neither offers promotion, so the fallback is honest');
+
+  // --- move / remove / resize, with overrides following ---
+  const before=sl(0).content.sections.map(s=>s.type);
+  ok(FI.moveSection(0,2,0),'moveSection reports success');
+  const after=sl(0).content.sections.map(s=>s.type);
+  ok(after[0]===before[2]&&after[1]===before[0]&&after[2]===before[1],'the section actually moved');
+  ok(!!(sl(0).overrides||{})['sections.0.content.quote'],'the moved section took its override with it (2 -> 0)');
+  ok(sec(0).querySelector('[data-el="sections.0.content.quote"]').style.color==='rgb(170, 187, 204)',
+     '…and the style still lands after the move');
+  FI.undoOp();
+  ok(sl(0).content.sections.map(s=>s.type).join()===before.join()&&!!(sl(0).overrides||{})['sections.2.content.quote'],
+     'undo restores both the order and the keys');
+
+  ok(FI.moveSection(0,0,-5)===false,'a no-op move is refused rather than silently reshuffling');
+  ok(FI.moveSection(1,0,1)===false,'section verbs decline on a non-composed slide');
+
+  const n0=sl(0).content.sections.length;
+  ok(FI.removeSection(0,2),'removeSection reports success');
+  ok(sl(0).content.sections.length===n0-1,'the section is gone');
+  ok(!(sl(0).overrides||{})['sections.2.content.quote'],'its overrides went with it');
+  FI.undoOp();
+  ok(sl(0).content.sections.length===n0&&!!(sl(0).overrides||{})['sections.2.content.quote'],'undo restores both');
+
+  ok(FI.resizeSection(0,1,3),'resizeSection reports success');
+  ok(sl(0).content.sections[1].size===3,'size stored as a weight');
+  ok(sec(0).querySelector('[data-el="sections.1"]').style.flexGrow==='3','…and reaches the DOM as flex-grow');
+  FI.resizeSection(0,1,0);
+  ok(!('size' in sl(0).content.sections[1]),'0 clears the weight rather than storing 0');
+
+  // --- naming: sections read as what they are, not as "Section 3" ---
+  const rows=FI.itemRows(sec(0)).filter(r=>/^sections\.\d+$/.test(r.key));
+  ok(rows.length===sl(0).content.sections.length,'every section gets an Items-panel row');
+  ok(rows.some(r=>r.node.classList.contains('sec-quote')),'…including the quote section');
+  di.body.classList.remove('forge-edit');
+}
+
+// =====================================================================
+// PERSONALITY (composer plan §E) — the type/space/shape/motif axis.
+// The contract worth guarding: a deck WITHOUT one must carry no attribute at
+// all, so the default rendering can't drift; and the attribute must survive a
+// full re-render, since that is what a saved deck reopens through.
+// =====================================================================
+{
+  const PL={meta:{title:'Personality',seed:7},slides:[
+    {layout:'cover',content:{title:'C'}},{layout:'quote',content:{quote:'Q'}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dL=boot(NEW,PL); await new Promise(r=>setTimeout(r,400));
+  const wL=dL.window, dl=wL.document, SGL=wL.SG, FL=wL.Forge;
+  const root=()=>dl.documentElement;
+
+  ok(!('personality' in SGL.data),'a deck without a personality has no such key');
+  ok(!root().hasAttribute('data-personality'),'…and no attribute — the default path is untouched');
+
+  ok(FL.setPersonality('blueprint'),'setPersonality accepts a known name');
+  ok(SGL.data.personality==='blueprint','…and stores it on the deck');
+  ok(root().getAttribute('data-personality')==='blueprint','…and reaches the root attribute');
+  SGL.render(dl.getElementById('deck'),SGL.data);
+  ok(root().getAttribute('data-personality')==='blueprint','the attribute survives a full re-render (the boot path)');
+
+  ok(FL.setPersonality('editorial')&&root().getAttribute('data-personality')==='editorial','switching swaps the attribute');
+  ok(FL.setPersonality('nope')===false&&root().getAttribute('data-personality')==='editorial',
+     'an unknown personality is refused, leaving the current one alone');
+
+  FL.setPersonality('');
+  ok(!('personality' in SGL.data),'clearing removes the key rather than storing ""');
+  ok(!root().hasAttribute('data-personality'),'…and removes the attribute');
+  FL.undoOp();
+  ok(SGL.data.personality==='editorial'&&root().getAttribute('data-personality')==='editorial','undo restores both');
+
+  // personality is deck-level, never per-slide, and never touches slide content
+  const snap=JSON.stringify(SGL.data.slides);
+  FL.setPersonality('blueprint');
+  ok(JSON.stringify(SGL.data.slides)===snap,'switching personality does not touch a single slide');
+  ok(FL.personalities.length>=3&&FL.personalities.some(p=>p[1]==='editorial')&&FL.personalities.some(p=>p[1]==='blueprint'),
+     'the picker offers the default plus both v1 personalities');
+}
+
+// =====================================================================
+// SLIDE PRESETS (composer plan §F) — whole slide designs in the ⊞ gallery.
+// The two things that can actually go wrong: a preset getting mutated by the
+// slide inserted from it, and a `.forge-ghost` thumbnail surviving into #deck
+// (which shifts every .slide index and breaks navigation — the known pitfall).
+// =====================================================================
+{
+  const PS={meta:{title:'Presets',seed:7},slides:[
+    {layout:'cover',content:{title:'C'}},{layout:'quote',content:{quote:'Q'}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}},
+    {layout:'divider',content:{title:'D'}} ]};
+  const dS=boot(NEW,PS); await new Promise(r=>setTimeout(r,400));
+  const wS=dS.window, ds=dS.window.document, SGS=wS.SG, FS=wS.Forge;
+  ds.body.classList.add('forge-edit');
+  const slides=()=>SGS.data.slides;
+  const ghosts=()=>ds.getElementById('deck').querySelectorAll('.forge-ghost').length;
+
+  ok(Array.isArray(FS.presets)&&FS.presets.length>=8,'the built-in preset list is exposed and populated');
+  ok(FS.presets.every(p=>p.name&&p.desc&&p.slide&&p.slide.layout),'every preset has a name, a description and a slide');
+  ok(FS.presets.filter(p=>p.slide.layout==='composed').length>=6,
+     'most presets are composed — the classics are already one click away elsewhere');
+  // every preset must be a slide the validator would accept, i.e. it renders
+  const bad=FS.presets.filter(p=>{ try{ return !SGS.layouts[p.slide.layout]; }catch(e){ return true; } });
+  ok(bad.length===0,'every preset names a real layout ('+bad.map(p=>p.name)+')');
+
+  const n0=slides().length, cur=0;
+  wS.location.hash='#1';
+  ok(FS.insertPreset(FS.presets[0]),'insertPreset reports success');
+  ok(slides().length===n0+1,'a slide was added');
+  ok(slides()[1].layout===FS.presets[0].slide.layout,'…right after the current one');
+  // deep clone: editing the inserted slide must not reach back into the preset
+  const presetJSON=JSON.stringify(FS.presets[0].slide);
+  SGS.setPath(slides()[1].content,'sections.0.content.title','MUTATED');
+  ok(JSON.stringify(FS.presets[0].slide)===presetJSON,'mutating the inserted slide never touches the preset');
+  FS.undoOp();
+
+  // masters round-trip, now that a master may hold a composed slide
+  SGS.data.slides[1]={layout:'composed',content:{sections:[
+    {type:'titleband',content:{title:'Mine'}},{type:'stats',content:{stats:[{value:'9',label:'x'}]}} ]},
+    overrides:{'sections.1.content.stats.0':{w:200}}};
+  SGS.render(ds.getElementById('deck'),SGS.data);
+  wS.location.hash='#2';
+  FS.saveMaster('My composed');
+  ok(!!(SGS.data.masters||{})['My composed'],'a composed slide saves as a master');
+  ok(SGS.data.masters['My composed'].base==='composed','…recording composed as its base layout');
+  const before2=slides().length;
+  FS.addSlide(null,'My composed');
+  ok(slides().length===before2+1,'the master inserts as a new slide');
+  const made=slides()[2];
+  ok(made.layout==='composed'&&made.content.sections.length===2,'…and round-trips its sections');
+  ok(!!(made.overrides||{})['sections.1.content.stats.0'],'…and its section-depth overrides');
+
+  // the ghost pitfall: opening and closing the gallery must leave #deck clean
+  const nSlides=ds.getElementById('deck').querySelectorAll('.slide').length;
+  ok(ghosts()===0,'no ghosts before opening the gallery');
+  FS.insertGallery();
+  const gal=ds.getElementById('forge-gallery');
+  ok(!!gal,'the gallery opened');
+  const tabs=[...gal.querySelectorAll('.forge-gal-tab')].map(b=>b.textContent);
+  ok(tabs.join('|')==='Elements|Slides|From this deck','three tabs, in order');
+  [...gal.querySelectorAll('.forge-gal-tab')].forEach(b=>b.click());   // build every pane
+  gal.remove();
+  await new Promise(r=>setTimeout(r,50));
+  ok(ghosts()===0,'closing the gallery leaves NO .forge-ghost inside #deck');
+  ok(ds.getElementById('deck').querySelectorAll('.slide').length===nSlides,
+     '…so the .slide indices are unchanged (the known ghost pitfall)');
+  ds.body.classList.remove('forge-edit');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));

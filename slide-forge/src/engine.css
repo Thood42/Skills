@@ -4,6 +4,55 @@
    so it themes globally and honours per-slide overrides.
    ===================================================================== */
 
+/* =====================================================================
+   COMPOSED SLIDES — section arrangement (composer plan §C).
+   `.slide` is already display:flex/column, so a section is just a flex child
+   and the whole arrangement is a handful of rules. `size` in the deck JSON
+   becomes an inline `flex-grow:N` — grow only. The BASIS lives here, and it
+   differs by axis on purpose:
+     • in a ROW, basis 0, so the weights read as literal width proportions
+       (size 2 next to size 1 really is two-thirds of the row);
+     • in the COLUMN, basis auto, so a weight distributes the LEFTOVER height
+       and can never squeeze a section below its own content — basis 0 there
+       pushes tall content straight off the bottom of the slide.
+   When a slide asks for more than 720px, SOMETHING has to give, and which
+   section gives is the one real decision here. A section keeps flexbox's
+   automatic minimum height by default, so it is never handed less room than the
+   content it draws. The genuinely ELASTIC types opt out with `min-height:0` and
+   absorb the whole overflow — a chart, a table, a timeline or an image renders
+   at whatever height it is given, whereas a stat card is 163px of padding and
+   type no matter what. Without this split, an over-full slide shrinks every
+   section proportionally and the rigid ones quietly spill off the bottom.
+   `min-width:0` is unconditional: across a row, text should re-wrap.
+   ===================================================================== */
+.sec{position:relative; display:flex; flex-direction:column; min-width:0}
+.sec-chart,.sec-table,.sec-timeline,.sec-media{min-height:0}
+/* Layout bodies all declare `flex:1` (= grow 1, basis 0), because as a direct
+   child of `.slide` each is meant to eat the whole slide. Inside a section that
+   basis of 0 erases the block from its section's intrinsic height, so a RIGID
+   section would measure at nothing and be handed nothing. Same split, one level
+   down: only the rigid bodies get their content height back. */
+.sec > .stat-grid, .sec > .cmp, .sec > .editorial, .sec > .agenda-grid,
+.sec > .take, .sec > .gallery{flex-basis:auto}
+.sec-row{position:relative; display:flex; align-items:stretch; gap:var(--p-sec-gap,34px); min-height:0; min-width:0}
+.sec-row > .sec{flex:1 1 0}
+/* Section bodies carry the leading margin their classic layout used to separate
+   them from the title above (.stat-grid 42px, .cmp 40px, .timeline 64px …).
+   Mid-column that IS the spacing, and it comes for free. It is wrong in exactly
+   two places: inside a row, where two sections must align at the row's top, and
+   at the very top of the slide, where there is nothing to be spaced from. */
+.sec-row > .sec > :first-child,
+.lyt-composed > .sec:first-child > :first-child,
+.lyt-composed > .sec-row:first-child > .sec > :first-child{margin-top:0}
+.sec-unknown{padding:18px 22px; border:1px dashed var(--brd-2); border-radius:12px}
+
+/* Refugee rules: these are scoped to the classic layout's own wrapper
+   (`.media-split .ms-media`), which does not exist when the same builder runs
+   as a standalone section. Match the section wrapper too, or the composed copy
+   renders unstyled. */
+.sec-media .ms-media{border-radius:var(--p-radius,18px); min-height:0; flex:1}
+.sec-bullets .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1}
+
 /* ---- inline icon wrapper: SVG inherits text color via currentColor ---- */
 .ico-wrap{display:inline-flex; align-items:center; justify-content:center; color:var(--cyan)}
 .ico-wrap svg{width:1em; height:1em; display:block; fill:none; stroke:currentColor}
@@ -92,7 +141,7 @@ body.presenting{cursor:none}
 
 /* MEDIA-SPLIT — picture one side, prose/bullets the other */
 .media-split{display:grid; grid-template-columns:1fr 1fr; gap:40px; flex:1; min-height:0; align-items:stretch}
-.media-split .ms-media{border-radius:18px; min-height:0}
+.media-split .ms-media{border-radius:var(--p-radius,18px); min-height:0}
 .media-split .ms-text{display:flex; flex-direction:column; justify-content:center; min-width:0}
 .ms-body{margin-top:16px; font-size:17px; line-height:1.6; color:var(--muted); max-width:48ch}
 .ms-items{margin-top:16px; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px}

@@ -439,3 +439,130 @@ clamps). **These were not run in this workspace — it has no Node.** Every one 
 mirrored and passed in a real browser (Chrome, served over `python -m http.server`), which also
 covered what jsdom can't: focus centring to the stage centre, gesture math at zoom, live preview
 miniatures, and the downloaded copy carrying no editor chrome.
+
+---
+
+# v6 — composition, personality, whole-slide presets (2026-08-15)
+
+The composer upgrade. Full design in `docs/plans/slide-forge-composer/`. Additive as always:
+present mode, the identity model and every existing data key are untouched, `meta.schemaVersion`
+stays **3**, and a deck with no `composed` slide and no `personality` renders exactly as it did.
+
+## Sections and the `composed` layout
+
+A slide can now be an **arrangement of sections** instead of one fixed layout. The mechanism is
+worth understanding because it explains why nothing else had to change:
+
+```js
+S[type].build(content, base) -> Node[]
+```
+
+A section *is* the classic layout's own body, extracted and parameterized by one key prefix. At
+`base=''` it is the classic layout (byte-identical — `tests/parity.mjs` is the guard); at
+`base='sections.2.content.'` it is a section of a composed slide. **One implementation, two
+callers.** Because every authored `data-el`/`data-bind`/`data-arr` key stays a literal content path,
+overrides, bind write-back, `hide`/`fs`, item verbs and the orphan GC all work at section depth with
+no new machinery — the payoff of the v3 authored-identity decision.
+
+Twelve section types (`titleband`, `stats`, `bignum`, `chart`, `table`, `comparison`, `quote`,
+`agenda`, `timeline`, `prose`, `media`, `bullets`) live in `src/sections.js` alongside the ten
+classic layouts that are now compositions of them. `SG.SECTION_TYPES` is the single source of the
+list, read by both the editor and `scripts/validate.py`.
+
+Data shape: `content.sections = [Section | Row]`, `Section = {type, size?, content}`,
+`Row = {type:'row', size?, items:[Section]}`. **Rows cannot nest** — a deliberate ceiling.
+
+### The sizing rules (settled after several wrong attempts; don't re-derive them)
+
+- `size` writes **`flex-grow` only**, never the `flex` shorthand. The basis differs by axis: `0` in
+  a row so weights read as literal width proportions, `auto` in the column so a weight distributes
+  *leftover* height and can never cap a section below its content.
+- `.sec` keeps flexbox's **automatic minimum height**. The elastic types (`chart`, `table`,
+  `timeline`, `media`) opt out with `min-height:0` and absorb an over-full slide. A chart's SVG
+  carries ~600px of *intrinsic* height, so without that split the shrink phase takes a proportional
+  bite out of every section and the rigid ones spill off the bottom.
+- Rigid bodies (`.stat-grid`, `.cmp`, `.editorial`, `.agenda-grid`, `.take`, `.gallery`) get
+  `flex-basis:auto` back inside a `.sec`, or they contribute nothing to their section's height.
+- CSS refugees — rules scoped to a classic layout's own `<section>` or wrapper (`quote`, `bignum`,
+  `.media-split .ms-media`, `.media-split .ms-text`) — are **dual-scoped** onto `.sec-<type>`.
+
+## Promotion
+
+`SG.TO_SECTIONS[layout](content) -> {sections, keymap}` for the ten decomposable classics.
+`F.promoteSlide(i)` rewrites the slide and remaps override keys **longest-prefix-first** — matching
+on `k === p || k.startsWith(p + '.')`, which is what stops `title` swallowing `timeline`. The whole
+rewrite is one `F.do`, so one undo restores the classic slide exactly.
+
+Reachable from right-click, "Convert to composed". It never runs on load.
+
+**One deliberate loss:** agenda's `rail` is slide chrome with no section to live in, so converting
+an agenda slide drops a styled rail. The orphan GC removes the key and logs it.
+
+## Integrated insert — the point of the whole exercise
+
+`F.insertIntoFlow(slideIdx, secType, content?, atIdx?)`. From the Insert gallery, one click has
+three outcomes and the user is always told which they got:
+
+| target slide | what happens |
+|---|---|
+| `composed` | the section is spliced into the flow; neighbours make room |
+| decomposable classic | a two-button confirm, then promote + insert as **one** undo step |
+| genuinely bespoke | the old floating object, plus a toast saying why |
+
+13 of the 26 gallery cards carry a "joins the layout" tag (the 5th field in `GALLERY`). A card that
+picks one item of a list ("Stat card" picks `stats.0`) inserts a section holding **one** item, so
+the list verbs work on it immediately.
+
+Section verbs: `F.moveSection` / `F.removeSection` / `F.resizeSection`, all remapping override keys
+through the same helper the item verbs use (`sections` is just another array path). A move lifts the
+moved section's overrides out *before* the shift and puts them back at the destination. The
+inspector shows a **"Section N of M"** block whenever the selection is inside a section at any
+depth, and sections name themselves by type ("Stat row") off their `.sec-<type>` class.
+
+New chrome: `F.toast(msg)` and `F.confirmDo(title, body, okLabel, ok, altLabel, alt)` — two *named*
+buttons, because both outcomes are legitimate and neither is "cancel".
+
+## Personality
+
+`data.personality` becomes `data-personality` on `<html>`, driving `src/personality.css`. Themes own
+colour; personalities own type, space, shape and motif. Two to start: `editorial` and `blueprint`.
+Thirteen `--p-*` tokens, each consumed as `var(--p-x, <today's value>)` at its use site, so deleting
+the file changes nothing and a deck with no personality matches no rule in it.
+
+**The font-precedence trap.** Themes write `--font-*` as *inline* styles on `<html>`, which beat any
+stylesheet, so a personality declares `--p-font-*` and `SG.applyPersonality` copies them onto
+`--font-*` inline — after the theme, before the brand kit, which wins over both. The **clearing** of
+those inline props is a separate `SG.clearPersonalityFonts()` that must run **before**
+`applyGlobalTheme`: doing it inside `applyPersonality` strips the font the theme just set, so
+turning a personality off silently took the theme's typeface with it.
+
+## Whole-slide presets
+
+Ten built-in `PRESETS` (8 composed) on a new **Slides** tab; the Insert gallery is now
+Elements | Slides | From this deck. `gallerySlideThumb` renders a whole slide into the off-screen
+ghost and scales it into a 16:9 well, so a preview carries the deck's live theme *and* personality.
+Built on tab open, never at editor boot. `F.insertPreset` deep-clones, so an inserted slide can
+never edit the built-in.
+
+"From this deck" is the existing `data.masters`, unchanged on disk — a master may now hold a
+composed slide (`base` already recorded the layout). `F.saveMaster(name, slideIdx)` is now a real
+function rather than a button handler.
+
+**Naming trap:** the preset card was `class="forge-gal-card slide"` and picked up **deck.css's**
+`.slide{position:absolute; inset:0}`, blowing every card out to 1280px inside a 202px grid track.
+Editor chrome must never reuse a deck class name; the modifier is `whole`.
+
+## Verification
+
+`tests/editor-ops.mjs` is at **253 assertions** (from 142), covering composed key authoring,
+section-depth overrides, promotion remapping and single-undo restore, insert-into-flow in all three
+target states, move/remove/resize with overrides following, bind write-back at row depth,
+personality data + attribute semantics, preset deep-clone isolation, masters round-trip, and the
+`.forge-ghost` sweep. `tests/parity.mjs` holds at its **7-diff baseline**, which is itself the proof
+that ten re-expressed layouts render byte-identically.
+
+**Run in this workspace this time** (Node 26 is on PATH via PowerShell). What jsdom still cannot
+reach was verified in a real browser and recorded in `docs/plans/slide-forge-composer/00-status.md`:
+composed geometry (no bounding box crosses 1280x720, row weights landing at 713/357), the
+neighbours-make-room insert, personality font precedence and measured token deltas, and the preset
+thumbnails. Rebuild the browser fixture with `python tests/make-demo.py`.

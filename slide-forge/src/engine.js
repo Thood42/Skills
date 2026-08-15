@@ -98,9 +98,13 @@
   function H(s){ var t=D.createElement('template'); t.innerHTML=s==null?'':String(s); return t.content; }
   SG.N=N; SG.H=H;
 
-  function kickerN(t){ return t?N('div.eyebrow-row',{key:'kicker'},
-    N('span.kicker',{key:'kicker.text',bind:'kicker',html:rich(t)})):null; }
-  function titleN(t){ return t?N('h1.title',{bind:'title',html:rich(t)}):null; }
+  /* The optional `b` (base) prefix is what lets one builder serve two callers:
+     '' for a classic layout (keys stay "kicker"/"title", byte-identical to v3)
+     and 'sections.N.content.' when the same nodes are built inside a composed
+     slide (composer plan §A). Every helper that authors a key takes it. */
+  function kickerN(t,b){ b=b||''; return t?N('div.eyebrow-row',{key:b+'kicker'},
+    N('span.kicker',{key:b+'kicker.text',bind:b+'kicker',html:rich(t)})):null; }
+  function titleN(t,b){ b=b||''; return t?N('h1.title',{bind:b+'title',html:rich(t)}):null; }
 
   /* ---------- asset registry (icons inline+themeable, images base64/linked, svg diagrams) ----------
      v2 registry shape (media plan §2.1): images[name] is EITHER a legacy plain string (a src/data
@@ -277,11 +281,22 @@
       iframe.src=url; }
     return {shield:shield,wrap:wrap,poster:poster}; };
 
+  /* ---------- helper surface for src/sections.js (composer plan §"Types") ----------
+     sections.js is a separate module so the engine stays a kernel (node builder,
+     render loop, assets, embeds) and the composition vocabulary is one readable
+     file. It needs the same tiny helpers the layouts use; this is the whole
+     widening of the internal API. */
+  SG.h = {rich:rich, esc:esc, arr:arr, kickerN:kickerN, titleN:titleN, pad:pad,
+          emRich:emRich, icon:icon, mediaImgWrap:mediaImgWrap, fitStyle:fitStyle};
+
   /* =====================================================================
      LAYOUT REGISTRY  —  name -> function(content) -> node array.
      Pager + progress are appended by the renderer, never here.
      Keys are authored: named blocks ("title","rail"), array items by content
      path ("stats.2"), leaves bound to the field they render ("stats.2.label").
+     Layouts that decompose into sections are registered in src/sections.js
+     instead (they become thin S[...] compositions); their entries are absent
+     here on purpose.
      ===================================================================== */
   var L = SG.layouts = {};
 
@@ -299,15 +314,7 @@
           ? N('span',{key:'meta.'+i},N('b',null,t))
           : N('span',{bind:'meta.'+i,text:t}); })):null ]; };
 
-  L.agenda=function(c){
-    return [ N('div.rail',{key:'rail'}), kickerN(c.kicker), titleN(c.title),
-      N('div.agenda-grid.sg-stagger.sg-onenter',{key:'items',arr:'items'},
-        arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.ag-item',{key:P},[
-            N('div.ag-num',{key:P+'.num'},pad(i+1)),
-            N('div.ag-body',{key:P+'.body'},[
-              N('h3',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('p',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]; };
+  /* agenda -> sections.js (rail + titleband + agenda) */
 
   L.divider=function(c){
     return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
@@ -315,64 +322,14 @@
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
 
-  L['stat-grid']=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.stat-grid',{key:'stats',arr:'stats'},arr(c.stats).map(function(s,i){ var P='stats.'+i;
-        var num = s.count!=null
-          ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
-              +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
-          : esc(s.value);
-        return N('div.stat',{key:P},[
-          N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
-          N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; };
+  /* stat-grid -> sections.js (titleband + stats) */
 
-  L.bignum=function(c){
-    var hero = c.count!=null
-      ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
-      : esc(c.value);
-    return [ kickerN(c.kicker), N('div.hero-num',{key:'num',html:hero}),
-      c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
-
-  L.chart=function(c){
-    /* v2+: author charts as data (type + data.labels/series); SG.charts renders
-       theme-token SVG. content.svg / content.body stays the bespoke escape hatch. */
-    var body=c.data?(SG.charts?SG.charts.render(c):''):(c.svg||c.body||'');
-    return [ N('div.chart-head',{key:'head'},[
-        N('div',null,[kickerN(c.kicker),titleN(c.title)]),
-        c.note?N('p',{key:'note',bind:'note',text:c.note,
-          style:'font-family:var(--font-mono);font-size:13px;color:var(--faint)'}):null ]),
-      N('div.chart-wrap',{key:'chart',html:body}) ]; };
-
-  L.table=function(c){
-    var o=c.options||{}, cols=arr(c.columns), hi=o.highlightCol!=null?+o.highlightCol:-1;
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.tbl-wrap.sg-fade-rise.sg-onenter',{key:'table'},[
-        N('table.tbl'+(o.compact?'.compact':''),null,[
-          N('thead',null,N('tr',null,cols.map(function(h,j){
-            return N('th'+(j===hi?'.hi':''),{bind:'columns.'+j,html:rich(h)}); }))),
-          N('tbody',null,arr(c.rows).map(function(r,i){
-            return N('tr',null,arr(r).map(function(cell,j){
-              return N('td'+(j===hi?'.hi':''),{bind:'rows.'+i+'.'+j,html:rich(String(cell==null?'':cell))}); })); })) ]),
-        c.note?N('p.tbl-note',{key:'tnote',bind:'note',text:c.note}):null ]) ]; };
-
-  L.comparison=function(c){
-    function col(side,cls,base){ if(!side) return null;
-      return N('div.cmp-col.'+cls,{key:base},[
-        side.tag?N('div.tag',{bind:base+'.tag',html:rich(side.tag)}):null,
-        N('h3',{bind:base+'.title',html:rich(side.title)}),
-        N('ul',{key:base+'.items',arr:base+'.items'},arr(side.items).map(function(x,i){
-          return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.cmp',{key:'cmp'},[ col(c.left,'sup','left'),
-        N('div.vs-rail',{key:'vs'},N('div.vs-badge',{key:'badge',bind:'badge',text:c.badge||'VS'})),
-        col(c.right,'uns','right') ]) ]; };
-
-  L.quote=function(c){
-    return [ N('div.quote-mark',{key:'mark',html:'&ldquo;'}),
-      N('blockquote.sg-reveal-wipe.sg-onenter',{bind:'quote',html:rich(c.quote)}),
-      c.by?N('div.by',{key:'by'},[N('div.line'),
-        N('span',{key:'by.text',bind:'by',html:rich(c.by)})]):null,
-      c.subtitle?N('p.subtitle',{bind:'subtitle',style:'margin-top:26px',html:rich(c.subtitle)}):null ]; };
+  /* bignum     -> sections.js (kicker + bignum; a CSS refugee, dual-scoped
+                   `.bignum, .sec-bignum`)
+     chart      -> sections.js (chart, which carries its own head)
+     table      -> sections.js (titleband + table)
+     comparison -> sections.js (titleband + comparison)
+     quote      -> sections.js (a CSS refugee, dual-scoped `.quote, .sec-quote`) */
 
   L.code=function(c){
     return [ kickerN(c.kicker), titleN(c.title),
@@ -383,17 +340,7 @@
           N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
         c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
-  L.timeline=function(c){
-    return [ kickerN(c.kicker), titleN(c.title),
-      N('div.timeline',{key:'timeline'},[
-        N('div.tl-track'), N('div.tl-spark'),
-        N('div.tl-items',{key:'items',arr:'items'},arr(c.items).map(function(it,i){ var P='items.'+i;
-          return N('div.tl-item',{key:P},[
-            N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
-            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
-            N('div.ev',{key:P+'.ev'},[
-              N('b',{bind:P+'.title',html:rich(it.title)}),
-              it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; };
+  /* timeline -> sections.js (titleband + timeline) */
 
   L.pipeline=function(c){
     var nodes=arr(c.nodes), kids=[];
@@ -433,15 +380,7 @@
       N('div.statement.sg-glow-pulse-box',{bind:'statement',html:emRich(c.statement||'')}),
       c.lead?N('p.lead',{bind:'lead',html:rich(c.lead)}):null ]; };
 
-  L.editorial=function(c){
-    return [ kickerN(c.kicker),
-      N('div.editorial',{key:'editorial'},[
-        N('div.ed-lead.sg-reveal-wipe.sg-onenter',{bind:'lead',html:rich(c.lead)}),
-        N('div.ed-cols.sg-stagger.sg-onenter',{key:'columns',arr:'columns'},
-          arr(c.columns).map(function(col,i){ var P='columns.'+i;
-            return N('div.ed-col',{key:P},[
-              N('h3',{bind:P+'.head',html:rich(col.head)}),
-              N('p',{bind:P+'.body',html:rich(col.body)}) ]); })) ]) ]; };
+  /* editorial -> sections.js (kicker + prose) */
 
   L['hero-asym']=function(c){
     return [ N('div.hero-asym',{key:'hero'},[
@@ -476,16 +415,8 @@
       (c.kicker||c.title)?N('div.img-cap-band',{key:'band'},[ kickerN(c.kicker), titleN(c.title) ]):null,
       c.caption?N('p.img-caption',{bind:'caption',html:rich(c.caption)}):null ]; };
 
-  /* MEDIA-SPLIT — picture one side, prose/bullets the other (media plan §4). */
-  L['media-split']=function(c){
-    var side=c.side==='right'?'right':'left';
-    var img=mediaImgWrap(c.image,{key:'image'},fitStyle(c));
-    img.classList.add('ms-media');
-    var text=N('div.ms-text',{key:'text'},[ kickerN(c.kicker), titleN(c.title),
-      c.body?N('p.ms-body',{bind:'body',html:rich(c.body)}):null,
-      arr(c.items).length?N('ul.ms-items',{key:'items',arr:'items'},arr(c.items).map(function(x,i){
-        return N('li',{bind:'items.'+i,html:rich(x)}); })):null ]);
-    return [ N('div.media-split.side-'+side,{key:'split'}, side==='left'?[img,text]:[text,img]) ]; };
+  /* media-split -> sections.js (the `media` + `bullets` sections, wrapped in
+     the .media-split grid; both halves are CSS refugees, dual-scoped) */
 
   /* GALLERY — 2-6 image grid, each tile independently add/remove-able. */
   L.gallery=function(c){
@@ -619,6 +550,34 @@
     if(brand.fonts){
       if(brand.fonts.display) root.style.setProperty('--font-display',"'"+brand.fonts.display+"','DejaVu Sans',system-ui,sans-serif");
       if(brand.fonts.body) root.style.setProperty('--font-body',"'"+brand.fonts.body+"','DejaVu Sans',system-ui,sans-serif"); } }
+  /* ---------- deck personality (composer plan §E) ----------
+     The second design axis: themes own colour, personalities own type, space,
+     shape and motif. `data.personality` becomes an attribute on <html> and
+     src/personality.css does the rest — EXCEPT the font pairing, which a
+     stylesheet cannot win: applyGlobalTheme writes the theme's font variables
+     as INLINE styles, and inline beats any rule. So each personality declares
+     `--p-font-*`, and we read those back off the cascade and re-apply them
+     inline here — after the theme, before the brand kit, which is meant to
+     override both.
+
+     The clearing is a SEPARATE step that has to run BEFORE applyGlobalTheme,
+     not inside applyPersonality: the two write the same inline properties, so
+     clearing afterwards would strip the font the theme had just set and a deck
+     that turned its personality off would lose its theme's typeface too. */
+  var P_FONTS=['display','body','mono'];
+  function clearPersonalityFonts(){ var root=D.documentElement;
+    (SG._pFonts||[]).forEach(function(p){ root.style.removeProperty(p); });
+    SG._pFonts=[]; }
+  function applyPersonality(name){ var root=D.documentElement;
+    if(name) root.setAttribute('data-personality',String(name));
+    else { root.removeAttribute('data-personality'); return; }
+    var cs=W.getComputedStyle(root);
+    P_FONTS.forEach(function(k){
+      var v=(cs.getPropertyValue('--p-font-'+k)||'').trim(); if(!v) return;
+      root.style.setProperty('--font-'+k,v); SG._pFonts.push('--font-'+k); }); }
+  SG.applyPersonality=applyPersonality;
+  SG.clearPersonalityFonts=clearPersonalityFonts;
+
   function brandMark(brand,lay){ if(!brand||!brand.logo) return null;
     if(lay!=='cover'&&lay!=='closing') return null;
     var url=imageURL(brand.logo); if(!url) return null;
@@ -670,7 +629,9 @@
     data=data||SG.data; SG.data=data;
     var slides=arr(data.slides), total=slides.length;
     var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
+    clearPersonalityFonts();              /* BEFORE the theme — see the note above */
     applyGlobalTheme(data.theme);
+    applyPersonality(data.personality);   /* after the theme, before the brand */
     applyBrand(data.brand);
     if(data.meta){ if(data.meta.title) D.title=data.meta.title;
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);

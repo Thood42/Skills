@@ -13,10 +13,113 @@ Conventions used below:
 - A missing or unreachable image/diagram never renders blank: it falls back to a small "Content unavailable" card naming what's missing (media plan §5.1/§7.1).
 
 ## Contents
+**Compose your own:** [composed](#composed) — build a slide out of sections instead of picking a fixed shape.
 Original: [cover](#cover) · [agenda](#agenda) · [divider](#divider) · [stat-grid](#stat-grid) · [bignum](#bignum) · [chart](#chart) · [comparison](#comparison) · [quote](#quote) · [code](#code) · [timeline](#timeline) · [pipeline](#pipeline) · [closing](#closing)
 New: [manifesto](#manifesto) · [editorial](#editorial) · [hero-asym](#hero-asym) · [figure](#figure) · [metric-dash](#metric-dash) · [leaderboard](#leaderboard) · [diptych](#diptych) · [matrix](#matrix) · [stack](#stack) · [quote-mosaic](#quote-mosaic) · [index-mosaic](#index-mosaic) · [before-after](#before-after)
 Media (2026-07-31): [image](#image) · [media-split](#media-split) · [gallery](#gallery) · [diagram](#diagram) · [embed](#embed)
 Escape hatch: [raw](#raw)
+
+---
+
+## composed
+
+**Reach for this when no single layout is the right shape.** A composed slide is
+an arrangement of *sections* — a title band here, a stat row under a chart, a
+quote beside an image — in any order you like. It is not a fallback: it is the
+normal way to build a slide whose idea doesn't happen to match one of the fixed
+shapes. Before dropping to `raw`, compose.
+
+```json
+{ "layout":"composed", "content":{ "sections":[
+  {"type":"titleband", "content":{"kicker":"Where we are","title":"The year in three numbers"}},
+  {"type":"row", "size":1, "items":[
+    {"type":"stats", "size":2, "content":{"stats":[
+      {"count":84,"unit":"%","label":"of tickets auto-resolved"},
+      {"value":"3.1x","label":"faster first response"}]}},
+    {"type":"quote", "size":1, "content":{"quote":"It stopped feeling like a queue.","by":"Support lead"}}
+  ]}
+]}}
+```
+
+**The shape.** `content.sections` is an array. Each entry is either
+
+- a **section** — `{"type":<name>, "size"?:<number>, "content":{…}}` — or
+- a **row** — `{"type":"row", "size"?:<number>, "items":[<section>, …]}`
+
+Rows are the only nesting: **a row cannot contain a row.** That ceiling is
+deliberate. If you want a third level, you almost always want a second slide.
+
+**`size` is a weight, not a height.** Down the slide it distributes the
+*leftover* room, so a section without a `size` is exactly as tall as its own
+content and one with `size:2` takes twice the surplus of one with `size:1`.
+Across a row it reads as a literal proportion: `size:2` beside `size:1` really
+is two-thirds of the row. Rule of thumb: **give the stretchy thing a size and
+leave the rigid things alone** — put `size` on the chart, the table, the
+timeline or the picture, and let a stat row or a title band take its natural
+height. A slide that asks for more than fits will compress the elastic sections
+first and never squeeze a stat card off the bottom.
+
+### Section types
+
+Each keeps the field names of the layout it came from, so anything you already
+know transfers. A section only ever owns *its* fields — a `stats` section has no
+`title`, because a `titleband` above it owns that.
+
+| type | fields | it is |
+|---|---|---|
+| `titleband` | `kicker`, `title` | the kicker + title every headed layout opens with |
+| `stats` | `stats:[{value\|count, unit, label, fmt}]` | the stat-grid card row |
+| `bignum` | `value` \| `count` (+`fmt`), `subtitle` | one hero figure (no kicker — put a titleband above it) |
+| `chart` | `kicker`, `title`, `note`, `type`, `data`, `options` | a chart **with its own head** — don't add a titleband |
+| `table` | `columns`, `rows`, `options`, `note` | the table block |
+| `comparison` | `left`, `right`, `badge` | two columns + the VS rail |
+| `quote` | `quote`, `by`, `subtitle` | a pull quote |
+| `agenda` | `items:[{title, desc}]` | the numbered two-column roadmap |
+| `timeline` | `items:[{year, title, desc, now}]` | the horizontal track |
+| `prose` | `lead`, `columns:[{head, body}]` | editorial lead + rule-lined columns |
+| `media` | `image`, `fit`, `focal` | a picture (the media-split image half) |
+| `bullets` | `kicker`, `title`, `body`, `items:[…]` | prose + bullets (the media-split text half) |
+
+Two of these come with their own heading and should **not** get a `titleband`
+above them: `chart` (its `note` sits on the title's baseline) and `bullets`.
+
+**One line of body text** — a caption, a closing thought under a comparison — is
+a `bullets` section with only `body` and no `items`. Don't reach for `prose`:
+its lead is 46px display type sized to carry a whole editorial slide, and it
+will dominate whatever it sits under.
+
+### Which layout, which composition
+
+Ten classic layouts are literally compositions of these sections — the classic
+name is just the shorter way to write a common arrangement. Use the classic when
+it fits exactly; compose when it doesn't.
+
+| classic | is |
+|---|---|
+| `stat-grid` | `titleband` + `stats` |
+| `table` | `titleband` + `table` |
+| `comparison` | `titleband` + `comparison` |
+| `timeline` | `titleband` + `timeline` |
+| `agenda` | `titleband` + `agenda` (plus the decorative rail) |
+| `bignum` | kicker + `bignum` |
+| `editorial` | kicker + `prose` |
+| `chart` | `chart` |
+| `quote` | `quote` |
+| `media-split` | a row of `media` + `bullets` |
+
+The other layouts (`cover`, `divider`, `closing`, `figure`, `image`, `diptych`,
+`hero-asym`, `manifesto`, `embed`, `gallery`, `pipeline`, `code`, `metric-dash`,
+`leaderboard`, `matrix`, `stack`, the mosaics, `before-after`) are genuinely
+bespoke shapes and stay whole. Use them as they are.
+
+### In the editor
+
+A composed slide's sections can be reordered, removed and re-weighted (select
+anything inside one; the inspector shows "Section N of M"). A **decomposable
+classic** can be converted — right-click → **Convert to composed** — which keeps
+every style you had applied and is one undo away from being reversed. That
+conversion is also what lets ⊞ Insert drop a new piece *into* the slide's
+arrangement rather than floating it on top.
 
 ---
 

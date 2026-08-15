@@ -1,0 +1,100 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mockup — whole-slide preset gallery</title>
+<style>
+  body{margin:0;padding:40px;background:#08090f;color:#e8ecf4;font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+  h1{font-size:20px;font-weight:600} p.note{color:#8b93a7;max-width:75ch}
+  .modal{width:860px;margin-top:24px;background:#0c0f1a;border:1px solid #232838;border-radius:14px;
+         box-shadow:0 24px 60px #000a;overflow:hidden}
+  .head{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #1a2033}
+  .head b{font-size:14px}
+  .search{flex:1;max-width:280px;background:#121628;border:1px solid #232838;border-radius:8px;
+          padding:6px 12px;color:#8b93a7;font-size:12.5px}
+  .tabs{display:flex;gap:4px;margin-left:auto}
+  .tab{padding:5px 12px;border-radius:7px;font-size:12px;color:#8b93a7;cursor:default}
+  .tab.on{background:#1a2440;color:#57e6c8}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:18px}
+  .card{cursor:default}
+  .thumb{aspect-ratio:16/9;border:1px solid #232838;border-radius:8px;overflow:hidden;position:relative;
+         background:radial-gradient(120% 140% at 80% -20%,#131a2e 0%,#0a0d18 60%);padding:9px 11px;box-sizing:border-box;
+         display:flex;flex-direction:column;gap:5px}
+  .card:hover .thumb{border-color:#57e6c8}
+  .t{height:8px;border-radius:2px;background:#dfe5f2;opacity:.85;width:70%}
+  .t.sm{height:4px;width:40%;background:#57e6c8}
+  .row{display:flex;gap:5px;flex:1;min-height:0}
+  .bx{flex:1;border-radius:3px;background:#1d2742;border:1px solid #232a44}
+  .bx.acc{background:linear-gradient(135deg,#1e3a42,#14202e)}
+  .bars{flex:1;display:flex;align-items:flex-end;gap:3px;padding:2px}
+  .bars i{flex:1;background:#57e6c8;opacity:.7;border-radius:1px}
+  .strip{display:flex;gap:5px;height:12px}
+  .strip .bx{border-radius:2px}
+  .lbl{font-size:11.5px;color:#c9d1e2;margin-top:6px}
+  .sub{font-size:10.5px;color:#565f75}
+  .badge{position:absolute;top:6px;right:6px;font-size:9px;padding:2px 6px;border-radius:99px;
+         background:#1a2440;color:#57e6c8;letter-spacing:.04em}
+  .foot{padding:10px 18px;border-top:1px solid #1a2033;color:#565f75;font-size:11.5px}
+</style>
+<h1>Mockup 4 — ⊞ Insert grows a “Slides” tab: whole-slide presets</h1>
+<p class="note">The existing element gallery gains a sibling tab. Thumbnails are live miniatures
+rendered in <em>this deck's</em> theme and personality (the editor already renders scaled
+miniatures for elements — same trick, whole slide). “From this deck” lets any slide you've
+composed be reused as a preset. Classic = the original 29, unchanged.</p>
+
+<div class="modal">
+  <div class="head">
+    <b>⊞ Insert</b>
+    <span class="search">🔍 search slides &amp; elements…</span>
+    <div class="tabs">
+      <span class="tab">Elements</span>
+      <span class="tab on">Slides</span>
+      <span class="tab">From this deck</span>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="thumb"><span class="badge">classic</span><div class="t sm"></div><div class="t"></div>
+        <div class="row"><div class="bx"></div><div class="bx"></div></div></div>
+      <div class="lbl">Comparison</div><div class="sub">two options + VS rail</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">composed</span><div class="t sm"></div><div class="t"></div>
+        <div class="row"><div class="bx bars"><i style="height:40%"></i><i style="height:65%"></i><i style="height:50%"></i><i style="height:85%"></i></div><div class="bx acc"></div></div>
+        <div class="strip"><div class="bx"></div><div class="bx"></div><div class="bx"></div></div></div>
+      <div class="lbl">Chart + quote + stats</div><div class="sub">evidence sandwich</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">composed</span><div class="t sm"></div>
+        <div class="row"><div class="bx acc" style="flex:2"></div>
+          <div style="flex:3;display:flex;flex-direction:column;gap:4px"><div class="t" style="width:90%"></div><div class="t" style="width:75%;opacity:.4"></div><div class="strip" style="margin-top:auto"><div class="bx"></div><div class="bx"></div></div></div></div></div>
+      <div class="lbl">Media + story + stats</div><div class="sub">screenshot with receipts</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">classic</span><div class="t sm"></div><div class="t"></div>
+        <div class="row"><div class="bx"></div><div class="bx"></div><div class="bx"></div><div class="bx"></div></div></div>
+      <div class="lbl">Stat grid</div><div class="sub">2×2 metric cards</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">composed</span>
+        <div class="row"><div style="flex:3;display:flex;flex-direction:column;gap:5px;justify-content:center"><div class="t" style="width:95%"></div><div class="t" style="width:80%"></div></div><div class="bx acc" style="flex:2"></div></div>
+        <div class="strip"><div class="bx"></div><div class="bx"></div><div class="bx"></div><div class="bx"></div></div></div>
+      <div class="lbl">Hero + logo strip</div><div class="sub">claim over proof points</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">classic</span><div class="t sm"></div><div class="t"></div>
+        <div class="row"><div class="bx acc"></div><div style="flex:1.4;display:flex;flex-direction:column;gap:4px;justify-content:center"><div class="t" style="width:85%;height:5px"></div><div class="t" style="width:70%;height:5px;opacity:.5"></div><div class="t" style="width:78%;height:5px;opacity:.5"></div></div></div></div>
+      <div class="lbl">Media split</div><div class="sub">picture + bullets</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">composed</span><div class="t sm"></div><div class="t"></div>
+        <div class="row"><div class="bx"></div><div class="bx"></div></div>
+        <div class="row" style="flex:.8"><div class="bx acc"></div></div></div>
+      <div class="lbl">Compare + verdict</div><div class="sub">two options, one call</div>
+    </div>
+    <div class="card">
+      <div class="thumb"><span class="badge">classic</span>
+        <div style="margin:auto;width:60%"><div class="t" style="width:100%;height:12px"></div><div class="t" style="width:55%;opacity:.4;margin-top:5px"></div></div></div>
+      <div class="lbl">Big number</div><div class="sub">one hero figure</div>
+    </div>
+  </div>
+  <div class="foot">Click inserts after the current slide with placeholder copy in your theme + personality · hover shows a full-size preview</div>
+</div>
