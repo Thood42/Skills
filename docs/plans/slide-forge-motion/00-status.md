@@ -452,6 +452,38 @@ state: `parity.mjs` **7** (unchanged), `editor-ops.mjs` **279/279**, `motion-aud
 `getComputedStyle`/class-state inspection (not screenshots — this session's pane never composited
 either).
 
+### Post-ship bug hunt, round 2 — 2026-08-16: kinetic override on a composite element
+
+Follow-up user report on the same test deck: slide 13's `overrides["tiles.1"].anim:"kinetic"`
+rendered as a missing block with no animation; removing the override made it reappear with the
+deck's ordinary entrance. Root cause, found in `editor.js`: `ensureKineticSpans(node)` — the
+function that wraps a text leaf's letters into `<span style="--i:N">` for `.sg-kinetic span`'s CSS
+to target — silently bails (`return`, no-op) whenever the target node has real element children,
+since replacing `innerHTML` would destroy that structure. A metric-dash tile (`tiles.1`) is a card
+with a value div + a label div, not a text leaf, so nothing ever got wrapped. But `applyAnim()`
+tagged the element `data-anim="kinetic"` / `.sg-onenter` regardless — and `.sg-onenter`/`data-anim`
+is exactly what `.mrun`'s `:not([data-anim])` guard uses to EXCLUDE an element from the deck's own
+default entrance (the whole point of a per-element override: you're replacing the default, not
+adding to it). Net effect: the tile got neither its own animation (nothing to wrap) nor the deck's
+(explicitly excluded) — left dependent on whatever unrelated CSS happened to still reach it, which
+is fragile and, per the report, sometimes resolved to literally not rendering.
+
+Fixed at the source, not just in the test deck: `ensureKineticSpans` now returns whether the node
+ends up with kinetic markup, and `applyAnim` checks that before committing to `want='kinetic'` —
+if it can't apply, it falls back to no override at all, so the element keeps the deck's ordinary
+entrance instead of being silently orphaned. "Kinetic letters" was always documented as a
+per-letter *headline* effect (anim.css: "needs .sg-onenter; wrap letters") — this makes that
+constraint fail safe instead of fail silent for any composite target, present deck or future one.
+`motion-test-deck.json`'s slide 13 also retargeted to `"tiles.1.label"` (a genuine text leaf,
+correct usage) instead of `"tiles.1"` (the whole card).
+
+2 new regression assertions in `tests/editor-ops.mjs` (283/283): kinetic on a composite element
+resolves to no `data-anim`/no `.sg-onenter`; kinetic on the same element's text-leaf field still
+wraps its letters normally. `parity.mjs` unchanged at 7; `motion-audit.mjs` unaffected at 111/111
+(this bug lives entirely in the editor's override-application path, not the render/motion engine).
+Verified live in a real browser: the retargeted label carries 63 per-letter spans and the tile
+renders with a valid, visible box.
+
 ## Notes for a fresh session
 
 **The ask (2026-08-15, user):** overhaul the animation mechanism *for the generation tool* in a

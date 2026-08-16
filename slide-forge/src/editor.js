@@ -413,10 +413,27 @@
     if(o.fs) node.style.fontSize=o.fs+'px';                 /* v4: direct text size, in px */
     if(o.z!=null) node.style.zIndex=o.z;
     if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); applyHref(node,o); }
-  function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')||node.children.length) return;
+  /* Wraps node's own text into per-letter <span style="--i:N"> for .sg-kinetic
+     span's CSS to target. Returns whether the node ends up with kinetic
+     markup: true if already split, true if it just split successfully, false
+     if node has REAL element children (a composite block — a card, a row of
+     divs) rather than a plain text leaf, since replacing its innerHTML would
+     destroy that structure. "Kinetic letters" is documented as a per-letter
+     HEADLINE effect (anim.css: "needs .sg-onenter; wrap letters") — it was
+     never meant to apply to anything but a text leaf. */
+  function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')) return true;
+    if(node.children.length) return false;
     var txt=node.textContent, o=''; for(var i=0;i<txt.length;i++){ var ch=txt[i]===' '?'&nbsp;':SG.esc(txt[i]); o+='<span style="--i:'+i+'">'+ch+'</span>'; }
-    node.innerHTML=o; }
+    node.innerHTML=o; return true; }
   function applyAnim(node,o){ var want=(o&&o.anim)||'', prev=node.getAttribute('data-anim')||'';
+    /* kinetic on a composite element can't produce its per-letter markup —
+       fall back to no override rather than tagging data-anim="kinetic" with
+       nothing behind it, which would ALSO exclude the element from the
+       deck's own default entrance (.mrun's :not([data-anim]) guard) with no
+       replacement of its own, leaving it dependent on whatever unrelated
+       legacy CSS happens to still reach it (found via user report,
+       2026-08-16: a metric-dash tile given this exact combination). */
+    if(want==='kinetic' && !ensureKineticSpans(node)) want='';
     if(prev&&prev!==want){ node.classList.remove('sg-'+prev); node.classList.remove('sg-onenter'); }
     node.removeAttribute('data-anim-trigger'); node.removeAttribute('data-anim-step');
     if(!want){ if(prev) node.removeAttribute('data-anim'); node.style.animationDelay=''; return; }
@@ -425,7 +442,6 @@
       if(o.animTrigger==='click'){ node.setAttribute('data-anim-trigger','click');
         node.setAttribute('data-anim-step',o.animStep!=null?o.animStep:0); }
       if(editing()) node.classList.add('run'); }
-    if(want==='kinetic') ensureKineticSpans(node);
     node.style.animationDelay=(o.animDelay?o.animDelay+'s':''); }
   function replayAnim(node){ if(!node) return; node.classList.remove('run'); void node.offsetWidth; node.classList.add('run'); }
   /* HIDDEN (v4 eye toggle): a hidden element stays visible-but-ghosted WHILE

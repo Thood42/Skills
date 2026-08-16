@@ -819,6 +819,48 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
     'save/reload preserves slide 1\'s own motion override AND its fallback to the deck reveal default');
 }
 
+// ---------- post-ship regression: overrides[key].anim="kinetic" on a
+// composite element (2026-08-16) ----------
+// Found via user report: a metric-dash tile ("tiles.1") given a kinetic
+// override rendered with no per-letter animation and, in the reporter's
+// words, the block "went missing". Root cause: ensureKineticSpans() (editor.js)
+// bails out for any node with real element children (it would destroy their
+// structure by replacing innerHTML) — a metric-dash tile is a card with a
+// value div + a label div, not a text leaf, so nothing ever gets wrapped.
+// applyAnim() used to tag the element data-anim="kinetic"/.sg-onenter
+// regardless, which ALSO excludes it from the deck's own default entrance
+// (.mrun's :not([data-anim]) guard) — leaving a composite element with
+// neither its own animation nor the deck's default one. Fixed: applyAnim now
+// checks ensureKineticSpans()'s return value and falls back to no override
+// (the element keeps the deck's ordinary entrance) when the target can't
+// actually take kinetic markup. The correct target for "kinetic letters" is
+// a text-leaf field (e.g. "tiles.1.label"), which still works exactly as
+// before.
+{
+  const dashDeck={meta:{title:'kinetic-regress',schemaVersion:4}, slides:[
+    {layout:'metric-dash', content:{title:'T', ring:{value:1,label:'r',suffix:''},
+      tiles:[{value:'a',unit:'',label:'Alpha'},{value:'b',unit:'',label:'Beta'}]}} ]};
+  const domK=boot(NEW,dashDeck); await new Promise(r=>setTimeout(r,400));
+  const wK=domK.window, dK=wK.document, SGK=wK.SG;
+  // SG.render REPLACES the .slide section on every call — re-query fresh
+  // each time rather than reusing a node reference across renders.
+  const secK=()=>dK.querySelector('#deck .slide');
+
+  // kinetic on the whole tile (composite: value div + label div) — falls back
+  SGK.data.slides[0].overrides={'tiles.0':{anim:'kinetic'}};
+  SGK.render(dK.getElementById('deck'),SGK.data);
+  const tile0=secK().querySelector('[data-el="tiles.0"]');
+  ok(!tile0.hasAttribute('data-anim'), 'kinetic on a composite element (tile with real children) is not applied — falls back instead of tagging an inert override');
+  ok(!tile0.classList.contains('sg-onenter'), 'the composite element keeps NO .sg-onenter from the failed kinetic attempt, so it is still eligible for the deck\'s own default entrance');
+
+  // kinetic on the tile's label — a genuine text leaf — still works
+  SGK.data.slides[0].overrides={'tiles.0.label':{anim:'kinetic'}};
+  SGK.render(dK.getElementById('deck'),SGK.data);
+  const label0=secK().querySelector('[data-el="tiles.0.label"]');
+  ok(label0.getAttribute('data-anim')==='kinetic', 'kinetic on a text-leaf field is applied normally');
+  ok(label0.querySelectorAll('span[style*="--i"]').length===5, 'the leaf\'s letters ("Alpha") are wrapped into per-letter spans');
+}
+
 // ---------- a generated deck still carries no editor state ----------
 const clean=JSON.parse(JSON.stringify(RICH_DECK));
 const dom3=boot(NEW,clean); await new Promise(r=>setTimeout(r,400));
