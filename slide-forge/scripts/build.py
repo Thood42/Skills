@@ -18,7 +18,7 @@ import sys, os, json, hashlib, argparse, zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC  = os.path.join(ROOT, 'src')
-BUDGET = 450 * 1024
+BUDGET = 500 * 1024   # raised from 450 KB for the v3.6 motion overhaul (Gate 2 decision, ~6 KB headroom left)
 
 PARTS = {                       # marker -> src file
     '%SG_JS%':       'sg.js',

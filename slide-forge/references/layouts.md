@@ -1,7 +1,11 @@
 # Layout catalog — content schemas
 
-Every slide in a deck is an object: `{ "layout": <name>, "content": {…}, "theme"?: {…}, "ambient"?: "auto"|"none", "class"?: "…" }`.
-The renderer derives the pager and progress bar from position, so you never number slides by hand. This file is the field reference; `reference-deck.html` is the live visual of each one.
+Every slide in a deck is an object:
+`{ "layout": <name>, "content": {…}, "theme"?: {…}, "ambient"?: "auto"|"none"|<name>, "motion"?: "calm"|"standard"|"expressive"|"off", "reveal"?: {"style": <name>}, "class"?: "…" }`.
+The renderer derives the pager and progress bar from position, so you never number slides by hand.
+`ambient` is background texture only; `motion`/`reveal` are element motion and step-through reveal,
+documented in `references/motion.md` — read it before reaching for either. This file is the field
+reference; `reference-deck.html` is the live visual of each one.
 
 Conventions used below:
 - Strings in `subtitle`, `label`, `caption`, `lead`, `body` accept light inline emphasis: `[[glow]]` (accent color), `**bold**`, `` `mono` ``.
@@ -269,12 +273,13 @@ Add a `theme` object to **any** slide to patch CSS variables for that slide only
 { "layout":"bignum", "theme":{ "--cyan":"#ffd166", "--bg":"#0c0a06", "--bg-2":"#1b1206" },
   "content":{ "count":1, "subtitle":"This slide runs warm while the rest stay cool." } }
 ```
-Set `"ambient":"none"` on a slide to silence its motion.
+Want the slide quieter or louder? That's `motion`, not `ambient` — see below.
 
 ---
 
-## Ambient animation (configurable per slide)
-Every slide carries one subtle background motion. Choose it in the JSON with `"ambient": "<name>"` on the slide (or set a deck-wide default in `defaults.ambient`). `"auto"` (or omitting it) keeps the layout's built-in motion; `"none"` silences it. The renderer injects the ambient as a themed background layer, so **any layout can take any ambient**.
+## Ambient animation (configurable per slide) — background texture ONLY
+
+Every slide carries one subtle background motion. Choose it in the JSON with `"ambient": "<name>"` on the slide (or set a deck-wide default in `defaults.ambient`). `"auto"` (or omitting it) keeps the layout's built-in motion; `"none"` turns the background layer off. The renderer injects the ambient as a themed background layer, so **any layout can take any ambient**.
 
 | name | motion | name | motion |
 |---|---|---|---|
@@ -288,3 +293,13 @@ Every slide carries one subtle background motion. Choose it in the JSON with `"a
 { "layout": "hero-asym", "ambient": "rays", "content": { "title": "Asymmetric by [[design]].", "rows": [ … ] } }
 ```
 All ambients are CSS-only, subtle (slow loops, low opacity), motion-safe (disabled under reduced-motion, with a finished resting state for the PDF), and read theme variables so they recolor with the theme. The five marked *(canvas)* were added from `canvas-design` philosophies — systematic, observational textures (radiant rays, paper grain, charted contours/waves, a faint constellation).
+
+**`ambient` never touches element motion** — titles, lists, figures, quotes. It only ever silences
+the drifting background layer plus a handful of small always-on decorative loops (a rail's sheen, a
+quote mark's breathe). **To calm or kill element motion, use `motion` instead** —
+`references/motion.md` is the field reference, and it is a deck/slide-level dial
+(`calm`/`standard`/`expressive`/`off`), not a per-ambient setting. Reaching for `"ambient":"none"`
+when what's actually wanted is "make this deck feel calmer" or "turn off the animation" is the single
+most common motion mistake — it used to be the *only* way to quiet a slide (and, before this
+distinction existed, it broke content by leaving it invisible); today it only mutes the background,
+and `motion: "off"`/`"calm"` is what actually addresses that request.

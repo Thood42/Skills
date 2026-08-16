@@ -1,0 +1,246 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mockup 3 — revealing text, and how</title>
+<!-- Gate 1 mockup (revised after Gate 1 feedback: the reveal STYLE is a choice with an
+     editable default, not one fixed animation). Throwaway by design. -->
+<style>
+  :root{ --bg:#070b14; --bg2:#0d1424; --ink:#e9eefc; --muted:#93a0bd; --faint:#5d6b8a;
+         --cyan:#3ce8ff; --indigo:#7c8cff; --mint:#44f3c4;
+         --brd:rgba(124,140,255,.20); --font:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+         --m-dur:.55s; --m-dist:18px; --m-ease:cubic-bezier(.2,.7,.2,1); }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.55}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:32px;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:16px;max-width:72ch}
+
+  .panel{background:var(--bg2);border:1px solid var(--brd);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .row + .row{margin-top:11px;padding-top:11px;border-top:1px solid var(--brd)}
+  .lead{font-size:12.5px;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;min-width:104px}
+  .grp{display:flex;gap:4px;padding:3px;background:rgba(0,0,0,.3);border-radius:10px;flex-wrap:wrap}
+  button{font:inherit;font-size:13.5px;color:var(--ink);background:transparent;
+         border:1px solid transparent;border-radius:7px;padding:6px 13px;cursor:pointer;white-space:nowrap}
+  button:hover{background:rgba(124,140,255,.16)}
+  button.on{background:var(--cyan);color:#04121a;font-weight:650}
+  button.ghost{border-color:var(--brd);background:rgba(124,140,255,.12)}
+  .note-inline{color:var(--faint);font-size:12.5px;margin-left:auto;max-width:40ch;text-align:right}
+  .inherit{color:var(--mint);font-size:12.5px}
+
+  .slide{position:relative;background:var(--bg2);border:1px solid var(--brd);border-radius:16px;
+         padding:40px 46px 44px;min-height:396px;cursor:pointer;overflow:hidden}
+  .slide::after{content:"click the slide, or press →";position:absolute;right:20px;bottom:15px;
+                font-size:12px;color:var(--faint);letter-spacing:.04em}
+  .kicker{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);margin-bottom:12px}
+  .title{font-size:37px;font-weight:700;letter-spacing:-.025em;margin:0 0 24px;line-height:1.12}
+  ul{margin:0;padding:0;list-style:none;max-width:62ch}
+  li{padding:12px 0 12px 26px;position:relative;color:var(--muted);font-size:18.5px;
+     border-bottom:1px solid rgba(124,140,255,.10)}
+  li::before{content:"";position:absolute;left:2px;top:22px;width:8px;height:8px;border-radius:50%;
+             background:var(--cyan);opacity:.8}
+  .prog{display:flex;gap:6px;margin-top:24px}
+  .pip{width:26px;height:4px;border-radius:99px;background:rgba(124,140,255,.22);transition:background .2s}
+  .pip.on{background:var(--cyan)}
+
+  /* =====================================================================
+     FIVE REVEAL STYLES. Each is just "how a step arrives" — the stepping
+     itself (what counts as a step, what advances it) is identical for all.
+     ===================================================================== */
+  @keyframes mRise{ from{opacity:0;transform:translateY(var(--m-dist))} to{opacity:1;transform:none} }
+  @keyframes mWipe{ from{clip-path:inset(0 100% 0 0)} to{clip-path:inset(0 0 0 0)} }
+  @keyframes mPop { from{opacity:0} to{opacity:1} }
+
+  li[data-step]{ opacity:0 }
+  li[data-step].shown{ opacity:1 }
+
+  /* 1 appear — the deck's ordinary entrance, reused */
+  [data-reveal="appear"] li.shown{ animation:mRise var(--m-dur) var(--m-ease) both }
+
+  /* 2 wipe — the line uncovers left to right */
+  [data-reveal="wipe"] li.shown{ animation:mWipe .62s cubic-bezier(.6,.05,.2,1) both }
+
+  /* 3 typewriter — characters land in turn, with a caret on the live line */
+  [data-reveal="typewriter"] li .ch{ opacity:0 }
+  [data-reveal="typewriter"] li.shown .ch{ animation:mPop .01s linear both;
+    animation-delay:calc(var(--i,0) * .022s) }
+  [data-reveal="typewriter"] li.shown.live::after{ content:"";display:inline-block;width:.08em;height:1.05em;
+    background:var(--cyan);vertical-align:-.16em;margin-left:.06em;animation:caret .8s step-end infinite }
+  @keyframes caret{ 50%{opacity:0} }
+
+  /* 4 word by word — the same idea at word granularity; far more readable on long lines */
+  [data-reveal="words"] li .wd{ opacity:0;display:inline-block }
+  [data-reveal="words"] li.shown .wd{ animation:mRise .4s var(--m-ease) both;
+    animation-delay:calc(var(--i,0) * .07s) }
+
+  /* 5 spotlight — nothing is ever hidden. The whole list is on the slide from the
+     start and the focus moves. Preferred when the audience needs the shape of the
+     list while you talk to one line of it. */
+  [data-reveal="spotlight"] li[data-step]{ opacity:.26;transition:opacity .35s ease,color .35s ease }
+  [data-reveal="spotlight"] li[data-step].shown{ opacity:.26 }
+  [data-reveal="spotlight"] li[data-step].live{ opacity:1;color:var(--ink) }
+  [data-reveal="spotlight"] li[data-step].live::before{ box-shadow:0 0 0 5px rgba(60,232,255,.16) }
+
+  /* the motion dial still governs everything: off = the whole list, on the slide, at rest */
+  [data-motion="off"] li[data-step]{ opacity:1 !important;animation:none !important;
+                                     clip-path:none !important;transform:none !important }
+  [data-motion="off"] li .ch,[data-motion="off"] li .wd{ opacity:1 !important;animation:none !important }
+  [data-motion="off"] li.live::after{ display:none }
+
+  .note{margin-top:24px;background:var(--bg2);border:1px solid var(--brd);border-radius:14px;
+        padding:18px 22px;color:var(--muted);font-size:14.5px}
+  .note b{color:var(--ink)}
+  .note ul{list-style:disc;padding-left:20px;margin:10px 0 0;max-width:none}
+  .note li{border:0;padding:4px 0 4px 0;font-size:14.5px;color:var(--muted)}
+  .note li::before{display:none}
+  footer{margin-top:32px;color:var(--faint);font-size:13px;border-top:1px solid var(--brd);padding-top:16px}
+</style>
+
+<div class="wrap">
+  <h1>Revealing text — and how</h1>
+  <p class="sub">Stepping through a list is one capability; <em>how</em> each point arrives is a separate
+  choice, with a default you set once for the deck and can override on any single slide. Pick a style and
+  step through it. The stepping behaves identically in all five — only the arrival changes.</p>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lead">Deck default</span>
+      <div class="grp" id="deckDefault">
+        <button data-r="appear" class="on">Appear</button>
+        <button data-r="wipe">Wipe</button>
+        <button data-r="typewriter">Typewriter</button>
+        <button data-r="words">Word by word</button>
+        <button data-r="spotlight">Spotlight</button>
+      </div>
+      <span class="note-inline">Set once. Every slide that steps uses this unless it says otherwise.</span>
+    </div>
+    <div class="row">
+      <span class="lead">This slide</span>
+      <div class="grp" id="slideOverride">
+        <button data-r="" class="on">Inherit</button>
+        <button data-r="appear">Appear</button>
+        <button data-r="wipe">Wipe</button>
+        <button data-r="typewriter">Typewriter</button>
+        <button data-r="words">Word by word</button>
+        <button data-r="spotlight">Spotlight</button>
+      </div>
+      <span class="note-inline">One slide can differ — a dense list often wants Spotlight even in an
+      Appear deck.</span>
+    </div>
+    <div class="row">
+      <span class="lead">Now showing</span>
+      <span class="inherit" id="resolved">appear &nbsp;·&nbsp; inherited from the deck</span>
+      <button class="ghost" id="next" style="margin-left:auto">→ Next point</button>
+      <button class="ghost" id="reset">↻ Start over</button>
+      <button class="ghost" id="motion">Motion: on</button>
+    </div>
+  </div>
+
+  <div class="slide" id="slide" data-reveal="appear" data-motion="on">
+    <div class="kicker">The ask</div>
+    <div class="title">Three things we need to decide today</div>
+    <ul id="list">
+      <li data-step="1">Whether onboarding moves to the platform team in Q4</li>
+      <li data-step="2">Whether we keep the pilot pricing past January</li>
+      <li data-step="3">Who owns the migration runbook</li>
+      <li data-step="4">And the one nobody wants: what we stop doing to pay for it</li>
+    </ul>
+    <div class="prog" id="prog"></div>
+  </div>
+
+  <div class="note">
+    <b>What this settles.</b> Step-through is not one animation — it is a stepping rule plus a reveal
+    style, and the two are chosen separately:
+    <ul>
+      <li><b>Appear / Wipe / Typewriter / Word&nbsp;by&nbsp;word</b> hide the upcoming points until you
+      call them.</li>
+      <li><b>Spotlight</b> hides nothing — the full list is on the slide and the focus moves. Best when
+      the room needs the shape of the list, and the only style that never withholds text from someone
+      reading ahead.</li>
+      <li>The choice cascades: <b>deck default → this slide → one specific element</b>, the same
+      shape as the motion dial, so there is one mental model rather than two.</li>
+      <li>With motion <b>off</b> — or for anyone whose system asks for reduced motion — every point is
+      simply on the slide from the start, in all five styles. Toggle it above and step through.</li>
+    </ul>
+  </div>
+
+  <footer>Mockup 3 of 3 · slide-forge v3.6 motion overhaul · step reveals + reveal styles</footer>
+</div>
+
+<script>
+  var $  = function(s,r){ return (r||document).querySelector(s); };
+  var $$ = function(s,r){ return [].slice.call((r||document).querySelectorAll(s)); };
+  var slide = $('#slide'), list = $('#list');
+  var steps = $$('li[data-step]', list);
+  var deckDefault = 'appear', slideOverride = '';
+
+  /* Split each line into word spans and character spans once, so the word/typewriter
+     styles have something to stagger. Both keep the original text selectable. */
+  steps.forEach(function(li){
+    var text = li.textContent, words = text.split(' '), ci = 0, wi = 0, out = '';
+    words.forEach(function(w, k){
+      out += '<span class="wd" style="--i:' + (wi++) + '">';
+      for (var i = 0; i < w.length; i++)
+        out += '<span class="ch" style="--i:' + (ci++) + '">' + w[i].replace('&','&amp;').replace('<','&lt;') + '</span>';
+      out += '</span>';
+      if (k < words.length - 1) { out += '<span class="ch" style="--i:' + (ci++) + '"> </span>'; }
+    });
+    li.innerHTML = out;
+  });
+
+  var prog = $('#prog');
+  prog.innerHTML = steps.map(function(){ return '<div class="pip"></div>'; }).join('');
+  var pips = $$('.pip', prog);
+  var at = 0;
+
+  function resolved(){ return slideOverride || deckDefault; }
+  function paint(){
+    slide.dataset.reveal = resolved();
+    $('#resolved').innerHTML = resolved() +
+      (slideOverride ? ' &nbsp;·&nbsp; <span style="color:var(--cyan)">set on this slide</span>'
+                     : ' &nbsp;·&nbsp; inherited from the deck');
+  }
+  function next(){
+    if (at >= steps.length) return false;
+    steps.forEach(function(s){ s.classList.remove('live'); });
+    steps[at].classList.add('shown');
+    steps[at].classList.add('live');
+    pips[at].classList.add('on');
+    at++;
+    return true;
+  }
+  function reset(){
+    at = 0;
+    steps.forEach(function(s){ s.classList.remove('shown','live'); void s.offsetWidth; });
+    pips.forEach(function(p){ p.classList.remove('on'); });
+  }
+  function pick(groupSel, set){
+    $$(groupSel + ' button').forEach(function(b){
+      b.onclick = function(e){
+        e.stopPropagation();
+        $$(groupSel + ' button').forEach(function(x){ x.classList.remove('on'); });
+        b.classList.add('on');
+        set(b.dataset.r);
+        paint(); reset();
+      };
+    });
+  }
+  pick('#deckDefault',   function(v){ deckDefault  = v; });
+  pick('#slideOverride', function(v){ slideOverride = v; });
+
+  $('#next').onclick  = function(e){ e.stopPropagation(); next(); };
+  $('#reset').onclick = function(e){ e.stopPropagation(); reset(); };
+  $('#motion').onclick = function(e){
+    e.stopPropagation();
+    var off = slide.dataset.motion !== 'off';
+    slide.dataset.motion = off ? 'off' : 'on';
+    this.textContent = 'Motion: ' + (off ? 'off' : 'on');
+    this.classList.toggle('on', off);
+    reset();
+  };
+  slide.onclick = next;
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') { reset(); }
+  });
+  paint();
+</script>

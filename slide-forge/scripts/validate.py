@@ -75,6 +75,8 @@ SECTION_S = {
 SECTION_TYPES = set(SECTION_S)
 # composer plan section E: the second design axis. Absent = today's rendering.
 PERSONALITIES = {'editorial', 'blueprint'}
+MOTIONS = {'calm', 'standard', 'expressive', 'off'}
+REVEALS = {'appear', 'wipe', 'typewriter', 'words', 'spotlight'}
 SECTION_ITEM = {   # same shape as ITEM, keyed by section type
  ('stats','stats'):[('label','s')], ('agenda','items'):[('title','s')],
  ('timeline','items'):[('year','sn'),('title','s')],
@@ -107,6 +109,29 @@ FREE_KEYS = {'id','type','x','y','w','h','rot','scale','z','text','size','color'
  'url','ratio','mode','poster','sandbox','chrome','title','fillPrev','name','hide','fs',
  'layout','pick','content','overrides'}
 OVERRIDE_KEY_RE = re.compile(r'^(b\d+(\.\d+){0,2}|[A-Za-z][\w-]*(\.[\w-]+)*)$')
+
+def _check_motion_reveal(obj, where, errs):
+    """Shared by deck-level `defaults` and each slide: motion is a plain enum,
+    reveal is {"style": <one of REVEALS>} (unit, if present, is 'item'/'block').
+    ambient is checked separately (AMBIENTS) — kept here in one call anyway so
+    every deck/slide motion-adjacent key is validated from a single site."""
+    amb = obj.get('ambient')
+    if amb is not None and amb not in AMBIENTS:
+        errs.append('%s: unknown ambient %r' % (where, amb))
+    mo = obj.get('motion')
+    if mo is not None and mo not in MOTIONS:
+        errs.append('%s: unknown motion %r (one of %s)' % (where, mo, sorted(MOTIONS)))
+    rv = obj.get('reveal')
+    if rv is not None:
+        if not isinstance(rv, dict):
+            errs.append('%s: reveal is not an object' % where)
+        else:
+            st = rv.get('style')
+            if st not in REVEALS:
+                errs.append('%s: reveal.style %r not one of %s' % (where, st, sorted(REVEALS)))
+            un = rv.get('unit')
+            if un is not None and un not in ('item', 'block'):
+                errs.append('%s: reveal.unit %r not "item" or "block"' % (where, un))
 
 def _check_overrides(ov, where, label, errs, warns):
     """One override bag — a slide's, or a content-backed free object's own
@@ -221,6 +246,12 @@ def validate(data, assets=None):
         if not isinstance(p, str) or p not in PERSONALITIES:
             errs.append('deck: unknown personality %r (one of %s, or omit it for the default)'
                         % (p, sorted(PERSONALITIES)))
+    defaults = data.get('defaults')
+    if defaults is not None:
+        if not isinstance(defaults, dict):
+            errs.append('deck: defaults is not an object')
+        else:
+            _check_motion_reveal(defaults, 'deck defaults', errs)
     prev = None
     for i, sl in enumerate(slides):
         where = 'slide %d' % (i+1)
@@ -297,9 +328,7 @@ def validate(data, assets=None):
                     errs.append('%s (table): rows[%d] is not a list' % (where, j))
                 elif len(r) != ncol:
                     warns.append('%s (table): rows[%d] has %d cells for %d columns' % (where, j, len(r), ncol))
-        amb = sl.get('ambient')
-        if amb is not None and amb not in AMBIENTS:
-            errs.append('%s: unknown ambient %r' % (where, amb))
+        _check_motion_reveal(sl, where, errs)
         ov = sl.get('overrides')
         if ov is not None:
             if not isinstance(ov, dict): errs.append('%s: overrides is not an object' % where)
@@ -381,7 +410,7 @@ def validate(data, assets=None):
     if theme is not None and not isinstance(theme, (str, dict)):
         errs.append('theme must be a string name or a {--var: value} object')
     v = (data.get('meta') or {}).get('schemaVersion')
-    if v is not None and v not in (1, 2, 3):
+    if v is not None and v not in (1, 2, 3, 4):
         errs.append('unknown meta.schemaVersion %r' % v)
     # asset-existence + alt-text (only possible with the registry alongside the
     # data, i.e. validating a .html — a bare deck.json can't know what's been

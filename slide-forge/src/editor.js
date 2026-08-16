@@ -59,6 +59,9 @@
   var CHART_TYPES=["bar","bar-h","stacked","line","area","pie","donut","scatter"];
   var TOKENS=["--bg","--bg-2","--ink","--muted","--cyan","--indigo","--mint"];
   var AMBIENTS=["auto","none","orbs","aurora","grid","rays","grain","contours","scan","waves","glow","constellation"];
+  var MOTIONS=[["Standard","standard"],["Calm","calm"],["Expressive","expressive"],["Off","off"]];
+  var REVEALS=[["— none (all at once) —",""],["Appear","appear"],["Wipe","wipe"],
+    ["Typewriter","typewriter"],["Word by word","words"],["Spotlight","spotlight"]];
   F.animChoices=[["— none —",""],
     ["Fade rise","fade-rise"],["Reveal wipe","reveal-wipe"],["Typewriter","typewriter"],["Kinetic letters","kinetic"],
     ["Stagger children","stagger"],
@@ -410,10 +413,27 @@
     if(o.fs) node.style.fontSize=o.fs+'px';                 /* v4: direct text size, in px */
     if(o.z!=null) node.style.zIndex=o.z;
     if(o.theme) Object.keys(o.theme).forEach(function(k){ node.style.setProperty(k,o.theme[k]); }); applyHref(node,o); }
-  function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')||node.children.length) return;
+  /* Wraps node's own text into per-letter <span style="--i:N"> for .sg-kinetic
+     span's CSS to target. Returns whether the node ends up with kinetic
+     markup: true if already split, true if it just split successfully, false
+     if node has REAL element children (a composite block — a card, a row of
+     divs) rather than a plain text leaf, since replacing its innerHTML would
+     destroy that structure. "Kinetic letters" is documented as a per-letter
+     HEADLINE effect (anim.css: "needs .sg-onenter; wrap letters") — it was
+     never meant to apply to anything but a text leaf. */
+  function ensureKineticSpans(node){ if(node.querySelector('span[style*="--i"]')) return true;
+    if(node.children.length) return false;
     var txt=node.textContent, o=''; for(var i=0;i<txt.length;i++){ var ch=txt[i]===' '?'&nbsp;':SG.esc(txt[i]); o+='<span style="--i:'+i+'">'+ch+'</span>'; }
-    node.innerHTML=o; }
+    node.innerHTML=o; return true; }
   function applyAnim(node,o){ var want=(o&&o.anim)||'', prev=node.getAttribute('data-anim')||'';
+    /* kinetic on a composite element can't produce its per-letter markup —
+       fall back to no override rather than tagging data-anim="kinetic" with
+       nothing behind it, which would ALSO exclude the element from the
+       deck's own default entrance (.mrun's :not([data-anim]) guard) with no
+       replacement of its own, leaving it dependent on whatever unrelated
+       legacy CSS happens to still reach it (found via user report,
+       2026-08-16: a metric-dash tile given this exact combination). */
+    if(want==='kinetic' && !ensureKineticSpans(node)) want='';
     if(prev&&prev!==want){ node.classList.remove('sg-'+prev); node.classList.remove('sg-onenter'); }
     node.removeAttribute('data-anim-trigger'); node.removeAttribute('data-anim-step');
     if(!want){ if(prev) node.removeAttribute('data-anim'); node.style.animationDelay=''; return; }
@@ -422,7 +442,6 @@
       if(o.animTrigger==='click'){ node.setAttribute('data-anim-trigger','click');
         node.setAttribute('data-anim-step',o.animStep!=null?o.animStep:0); }
       if(editing()) node.classList.add('run'); }
-    if(want==='kinetic') ensureKineticSpans(node);
     node.style.animationDelay=(o.animDelay?o.animDelay+'s':''); }
   function replayAnim(node){ if(!node) return; node.classList.remove('run'); void node.offsetWidth; node.classList.add('run'); }
   /* HIDDEN (v4 eye toggle): a hidden element stays visible-but-ghosted WHILE
@@ -2053,6 +2072,17 @@
         sl.layout=v; sl.content=next; }); })));
     s.appendChild(field('Ambient',selectInput(AMBIENTS,slide.ambient||'auto',function(v){
       F.do('ambient',function(data){ if(v==='auto') delete data.slides[i].ambient; else data.slides[i].ambient=v; }); })));
+    s.appendChild(field('Motion',selectInput([['Inherit','']].concat(MOTIONS),slide.motion||'',
+      function(v){ F.setMotion(v,i); })));
+    s.appendChild(field('Reveal',selectInput(REVEALS,(slide.reveal&&slide.reveal.style)||'',
+      function(v){ F.setReveal(v,i); })));
+    (function(){ var resolved=SG.motion?SG.motion.resolve(slide,SG.data):null; if(!resolved) return;
+      var mSrc=slide.motion?'this slide':((SG.data.defaults&&SG.data.defaults.motion)?'deck default':'built-in');
+      var rSrc=(slide.reveal&&slide.reveal.style)?'this slide'
+        :((SG.data.defaults&&SG.data.defaults.reveal&&SG.data.defaults.reveal.style)?'deck default':null);
+      var txt='Resolved: motion <b>'+resolved.motion+'</b> ('+mSrc+')'
+        +(resolved.reveal?', reveal <b>'+resolved.reveal.style+'</b> ('+rSrc+')':', no reveal (all at once)');
+      s.appendChild(el('div','forge-hint',txt)); })();
     var nt=el('textarea'); nt.rows=3; nt.value=slide.notes||'';
     nt.onfocus=function(){ F.pushUndo(); };
     nt.oninput=function(){ SG.data.slides[i].notes=nt.value; F.saveDebounced(); };
@@ -2117,7 +2147,13 @@
     bs.onchange=function(){ F.do('build steps',function(data){ data.defaults=data.defaults||{};
       if(bs.checked) data.defaults.buildSteps=true; else delete data.defaults.buildSteps; }); };
     s.appendChild(fieldRow('Build steps (click-to-reveal)',bs));
-    s.appendChild(el('div','forge-hint','Off (default): everything is visible everywhere. On: while presenting, elements with an On-click trigger wait for → / Space / click.')); }
+    s.appendChild(el('div','forge-hint','Off (default): everything is visible everywhere. On: while presenting, elements with an On-click trigger wait for → / Space / click.'));
+    s.appendChild(field('Motion',selectInput(MOTIONS,(SG.data.defaults&&SG.data.defaults.motion)||'standard',
+      function(v){ F.setMotion(v); })));
+    s.appendChild(el('div','forge-hint','How every title, list and figure enters, deck-wide — calm, standard, expressive, or off (which actually leaves everything visible, not hidden). Any slide can override this.'));
+    var curReveal=(SG.data.defaults&&SG.data.defaults.reveal&&SG.data.defaults.reveal.style)||'';
+    s.appendChild(field('Reveal',selectInput(REVEALS,curReveal,function(v){ F.setReveal(v); })));
+    s.appendChild(el('div','forge-hint','Step through a list point by point (→ / Space / click) instead of showing it all at once, deck-wide. Spotlight never hides anything — it dims the rest of the list and moves the focus.')); }
   /* theme picker + token grid — sidebar AND the ◐ Theme modal */
   function themeSection(body){ var s=sec(body,'Theme');
     var names=Object.keys(F.themes);
@@ -2148,6 +2184,28 @@
     if(name&&!PERSONALITIES.some(function(p){ return p[1]===name; })) return false;
     F.do('personality',function(data){
       if(name) data.personality=name; else delete data.personality; });
+    return true; };
+
+  /* ---- motion + reveal (v3.6): the deck -> slide cascade, one control
+     pair mirroring how personality already works. slideIdx omitted sets
+     the deck default (data.defaults.*); slideIdx given sets that one
+     slide's override. Empty string clears back to "inherit". One F.do() =
+     one undo, same contract as F.setPersonality. ---- */
+  F.setMotion=function(preset,slideIdx){
+    if(preset&&!MOTIONS.some(function(m){ return m[1]===preset; })) return false;
+    F.do('motion',function(data){
+      if(slideIdx==null){ data.defaults=data.defaults||{};
+        if(preset) data.defaults.motion=preset; else delete data.defaults.motion; }
+      else{ var sl=data.slides[slideIdx];
+        if(preset) sl.motion=preset; else delete sl.motion; } });
+    return true; };
+  F.setReveal=function(style,slideIdx){
+    if(style&&!REVEALS.some(function(r){ return r[1]===style; })) return false;
+    F.do('reveal',function(data){
+      if(slideIdx==null){ data.defaults=data.defaults||{};
+        if(style) data.defaults.reveal={style:style}; else delete data.defaults.reveal; }
+      else{ var sl=data.slides[slideIdx];
+        if(style) sl.reveal={style:style}; else delete sl.reveal; } });
     return true; };
   function personalityField(s){
     var cur=SG.data.personality||'';

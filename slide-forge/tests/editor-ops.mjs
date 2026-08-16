@@ -75,7 +75,7 @@ legacy.slides[1].overrides={'b3.0':{x:42,rot:-2},'b1':{color:'#123456'},'b9.9':{
 const dom2=boot(NEW,legacy); await new Promise(r=>setTimeout(r,500));
 const w2=dom2.window, S2=w2.SG;
 const ov2=S2.data.slides[1].overrides;
-ok(S2.data.meta.schemaVersion===3,'schema stamped v3');
+ok(S2.data.meta.schemaVersion===4,'schema stamped v4');
 ok(ov2&&ov2['items.0']&&ov2['items.0'].x===42,'legacy b3.0 -> items.0');
 ok(ov2&&ov2['kicker']&&ov2['kicker'].color==='#123456','legacy b1 -> kicker');
 ok(!ov2['b9.9'],'unmappable legacy key dropped');
@@ -85,7 +85,7 @@ ok(dom2.window.document.querySelectorAll('#deck .slide')[1].querySelector('[data
 
 // ---------- deck JSON round-trip stays valid ----------
 const rt=JSON.parse(JSON.stringify(SG.data));
-ok(rt.slides.length===26&&rt.meta.schemaVersion===3,'data round-trips');
+ok(rt.slides.length===26&&rt.meta.schemaVersion===4,'data round-trips');
 
 // =====================================================================
 // MEDIA PLAN (2026-07-31) — asset registry v2, links, embeds.
@@ -743,6 +743,122 @@ ok(V1.every(t=>wC.SG.SECTION_TYPES.indexOf(t)>=0)&&wC.SG.SECTION_TYPES.length===
   ok(ds.getElementById('deck').querySelectorAll('.slide').length===nSlides,
      '…so the .slide indices are unchanged (the known ghost pitfall)');
   ds.body.classList.remove('forge-edit');
+}
+
+// =====================================================================
+// MOTION + REVEAL (v3.6) — the deck -> slide cascade, mirroring how
+// personality already works: slideIdx omitted sets data.defaults.*,
+// slideIdx given overrides one slide, empty string clears back to inherit.
+// =====================================================================
+{
+  const ML={meta:{title:'Motion',seed:7},slides:[
+    {layout:'cover',content:{title:'C'}},
+    {layout:'stat-grid',content:{title:'S',stats:[{value:'1',label:'a'}]}} ]};
+  const dM=boot(NEW,ML); await new Promise(r=>setTimeout(r,400));
+  const wM=dM.window, dm=wM.document, SGM=wM.SG, FM=wM.Forge;
+  const secM=()=>dm.querySelectorAll('#deck .slide');
+
+  ok(!(SGM.data.defaults&&SGM.data.defaults.motion),'a fresh deck has no defaults.motion');
+  ok(secM()[0].getAttribute('data-motion')==='standard','…so it resolves to the built-in standard');
+
+  ok(FM.setMotion('calm'),'setMotion accepts a known preset with no slideIdx (deck default)');
+  ok(SGM.data.defaults.motion==='calm','…and stores it on data.defaults');
+  ok(secM()[0].getAttribute('data-motion')==='calm'&&secM()[1].getAttribute('data-motion')==='calm',
+    '…and both sections resolve to it — a deck default reaches every slide');
+
+  ok(FM.setMotion('expressive',1),'setMotion accepts a slideIdx for a per-slide override');
+  ok(SGM.data.slides[1].motion==='expressive','…and stores it on that slide only');
+  ok(secM()[0].getAttribute('data-motion')==='calm'&&secM()[1].getAttribute('data-motion')==='expressive',
+    'slide 0 stays on the deck default; slide 1 resolves its own override');
+
+  ok(FM.setMotion('nope')===false,'an unknown preset is refused');
+  ok(SGM.data.defaults.motion==='calm','…leaving the deck default unchanged');
+
+  FM.setMotion('',1);
+  ok(!('motion' in SGM.data.slides[1]),'clearing a slide override removes the key rather than storing ""');
+  ok(secM()[1].getAttribute('data-motion')==='calm','…and it falls back to the deck default again');
+  FM.undoOp();
+  ok(SGM.data.slides[1].motion==='expressive','undo restores the per-slide override');
+
+  // reveal follows the identical shape
+  ok(!(SGM.data.defaults&&SGM.data.defaults.reveal),'no reveal configured by default');
+  ok(FM.setReveal('spotlight'),'setReveal accepts a known style with no slideIdx');
+  ok(SGM.data.defaults.reveal.style==='spotlight','…stored as {style} on data.defaults');
+  ok(secM()[0].getAttribute('data-reveal')==='spotlight','…and reaches the section attribute');
+
+  ok(FM.setReveal('typewriter',1),'setReveal accepts a per-slide override');
+  ok(SGM.data.slides[1].reveal.style==='typewriter','…stored on that slide only');
+  ok(secM()[1].getAttribute('data-reveal')==='typewriter'&&secM()[0].getAttribute('data-reveal')==='spotlight',
+    'each slide resolves its own reveal independently');
+
+  FM.setReveal('',1);
+  ok(!('reveal' in SGM.data.slides[1]),'clearing removes the key');
+  ok(secM()[1].getAttribute('data-reveal')==='spotlight','…falls back to the deck default');
+
+  // one F.do() per call, matching F.setPersonality's contract
+  const depthBefore=FM.undo.length;
+  FM.setMotion('off');
+  ok(FM.undo.length===depthBefore+1,'F.setMotion pushes exactly one undo snapshot');
+
+  // a downloaded .html carries the settings with no editor chrome: the
+  // resolved data-motion/data-reveal attributes are plain content, not
+  // gated behind .forge-edit or any forge- prefixed class
+  ok(!secM()[0].className.split(' ').some(c=>/^forge-/.test(c)),'the resolved section carries no forge- chrome classes');
+
+  // round-trips through save/reload (export -> fresh boot from that JSON).
+  // State at this point: defaults.motion='off' (just set), defaults.reveal
+  // ={style:'spotlight'}; slide 1 still carries its own motion:'expressive'
+  // (restored by the undo above) but its reveal override was cleared, so it
+  // should resolve motion from ITS OWN override and reveal from the deck.
+  const exported=JSON.parse(JSON.stringify(SGM.data));
+  const dM2=boot(NEW,exported); await new Promise(r=>setTimeout(r,400));
+  const secM2=dM2.window.document.querySelectorAll('#deck .slide');
+  ok(secM2[0].getAttribute('data-motion')==='off'&&secM2[0].getAttribute('data-reveal')==='spotlight',
+    'save/reload preserves the deck defaults (motion off, reveal spotlight) on a slide with no override');
+  ok(secM2[1].getAttribute('data-motion')==='expressive'&&secM2[1].getAttribute('data-reveal')==='spotlight',
+    'save/reload preserves slide 1\'s own motion override AND its fallback to the deck reveal default');
+}
+
+// ---------- post-ship regression: overrides[key].anim="kinetic" on a
+// composite element (2026-08-16) ----------
+// Found via user report: a metric-dash tile ("tiles.1") given a kinetic
+// override rendered with no per-letter animation and, in the reporter's
+// words, the block "went missing". Root cause: ensureKineticSpans() (editor.js)
+// bails out for any node with real element children (it would destroy their
+// structure by replacing innerHTML) — a metric-dash tile is a card with a
+// value div + a label div, not a text leaf, so nothing ever gets wrapped.
+// applyAnim() used to tag the element data-anim="kinetic"/.sg-onenter
+// regardless, which ALSO excludes it from the deck's own default entrance
+// (.mrun's :not([data-anim]) guard) — leaving a composite element with
+// neither its own animation nor the deck's default one. Fixed: applyAnim now
+// checks ensureKineticSpans()'s return value and falls back to no override
+// (the element keeps the deck's ordinary entrance) when the target can't
+// actually take kinetic markup. The correct target for "kinetic letters" is
+// a text-leaf field (e.g. "tiles.1.label"), which still works exactly as
+// before.
+{
+  const dashDeck={meta:{title:'kinetic-regress',schemaVersion:4}, slides:[
+    {layout:'metric-dash', content:{title:'T', ring:{value:1,label:'r',suffix:''},
+      tiles:[{value:'a',unit:'',label:'Alpha'},{value:'b',unit:'',label:'Beta'}]}} ]};
+  const domK=boot(NEW,dashDeck); await new Promise(r=>setTimeout(r,400));
+  const wK=domK.window, dK=wK.document, SGK=wK.SG;
+  // SG.render REPLACES the .slide section on every call — re-query fresh
+  // each time rather than reusing a node reference across renders.
+  const secK=()=>dK.querySelector('#deck .slide');
+
+  // kinetic on the whole tile (composite: value div + label div) — falls back
+  SGK.data.slides[0].overrides={'tiles.0':{anim:'kinetic'}};
+  SGK.render(dK.getElementById('deck'),SGK.data);
+  const tile0=secK().querySelector('[data-el="tiles.0"]');
+  ok(!tile0.hasAttribute('data-anim'), 'kinetic on a composite element (tile with real children) is not applied — falls back instead of tagging an inert override');
+  ok(!tile0.classList.contains('sg-onenter'), 'the composite element keeps NO .sg-onenter from the failed kinetic attempt, so it is still eligible for the deck\'s own default entrance');
+
+  // kinetic on the tile's label — a genuine text leaf — still works
+  SGK.data.slides[0].overrides={'tiles.0.label':{anim:'kinetic'}};
+  SGK.render(dK.getElementById('deck'),SGK.data);
+  const label0=secK().querySelector('[data-el="tiles.0.label"]');
+  ok(label0.getAttribute('data-anim')==='kinetic', 'kinetic on a text-leaf field is applied normally');
+  ok(label0.querySelectorAll('span[style*="--i"]').length===5, 'the leaf\'s letters ("Alpha") are wrapped into per-letter spans');
 }
 
 // ---------- a generated deck still carries no editor state ----------

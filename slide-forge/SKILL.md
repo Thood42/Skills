@@ -25,6 +25,7 @@ slide-forge/
 │   ├── charts.md           ← chart + table data schemas (v2: author charts as DATA, never SVG)
 │   ├── themes.md           ← 11 drop-in palettes (let the user pick)
 │   ├── personalities.md    ← 2 design personalities (type/space/shape) — picked WITH the theme
+│   ├── motion.md           ← element motion (calm/standard/expressive/off) + step-through reveal
 │   ├── audiences.md        ← 8 content strategies (let the user pick)
 │   ├── templates.md        ← brand kits, masters, template packs
 │   └── editor.md           ← how the in-file editor works + what to tell the user
@@ -67,12 +68,20 @@ position/scale/rotation/recolor *overrides* and free-floating objects on top lat
    pairing to the same `<link>`. The personality itself is one key in the deck JSON —
    `"personality": "editorial"` — not a CSS edit. Omit the key for the default look. The user can
    change both later from the editor; this sets the starting look.
+   **Pick a `defaults.motion` deliberately from the same audience read that picked the strategy in
+   step 1** — `calm` for a serious/regulated/executive audience, `expressive` for a keynote or
+   launch, otherwise leave it unset (`standard`, the built-in default). Never reach for
+   `"ambient":"none"` to mean "calm" — that only ever silences the background layer now; `motion` is
+   the actual dial. See `references/motion.md`.
 5. **Write the content as JSON.** Charts are DATA (`references/charts.md`) — labels + series, never
    hand-drawn SVG.  Replace the `<script id="deck-data">` block: set `meta.title`,
    and build the `slides` array — one `{ "layout", "content" }` object per slide. Read
    `references/layouts.md` for each layout's `content` fields. Use the user's exact words where they
    gave them; where they gave a topic, write tight slide copy (titles ≤ 6 words, supporting lines
    ≤ ~14 words). This is the whole deck — there is no per-slide HTML to renumber.
+   If a slide's whole point is being talked through one item at a time (a phased plan, a
+   step-by-step comparison, a build-up to a number), give THAT slide `"reveal":{"style":"…"}` —
+   see `references/motion.md` for the five styles. Most slides want no `reveal` at all.
 6. **Add the user's icons/images (only if they provided them).** See *Assets*. If they gave none,
    leave icon/image slots out — do not invent or fetch images.
 7. **Self-inspect (required).** Validate the JSON and confirm the deck structure before delivering
@@ -95,11 +104,13 @@ One JSON object in `<script id="deck-data">`:
   "meta":   { "title": "How Machines Learn", "seed": 7 },
   "theme":  "midnight-neon",                 // label; the real palette is the :root you pasted
   "personality": "editorial",                // optional: type/space/shape/motif. Omit = default look.
-  "defaults": { "ambient": "auto" },
+  "defaults": { "ambient": "auto", "motion": "calm" },   // motion: omit for the standard default
   "slides": [
     { "layout": "cover",  "content": { "title": "How Machines", "accent": "Learn", "subtitle": "…" } },
     { "layout": "stat-grid",
-      "content": { "title": "By the numbers", "stats": [ { "count": 94, "unit": "%", "label": "…" } ] } }
+      "content": { "title": "By the numbers", "stats": [ { "count": 94, "unit": "%", "label": "…" } ] } },
+    { "layout": "agenda", "reveal": { "style": "spotlight" },
+      "content": { "items": [ { "title": "…" }, { "title": "…" } ] } }
   ]
 }
 ```
@@ -107,8 +118,10 @@ One JSON object in `<script id="deck-data">`:
 - **`layout`** picks a template; **`content`** is that layout's fields (in `references/layouts.md`).
 - **Numbering is derived** — never store pager text or progress widths.
 - Inline emphasis in text fields: `[[glow]]`, `**bold**`, `` `mono` ``.
-- A slide can carry a `"theme"` object (per-slide recolor) and `"ambient"` ("auto"/"none"/a named
-  motion). The **`raw`** layout (`content.html`) is the escape hatch for a one-off bespoke slide.
+- A slide can carry a `"theme"` object (per-slide recolor), `"ambient"` ("auto"/"none"/a named
+  motion — background texture only), `"motion"` ("calm"/"standard"/"expressive"/"off" — element
+  motion, `references/motion.md`), and `"reveal"` (`{"style":"…"}` — step through its list point by
+  point). The **`raw`** layout (`content.html`) is the escape hatch for a one-off bespoke slide.
 
 You author the deck purely through `content`. The editor's manual edits land in two **optional**
 per-slide channels you normally leave absent — `overrides` and `freeObjects` — documented in
@@ -240,6 +253,11 @@ You can't see a rendered HTML file here, so verify what you *can*:
    idea had to be trimmed or padded to fit its layout, that slide wanted to be `composed`. Also check
    the reverse — a `composed` slide whose sections are exactly one classic layout's decomposition
    should just be that layout.
+7. **Motion reads as a deliberate choice, not a default nobody made.** Check `defaults.motion`
+   against the audience picked in step 1 — a `calm` request that still says nothing, or an
+   `expressive` keynote left at the plain default, both mean step 4 was skipped. Grep the deck for
+   `"ambient":"none"`: if it's there, it's very likely wrong (see the next section) — it hasn't meant
+   "calm" since this system shipped.
 
 If you have a browser-capable renderer available, also open the file, toggle **Edit**, and confirm
 panels appear and an element drags. If not, rely on the JSON + structure checks above and tell the
@@ -267,3 +285,12 @@ user the deck is generated and ready to open.
 8. **Don't edit the engine or the editor `<script>` blocks.** You only replace `deck-data` (and
    `deck-assets` via `assets.py`). The template's source lives in `src/` and is rebuilt with
    `scripts/build.py` — that's for developing the tool, never for authoring a deck.
+9. **`"ambient":"none"` does not mean "calm" or "no animation".** It silences the background layer
+   only. If the ask is a quieter or motion-free deck, that's `"motion":"calm"` or `"motion":"off"`
+   (`references/motion.md`) — never ambient.
+10. **Don't hand-author per-element animation to fake step-through.** A slide that wants to reveal
+    point by point gets one `"reveal":{"style":"…"}` key; every title/list/figure already enters
+    consistently on its own without you touching individual elements' `overrides[key].anim`.
+11. **Reveal is for slides that are genuinely talked through one point at a time**, not a default to
+    reach for on every list. Most slides should have no `reveal` key at all — stepping is a real
+    presenting-style commitment (the audience has to click through it), not free polish.
