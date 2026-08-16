@@ -412,5 +412,79 @@ for(const t of NEVER_ANIMATED){
   ok(!item.hasAttribute('data-split'), 'appear/wipe/spotlight never call split() — no .ch/.wd markup for styles that don\'t need it');
 }
 
+// ---------- post-ship regression: reveal computed opacity (2026-08-16) ----------
+// Found via user report: "the reveal options ... seem to make no changes to the
+// animations" and "typewriter/words are not working". Every prior reveal test
+// above asserted .shown/.live CLASS state only, never actual computed opacity —
+// so none of them caught that a step could carry the right classes and still be
+// permanently visible (or permanently invisible) because of a CSS cascade bug.
+// Two distinct root causes, both fixed:
+//  1. agenda's list wrapper still carries the LEGACY `.sg-stagger` class
+//     (kept deliberately for compatibility, see 00-status.md's slice 2 note) —
+//     its children are exactly the same elements SG.motion.tag() marks
+//     data-step. engine.css's shared RESOLVED-STATE block force-showed
+//     `.sg-stagger>*`/`.sg-fade-rise`/`.sg-reveal-wipe`/`[data-role]`/
+//     `[data-role="list"]>*` with NO `:not([data-step])` guard (equal
+//     specificity + !important beats the reveal system's own unguarded
+//     [data-step]{opacity:0}), permanently pinning a step to opacity:1
+//     regardless of .shown. anim.js's `.mrun` entrance rule already excluded
+//     [data-step] the same way; the legacy classes and the resolved-state
+//     block just never learned the same lesson when reveal (slice 4) shipped.
+//  2. typewriter/words only ever set opacity on the .ch/.wd SPANS inside a
+//     step, never on the [data-step] unit itself — the base [data-step]
+//     {opacity:0} was left standing on the container, so even a fully "shown"
+//     line stayed invisible forever (a parent's opacity:0 hides the whole
+//     subtree no matter what a child's own opacity says). appear/wipe already
+//     had `[data-reveal="appear"] [data-step].shown{opacity:1}`; typewriter/
+//     words needed the exact same rule and never had it.
+{
+  const stepDeck={meta:{title:'regress-agenda',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'appear'}, content:{title:'T',
+      items:[{title:'a'},{title:'b'},{title:'c'}]}} ]};
+  const domR1=boot(NEW,stepDeck); await new Promise(r=>setTimeout(r,400));
+  const wR1=domR1.window, dR1=wR1.document, SR1=wR1.SG;
+  const secR1=dR1.querySelector('#deck .slide');
+  const itemsR1=[].slice.call(secR1.querySelectorAll('[data-arr="items"]>*'));
+  ok(itemsR1.every(function(u){ return wR1.getComputedStyle(u).opacity==='0'; }),
+    'agenda+appear: every step (agenda\'s items, which also carry the legacy .sg-stagger class on their container) starts at computed opacity 0, not force-shown by the legacy resolved-state rule');
+  SR1.stepNext();
+  ok(wR1.getComputedStyle(itemsR1[0]).opacity==='1', 'agenda+appear: the shown step becomes computed opacity 1');
+  ok(wR1.getComputedStyle(itemsR1[1]).opacity==='0', 'agenda+appear: the next step is still computed opacity 0 (not leaked visible by the legacy class)');
+}
+{
+  const twDeck={meta:{title:'regress-tw',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'typewriter'}, content:{title:'T', items:[{title:'Hi there'}]}} ]};
+  const domR2=boot(NEW,twDeck); await new Promise(r=>setTimeout(r,400));
+  const wR2=domR2.window, dR2=wR2.document, SR2=wR2.SG;
+  const unitR2=dR2.querySelector('#deck .slide [data-arr="items"]>*');
+  ok(wR2.getComputedStyle(unitR2).opacity==='0', 'typewriter: the step container starts at computed opacity 0');
+  SR2.stepNext();
+  ok(wR2.getComputedStyle(unitR2).opacity==='1',
+    'typewriter: the step CONTAINER itself resolves to computed opacity 1 once shown, not just its .ch spans — a parent stuck at opacity:0 would hide fully-opaque children too');
+  const chR2=unitR2.querySelector('.ch');
+  ok(!!chR2 && wR2.getComputedStyle(chR2).opacity==='1', 'typewriter: its .ch spans are also visible once shown');
+}
+{
+  const wordsDeck={meta:{title:'regress-words',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'words'}, content:{title:'T', items:[{title:'One two'}]}} ]};
+  const domR3=boot(NEW,wordsDeck); await new Promise(r=>setTimeout(r,400));
+  const wR3=domR3.window, dR3=wR3.document, SR3=wR3.SG;
+  const unitR3=dR3.querySelector('#deck .slide [data-arr="items"]>*');
+  SR3.stepNext();
+  ok(wR3.getComputedStyle(unitR3).opacity==='1', 'words: the step container itself resolves to computed opacity 1 once shown (same bug/fix as typewriter)');
+}
+{
+  const spotDeck={meta:{title:'regress-spot',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'spotlight'}, content:{title:'T', items:[{title:'a'},{title:'b'}]}} ]};
+  const domR4=boot(NEW,spotDeck); await new Promise(r=>setTimeout(r,400));
+  const wR4=domR4.window, dR4=wR4.document, SR4=wR4.SG;
+  const itemsR4=[].slice.call(dR4.querySelectorAll('#deck .slide [data-arr="items"]>*'));
+  ok(itemsR4.every(function(u){ return wR4.getComputedStyle(u).opacity==='0.3'; }),
+    'spotlight: every step starts dimmed (computed opacity 0.3), not force-shown by the legacy resolved-state rule');
+  SR4.stepNext();
+  ok(wR4.getComputedStyle(itemsR4[0]).opacity==='1', 'spotlight: the live step brightens to computed opacity 1');
+  ok(wR4.getComputedStyle(itemsR4[1]).opacity==='0.3', 'spotlight: the not-yet-current step stays dimmed');
+}
+
 console.log(pass+' passed, '+fail+' failed');
 if(fail) process.exitCode=1;

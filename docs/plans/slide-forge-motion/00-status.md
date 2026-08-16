@@ -397,6 +397,61 @@
     both structurally (every title/list in the codebase, including the 5 layouts RICH_DECK doesn't
     cover) and by direct measurement in a real browser.
 
+### Post-ship bug hunt 2026-08-16 — real user feedback on `slide-forge/motion-test-deck.html`
+
+A 14-slide feature-test deck was built exercising all 4 presets, all 5 reveal styles, the
+off+reveal interaction, and a per-element `overrides[key].anim` override. User feedback on it:
+typewriter/words "not working, especially words"; spotlight "only highlights the corner of each
+element"; the closing slide's content overflowed the slide window; and, most importantly, "reveal
+options on each slide and the global setting seem to make no changes to the animations." That last
+one sent this deeper than the deck itself — every prior reveal test in `motion-audit.mjs` asserted
+`.shown`/`.live` CLASS state only, never actual computed opacity, so none of them could have caught
+a step carrying the right classes while still being permanently visible or invisible. Two real
+product bugs found and fixed, both in the shared CSS, neither in `anim.js`'s JS logic:
+
+1. **Legacy `sg-*` classes never learned about `[data-step]`.** Several layouts (agenda, closing,
+   leaderboard/matrix/stack/mosaics, editorial, quote) still carry pre-v3.6 entrance classes
+   (`.sg-stagger`, `.sg-fade-rise`, `.sg-reveal-wipe`, `.sg-kinetic`) for compatibility (the
+   slice-2 "compatibility over cleanliness" decision). `anim.js`'s `.mrun` entrance rule already
+   excludes `[data-step]` from ITS OWN default entrance (`:not([data-step])`), but the LEGACY
+   selectors — both their active `.run` rule in `anim.css` and the force-visible copies in
+   `engine.css`'s shared RESOLVED-STATE block — never got the same exclusion. Equal specificity +
+   `!important` meant a reveal-tagged agenda item (or quote block, etc.) got permanently forced
+   to its finished visible state by the legacy rule regardless of `.shown`, defeating stepping
+   entirely for those layouts — this is almost certainly the actual cause of "reveal seems to make
+   no changes." Fixed by adding `:not([data-step])` everywhere the legacy/decorative selectors
+   force an opacity, mirroring the guard `.mrun` already had.
+2. **Typewriter/words never un-hid their own container.** `[data-reveal="typewriter"]`/`"words"`
+   only ever set opacity on the `.ch`/`.wd` SPANS inside a step; the base `[data-step]{opacity:0}`
+   was left standing on the step's own element, so even a fully "shown" line stayed invisible
+   forever — a parent's `opacity:0` hides the whole subtree no matter what a child says.
+   `appear`/`wipe` already had `[data-reveal="appear"] [data-step].shown{opacity:1}`; typewriter/
+   words needed the identical rule and never had it. This is why they read as "not working" at
+   all — nothing ever appeared, not even the wrong thing.
+
+Also fixed, not a code bug: the closing slide's demo content (4 takeaways + a note line) exceeded
+what the `closing` layout's fixed 3-column grid comfortably fits inside `.deck{overflow:hidden}`'s
+720px — trimmed to 3 takeaways in the test deck itself. And the "off + reveal, together" demo slide
+produces (correctly, per spec) zero visible change on click; the deck's own copy didn't say so, so
+it read as broken — reworded to state the expected no-op outcome directly instead of relying on the
+reader to infer it from the surrounding numbers.
+
+Also independently rediscovered, not a new finding: this session's Browser pane runs the test tab
+backgrounded/non-composited, so CSS `transition`s (spotlight's `opacity .35s ease`) never progress
+and `getComputedStyle` reads the pre-transition value indefinitely — already documented under
+"Gate 1 mockups" above from the original mockup session. Verified spotlight's CSS is cascade-correct
+(the `.live` rule has higher specificity and would win) despite this; a discrete-value read only
+needs the transition itself to not matter, which is why the new regression tests below assert
+`.live` opacity directly rather than through a transition.
+
+10 new `getComputedStyle`-based regression assertions added to `motion-audit.mjs` (agenda+appear,
+typewriter container+`.ch`, words container, spotlight dim/live) — the same class of check that was
+missing everywhere before, specifically to make this class of bug fail loudly next time. Final
+state: `parity.mjs` **7** (unchanged), `editor-ops.mjs` **279/279**, `motion-audit.mjs`
+**111/111**, `build.py --check` clean. All fixes verified live in a real browser via direct
+`getComputedStyle`/class-state inspection (not screenshots — this session's pane never composited
+either).
+
 ## Notes for a fresh session
 
 **The ask (2026-08-15, user):** overhaul the animation mechanism *for the generation tool* in a

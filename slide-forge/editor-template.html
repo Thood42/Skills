@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 9385f82f76 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build dea2e8990a — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -424,16 +424,24 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
 .sg-aurora{background:linear-gradient(120deg,rgba(60,232,255,.16),rgba(124,140,255,.16),rgba(68,243,196,.14),rgba(124,140,255,.16));background-size:300% 300%}
 .sg-typewriter{display:inline-block}
 @media (prefers-reduced-motion: no-preference){
-  /* 1 fade-rise — staggered entrance for lists/cards (needs .sg-onenter -> .run) */
-  @keyframes sgFadeRise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
-  .sg-fade-rise{opacity:0}
-  .sg-fade-rise.run{animation:sgFadeRise .7s cubic-bezier(.2,.7,.2,1) both}
-  .sg-stagger.run>*{opacity:0;animation:sgFadeRise .7s cubic-bezier(.2,.7,.2,1) both}
-  .sg-stagger.run>*:nth-child(2){animation-delay:.08s}
-  .sg-stagger.run>*:nth-child(3){animation-delay:.16s}
-  .sg-stagger.run>*:nth-child(4){animation-delay:.24s}
-  .sg-stagger.run>*:nth-child(5){animation-delay:.32s}
-  .sg-stagger.run>*:nth-child(6){animation-delay:.40s}
+  /* 1 fade-rise — staggered entrance for lists/cards (needs .sg-onenter -> .run).
+     :not([data-step]) on every rule below: several layouts (agenda, closing,
+     leaderboard/matrix/stack/mosaics, editorial) still carry this LEGACY class
+     for compatibility (Gate-era decision, see 00-status.md) alongside the v3.6
+     role system. anim.js's activate() fires .sg-onenter -> .run unconditionally
+     on every slide-enter, with no knowledge of `reveal` — without this guard, an
+     agenda item (or any element) that's ALSO a reveal step gets auto-revealed by
+     THIS system the instant the slide loads, regardless of motion or click state,
+     defeating the entire step-through feature (bug found via user report,
+     2026-08-16: "reveal options ... seem to make no changes"). */
+  .sg-fade-rise:not([data-step]){opacity:0}
+  .sg-fade-rise.run:not([data-step]){animation:sgFadeRise .7s cubic-bezier(.2,.7,.2,1) both}
+  .sg-stagger.run>*:not([data-step]){opacity:0;animation:sgFadeRise .7s cubic-bezier(.2,.7,.2,1) both}
+  .sg-stagger.run>*:not([data-step]):nth-child(2){animation-delay:.08s}
+  .sg-stagger.run>*:not([data-step]):nth-child(3){animation-delay:.16s}
+  .sg-stagger.run>*:not([data-step]):nth-child(4){animation-delay:.24s}
+  .sg-stagger.run>*:not([data-step]):nth-child(5){animation-delay:.32s}
+  .sg-stagger.run>*:not([data-step]):nth-child(6){animation-delay:.40s}
 
   /* 2 shimmer — holographic light sweep across text */
   @keyframes sgShimmer{0%{background-position:-180% 0}100%{background-position:180% 0}}
@@ -456,10 +464,14 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
   @keyframes sgFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
   .sg-float{animation:sgFloat 6s ease-in-out infinite}
 
-  /* 6 reveal-wipe — clip-path wipe-in (needs .sg-onenter -> .run) */
+  /* 6 reveal-wipe — clip-path wipe-in (needs .sg-onenter -> .run).
+     :not([data-step]) — same reason as fade-rise/stagger above: quote's
+     blockquote (and editorial's lead) carry this legacy class directly on the
+     element that can ALSO be a reveal step (a slide with no list steps through
+     its top-level roled blocks), so it must yield the same way. */
   @keyframes sgWipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-  .sg-reveal-wipe{clip-path:inset(0 100% 0 0)}
-  .sg-reveal-wipe.run{animation:sgWipe .9s cubic-bezier(.6,.05,.2,1) both}
+  .sg-reveal-wipe:not([data-step]){clip-path:inset(0 100% 0 0)}
+  .sg-reveal-wipe.run:not([data-step]){animation:sgWipe .9s cubic-bezier(.6,.05,.2,1) both}
 
   /* 7 typewriter — single line types in (needs .sg-onenter -> .run) */
   @keyframes sgType{from{width:0}to{width:100%}}
@@ -687,8 +699,18 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    print/static. That's folded into engine.css's shared RESOLVED-STATE
    block rather than repeated here. */
 [data-step]{ opacity:0 }
+/* typewriter/words are included here too, not just appear/wipe: their own rules
+   further down only touch the .ch/.wd SPANS inside a step, never the step
+   [data-step] element itself — opacity:0 on a parent hides every descendant
+   regardless of the child's own opacity, so without this the container (and
+   everything typed into it) stayed invisible forever, click or not (bug found
+   via user report, 2026-08-16: typewriter/words looked entirely non-functional,
+   worse than appear/wipe/spotlight because NOTHING ever appeared, not even a
+   half-finished state). */
 [data-reveal="appear"] [data-step].shown,
-[data-reveal="wipe"] [data-step].shown{ opacity:1 }
+[data-reveal="wipe"] [data-step].shown,
+[data-reveal="typewriter"] [data-step].shown,
+[data-reveal="words"] [data-step].shown{ opacity:1 }
 @media (prefers-reduced-motion: no-preference){
   [data-reveal="appear"] [data-step].shown{ animation:mRise var(--m-dur) var(--m-ease) both }
   [data-reveal="wipe"] [data-step].shown{ animation:mWipe var(--m-dur) cubic-bezier(.6,.05,.2,1) both }
@@ -715,6 +737,14 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    under motion:off/reduced-motion/print/static. */
 [data-reveal="typewriter"] [data-step] .ch{ opacity:0 }
 [data-reveal="words"] [data-step] .wd{ opacity:0; display:inline-block }
+/* Ungated fallback, same pattern as appear/wipe above: a shown step's characters/
+   words resolve to visible on their own, with no @media gate, so a reduced-motion
+   user still gets the reveal (click still un-hides the line) — just without the
+   per-character/word stagger, which is the only part actually gated below. Without
+   this, .ch/.wd had NO rule making them visible outside the no-preference media
+   query, so a reduced-motion user could never see a "shown" line at all. */
+[data-reveal="typewriter"] [data-step].shown .ch,
+[data-reveal="words"] [data-step].shown .wd{ opacity:1 }
 @media (prefers-reduced-motion: no-preference){
   @keyframes mPop{ from{opacity:0} to{opacity:1} }
   [data-reveal="typewriter"] [data-step].shown .ch{
@@ -1381,18 +1411,42 @@ body.hide-docs .doc-panel{display:none}
    used to be the only way to quiet a slide, and it stranded content at its
    hidden base (defect 1) because these declarations only ever ran for
    print. motion:"off" now runs them too, so it actually resolves to
-   visible instead of invisible. ===================================== */
+   visible instead of invisible.
+   Every selector here carries a :not([data-step]) guard, mirroring anim.css's
+   own entrance rules (.mrun [data-role="list"]>*:not(...):not([data-step]),
+   .sg-stagger.run>*:not([data-step]), .sg-reveal-wipe:not([data-step])) —
+   without it, an ordinary decorative element (new-system role OR legacy sg-*
+   class, several layouts still carry both for compatibility) that ALSO
+   happens to be a slide's reveal step matched here too (equal specificity,
+   !important), permanently forcing it to opacity:1 regardless of .shown and
+   silently defeating stepping under reduced-motion (bug found via user
+   report, 2026-08-16; see the print-only block below for why [data-step]
+   itself still needs its own explicit, unguarded rule there). ===================================== */
 @media print, (prefers-reduced-motion: reduce){
-  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
-  [data-role]:not([data-role="list"]):not([data-role="chrome"]),
-  [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd{
+  .sg-fade-rise:not([data-step]), .sg-stagger>*:not([data-step]), .sg-kinetic span:not([data-step]), .sg-reveal-wipe:not([data-step]),
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-step]),
+  [data-role="list"]>*:not([data-step]){
     opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
-  [data-step].live::after{ content:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
   .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
     transform:none !important; opacity:1 !important; animation:none !important }
+}
+/* [data-step] is deliberately NOT in the block above. Unlike decorative entrance
+   (mRise/mWipe), a slide's reveal-hiding is FUNCTIONAL — a presenter's own pacing
+   choice — and anim.css's contract for it is "stays hidden until revealed,
+   independent of motion preference" (see its TYPEWRITER+WORDS comment). Folding
+   [data-step] into the block above used to force every step fully visible the
+   instant prefers-reduced-motion:reduce matched, for ANY reveal style, on ANY
+   slide, regardless of motion/click state — that's not "skip the animation", it's
+   "skip the whole reveal feature", and it silently defeated appear/wipe/spotlight/
+   typewriter/words for every reduced-motion user (bug found via user report,
+   2026-08-16). Only PRINT (no presenter, no clicking) gets to fully resolve a
+   step's visibility regardless of .shown — reduced-motion alone must not. */
+@media print{
+  [data-step], [data-step] .ch, [data-step] .wd{ opacity:1 !important; animation:none !important }
+  [data-step].live::after{ content:none !important }
 }
 :is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
   [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd){

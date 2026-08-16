@@ -342,18 +342,42 @@ body.hide-docs .doc-panel{display:none}
    used to be the only way to quiet a slide, and it stranded content at its
    hidden base (defect 1) because these declarations only ever ran for
    print. motion:"off" now runs them too, so it actually resolves to
-   visible instead of invisible. ===================================== */
+   visible instead of invisible.
+   Every selector here carries a :not([data-step]) guard, mirroring anim.css's
+   own entrance rules (.mrun [data-role="list"]>*:not(...):not([data-step]),
+   .sg-stagger.run>*:not([data-step]), .sg-reveal-wipe:not([data-step])) —
+   without it, an ordinary decorative element (new-system role OR legacy sg-*
+   class, several layouts still carry both for compatibility) that ALSO
+   happens to be a slide's reveal step matched here too (equal specificity,
+   !important), permanently forcing it to opacity:1 regardless of .shown and
+   silently defeating stepping under reduced-motion (bug found via user
+   report, 2026-08-16; see the print-only block below for why [data-step]
+   itself still needs its own explicit, unguarded rule there). ===================================== */
 @media print, (prefers-reduced-motion: reduce){
-  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
-  [data-role]:not([data-role="list"]):not([data-role="chrome"]),
-  [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd{
+  .sg-fade-rise:not([data-step]), .sg-stagger>*:not([data-step]), .sg-kinetic span:not([data-step]), .sg-reveal-wipe:not([data-step]),
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-step]),
+  [data-role="list"]>*:not([data-step]){
     opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
-  [data-step].live::after{ content:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
   .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
     transform:none !important; opacity:1 !important; animation:none !important }
+}
+/* [data-step] is deliberately NOT in the block above. Unlike decorative entrance
+   (mRise/mWipe), a slide's reveal-hiding is FUNCTIONAL — a presenter's own pacing
+   choice — and anim.css's contract for it is "stays hidden until revealed,
+   independent of motion preference" (see its TYPEWRITER+WORDS comment). Folding
+   [data-step] into the block above used to force every step fully visible the
+   instant prefers-reduced-motion:reduce matched, for ANY reveal style, on ANY
+   slide, regardless of motion/click state — that's not "skip the animation", it's
+   "skip the whole reveal feature", and it silently defeated appear/wipe/spotlight/
+   typewriter/words for every reduced-motion user (bug found via user report,
+   2026-08-16). Only PRINT (no presenter, no clicking) gets to fully resolve a
+   step's visibility regardless of .shown — reduced-motion alone must not. */
+@media print{
+  [data-step], [data-step] .ch, [data-step] .wd{ opacity:1 !important; animation:none !important }
+  [data-step].live::after{ content:none !important }
 }
 :is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
   [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd){
