@@ -152,7 +152,7 @@
           N('h3',{bind:b+base+'.title',html:rich(side.title)}),
           N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
             return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
-      return [ N('div.cmp',{key:b+'cmp'},[ col(c.left,'sup','left'),
+      return [ N('div.cmp',{key:b+'cmp',role:'group'},[ col(c.left,'sup','left'),
         N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
         col(c.right,'uns','right') ]) ]; }
   };

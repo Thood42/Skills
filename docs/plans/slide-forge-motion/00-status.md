@@ -20,7 +20,7 @@
 
 ## Slices
 - [x] Slice 1 — tracer: one role end to end; the 6 never-animated lists stagger
-- [ ] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
+- [x] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
 - [ ] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
 - [ ] Slice 4 — build steps + appear/wipe/spotlight
 - [ ] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
@@ -83,6 +83,72 @@
     all 9 items measured `opacity:"1"` — nothing stranded. Console clean on the default deck and on
     `?edit`. Screenshots unavailable this session (Browser pane not compositing, same as prior
     sessions) — proof above is measured values.
+
+- **Slice 2 done 2026-08-16.** `SG.motion` widened to the full vocabulary: `FIELD_ROLE` (data-bind's
+  last segment -> role, the ~20-field table from Program Design verbatim) and `CLASS_ROLE` (a 4th
+  entry beyond the plan's three was needed — see the finding below), `roleOf()`'s full precedence
+  (`data-role` authored > `data-arr` > `data-bind` field > class table), a real `resolve()` reading
+  `defaults.motion -> slide.motion -> 'standard'`, and `tag()` rewritten as a section-wide recursive
+  walk (not just `[data-arr]` containers): every element gets one shot at a role in document order,
+  with list ITEMS treated as a "blocked" subtree (once inside one, FIELD_ROLE/CLASS_ROLE tagging
+  stops — the item is the animation unit via `[data-role="list"]>*`; tagging a nested title inside it
+  too would double-animate). `role:'group'` authored on `.cmp` (`sections.js`) and `.bna` (`engine.js`)
+  — the only 2 explicit authoring additions needed; every other role resolves from what layouts
+  already emit, exactly as Gate 2 measured. CSS gained the `calm`/`expressive` presets, the stagger
+  cap (`--m-step-eff: min(--m-step, --m-cap/--m-span)`), the general `[data-role]` rule (list
+  containers and chrome excluded — only their children/nothing animate), figure's `mWipe` variant,
+  and an unconditional `[data-role="chrome"]{animation:none!important}` outside the media query.
+  `editor-ops.mjs` unaffected (253/253); `parity.mjs` baseline held at **7** (see the two findings
+  below — both were diff-count regressions caught and fixed, not accepted). `motion-audit.mjs` grew
+  from 32 to **53 assertions**, now covering: FIELD_ROLE/CLASS_ROLE correctness, chrome exclusion,
+  group nesting, "no layout is silent", the literal `inconsistentElements` metric (silent titles +
+  silent lists, both 0), the cascade, and the 5 layouts RICH_DECK doesn't include (image, gallery,
+  diagram, embed — media-split was already covered in slice 1).
+  - **Deliberately did NOT strip the ~15 hardcoded legacy `sg-stagger`/`sg-reveal-wipe`/`sg-fade-rise`
+    classes still baked into agenda/editorial/leaderboard/matrix/stack/the mosaics/quote/table/figure's
+    title/etc.** First instinct was to remove them (cleaner, and it would fix the old nth-child(6)
+    stagger cap for those lists too) — but Program Design's own "least confident decision #1" already
+    settled this: "two run-flags coexisting... I chose compatibility over cleanliness," and removing
+    them would have inflated `parity.mjs` past the 7-diff baseline the plan explicitly commits to
+    keeping (only new *attributes* were pre-approved for the ignore-list, not class removals). Traced
+    through what actually happens when both systems target the same element: the new rule's higher
+    CSS specificity wins the `animation` shorthand cleanly (animation-origin values override static
+    ones regardless of selector specificity, so nothing strands) — **except** for `.sg-reveal-wipe`,
+    whose persistent `clip-path:inset(0 100% 0 0)` lives outside its own `.run` gate and isn't touched
+    by `mRise` (which only animates opacity/transform). Fixed with one defensive line instead of a
+    15-site refactor: the new system's general rule always sets `clip-path:none`, so it normalizes
+    that property regardless of which system ends up driving animation-name on a given element.
+    Verified empirically (`.vs-rail`/`.pager` -> `animationName:"none"`, nested list inside `.cmp`
+    -> `animationName:"mRise"` with distinct delays) rather than assumed.
+  - **Finding: `CLASS_ROLE` as specified in the plan (3 entries) missed 2 of 19 titles.** `cover` and
+    `closing` build their `<h1 class="title">` with `key:'title'` (mixed bound+unbound content — an
+    inline accent span alongside plain text) instead of `bind:'title'`, so `FIELD_ROLE` has nothing to
+    key off and they resolved to no role at all — caught by `motion-audit.mjs`'s new "every title
+    carries role=title" assertion actually failing on first run, per the plan's own "real-test rule."
+    Added a 4th `CLASS_ROLE` entry, `['h1.title','title']`, ahead of the other three — cheap, and it
+    only ever fires as a fallback since `FIELD_ROLE` already resolves the other 17.
+  - **Finding: touching `.style.setProperty()` on an element that already carries a hand-authored
+    inline style silently loses data — in jsdom, not in a real browser.** Two symptoms, same root
+    cause: (1) `.pager`/`.progress`'s existing `style="width:N%"` got reformatted to `"width: N%;"`
+    once anything called `.style.setProperty('--i',...)` on them, which is browser-legal but broke
+    `parity.mjs`'s raw string comparison on EVERY slide (34 diffs); (2) worse, figure's no-image
+    fallback (`style="background:linear-gradient(135deg,var(--bg-2),var(--bg))"`) had the ENTIRE
+    background declaration silently DELETED after the same kind of touch — jsdom's `cssstyle` package
+    can't round-trip `var()` inside a shorthand and drops what it can't parse when forced to
+    re-serialize. Verified in a real browser first (`el.getAttribute('style')` still shows the full
+    gradient after the same `--i` write) before concluding it was jsdom-only, not a real bug. Fixed
+    at the root rather than patched around: `tag()` now edits the style ATTRIBUTE STRING directly
+    (parse into declarations, replace-or-append, rejoin) instead of going through the CSSOM at all —
+    works identically in every engine because it never asks any engine to parse `var()`. Also skips
+    writing `--i` to chrome elements entirely (they never animate, so it's dead weight either way).
+    `parity.mjs` additionally gained a structural (not raw-string) style comparison as a second line
+    of defense. Baseline confirmed back at exactly 7 after both fixes.
+  - Browser-verified stagger cap at density, three presets: 40-element stat-grid list, delays
+    strictly increasing and 100% unique at every count tested (3/8/20/40 items) — last delay lands at
+    calm 0.585s (cap 0.6s), standard 0.878s (cap 0.9s, matches the Gate 3 mockup's own 0.877s
+    measurement almost exactly), expressive 1.171s (cap 1.2s). `data-motion` cascades correctly
+    (`defaults.motion` on the section, per-slide `motion` override wins). Console clean on the default
+    deck and on `?edit`.
 
 ## Notes for a fresh session
 

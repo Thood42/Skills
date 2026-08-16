@@ -31,7 +31,16 @@ function norm(n,w){
   for(const a of n.attributes){
     if(/^(data-el|data-bind|data-arr|class|data-role|data-decor|data-motion|data-reveal)$/.test(a.name)) continue;
     let v=a.value;
-    if(a.name==='style') v=v.replace(/--i:[^;]*;?/g,'').replace(/--m-span:[^;]*;?/g,'').trim();
+    if(a.name==='style'){
+      /* Touching .style.setProperty() at all (even for an unrelated custom
+         property) makes the DOM re-serialize the WHOLE style attribute in
+         its normalized form (spacing/semicolons), so compare declarations
+         structurally rather than as a raw string. */
+      v=v.split(';').map(s=>s.trim()).filter(Boolean)
+        .filter(s=>!/^--i\s*:/.test(s)&&!/^--m-span\s*:/.test(s))
+        .map(s=>{ const j=s.indexOf(':'); return j<0?s:s.slice(0,j).trim()+':'+s.slice(j+1).trim(); })
+        .sort().join(';');
+    }
     attrs[a.name]=v;
   }
   const kids=[...n.childNodes].map(c=>norm(c,w)).filter(x=>x!==null&&x!=='');

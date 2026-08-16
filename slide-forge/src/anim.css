@@ -176,20 +176,52 @@
 /* =====================================================================
    MOTION SYSTEM (v3.6) — role-driven entrance. See docs/plans/slide-forge-
    motion. A preset is a handful of custom properties; every role reads the
-   same ones, which is what makes drift structurally impossible. This slice
-   ships only the "standard" preset and the list stagger; calm/expressive/off
-   and the rest of the role vocabulary land in slice 2.
+   same ones, which is what makes drift structurally impossible. JS (anim.js
+   SG.motion) never picks an animation — it only resolves the preset and
+   stamps data-role/--i; every visual decision lives here.
    Deliberately NOT given a persistent "hidden" rule outside this query or
    outside animation:...both — unlike the legacy .sg-fade-rise pattern above,
    that means killing `animation` (ambient:"none", print) leaves these
-   elements at their natural visible state instead of stranding them. */
+   elements at their natural visible state instead of stranding them.
+   `off` is not a preset here on purpose — it needs the shared resolved-state
+   block (print already has one), which slice 3 builds. */
 [data-motion]{ --m-dur:.7s; --m-dist:26px; --m-step:.08s; --m-cap:.9s;
   --m-ease:cubic-bezier(.2,.7,.2,1) }
+[data-motion="calm"]{ --m-dur:.45s; --m-dist:10px; --m-step:.05s; --m-cap:.6s }
+[data-motion="expressive"]{ --m-dur:.95s; --m-dist:46px; --m-step:.13s; --m-cap:1.2s }
+
+/* STAGGER CAP (Gate 3, user: "add a cap on the stagger delay"). The step is
+   COMPRESSED so the whole sequence finishes inside --m-cap — it is not
+   clamped. Clamping would pile every late element onto the ceiling and
+   re-create defect 2 (the old nth-child(6) collision) at a different number.
+   --m-span (tag()'s running total) is never allowed to reach 0 — calc(x/0)
+   is invalid CSS — so the var(...,1) fallback here is a second line of
+   defense, not the only one. */
+.slide{ --m-step-eff: min(var(--m-step), calc(var(--m-cap) / var(--m-span,1))) }
 
 @media (prefers-reduced-motion: no-preference){
   @keyframes mRise{from{opacity:0;transform:translateY(var(--m-dist))}to{opacity:1;transform:none}}
+  @keyframes mWipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+  /* Every role reads the same numbers. List CONTAINERS are inert (excluded
+     below) — their CHILDREN are the animated unit, targeted by the second
+     selector so an unbounded item count still gets one entrance each (no
+     nth-child ceiling). `clip-path:none` is a defensive reset: a couple of
+     legacy per-element effects (.sg-reveal-wipe, still hardcoded on a few
+     layouts — see anim.js's tag() doc comment on "two run-flags coexisting")
+     leave a PERSISTENT clip-path outside their own .run gate; if THIS rule's
+     higher specificity wins the animation-name battle on the same element,
+     nothing else would ever clear that clip, stranding the content exactly
+     like defect 1. Normalizing it here means it's cleared regardless of
+     which system ends up driving the element. */
+  .mrun [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-anim]),
   .mrun [data-role="list"]>*:not([data-anim]){
     animation:mRise var(--m-dur) var(--m-ease) both;
-    animation-delay:calc(var(--i,0) * var(--m-step));
+    animation-delay:calc(var(--i,0) * var(--m-step-eff));
+    clip-path:none;
   }
+  .mrun [data-role="figure"]:not([data-anim]){ animation-name:mWipe }
 }
+/* chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
+   ambient layer) is matched explicitly and never entrance-animated — this
+   sits outside the media query so it holds under every motion preference. */
+[data-role="chrome"]{ animation:none !important }

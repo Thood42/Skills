@@ -7,46 +7,131 @@
   /* =====================================================================
      SG.motion (v3.6) — role-driven entrance motion. JS never picks an
      animation; it only resolves a preset/reveal and stamps data-role + --i
-     so anim.css can do the rest (see docs/plans/slide-forge-motion). This
-     slice: the tracer — resolve() is hardcoded, roleOf() only recognizes an
-     already-authored data-role or a data-arr container ("list"). Slice 2
-     widens both into the full vocabulary. */
+     so anim.css can do the rest (see docs/plans/slide-forge-motion). Slice 2:
+     the full role vocabulary (FIELD_ROLE + CLASS_ROLE), the real deck->slide
+     cascade, and a section-wide tag() pass. */
   window.SG = window.SG || {};
   SG.motion = SG.motion || {};
   SG.motion.ROLES = ['title','kicker','lead','body','meta','list','group',
                       'figure','number','quote','chrome'];
 
-  /* Resolve one element's role. Precedence: authored data-role > data-arr
-     container ("list") > null (not animated). Widened in slice 2. */
+  /* data-bind's LAST path segment -> role. Derived from the ~20 field names
+     layouts actually author (measured at Gate 2, see 03-program-design.md). */
+  SG.motion.FIELD_ROLE = {
+    title:'title', kicker:'kicker', subtitle:'lead', sub:'lead',
+    lead:'lead', body:'body', head:'title', desc:'body',
+    quote:'quote', by:'meta', label:'meta', note:'meta',
+    caption:'meta', value:'number', year:'meta', tag:'meta',
+    name:'body', statement:'quote', index:'meta', accent:'title' };
+
+  /* class/tag table for what data-arr and data-bind cannot speak for.
+     h1.title is its own entry: two layouts (cover, closing) build a title
+     that mixes bound and unbound content (an inline accent span alongside
+     plain text), so they key it (`key:'title'`) instead of binding it
+     (`bind:'title'`) — FIELD_ROLE alone would miss them, and "every title
+     enters the same way" is the headline promise, not an edge case. */
+  SG.motion.CLASS_ROLE = [
+    ['h1.title', 'title'],
+    ['.chart-anim,.tbl-wrap,.code-panel,.ms-media,.fig-img,img,svg', 'figure'],
+    ['.sg-count,.hero-num,.num,.sg-ring', 'number'],
+    ['.rail,.quote-mark,.tl-track,.tl-spark,.vs-rail,.divline,' +
+     '.pager,.progress,.amb,.dotrow,.code-sweep', 'chrome'] ];
+
+  /* Resolve one element's role. Precedence: authored data-role (baked in at
+     build time via N()'s role: attr, or set by an earlier tag() pass) >
+     data-arr container ("list") > data-bind field > class table > null
+     (not animated). */
   SG.motion.roleOf = function(node){
     var r = node.getAttribute && node.getAttribute('data-role');
     if(r) return r;
     if(node.hasAttribute && node.hasAttribute('data-arr')) return 'list';
+    var bind = node.getAttribute && node.getAttribute('data-bind');
+    if(bind){
+      var seg = bind.split('.'), field = seg[seg.length-1];
+      if(SG.motion.FIELD_ROLE[field]) return SG.motion.FIELD_ROLE[field];
+    }
+    for(var i=0; i<SG.motion.CLASS_ROLE.length; i++){
+      try{ if(node.matches && node.matches(SG.motion.CLASS_ROLE[i][0])) return SG.motion.CLASS_ROLE[i][1]; }
+      catch(e){}
+    }
     return null; };
 
-  /* The deck -> slide cascade. Hardcoded to 'standard' until slice 2 reads
-     defaults.motion / slide.motion. Never reads the DOM. */
+  /* The deck -> slide cascade. Never reads the DOM. overrides[key].anim (a
+     per-element choice) wins over all of this, but that's enforced in CSS
+     (:not([data-anim])) rather than here. */
   SG.motion.resolve = function(slide, data){
-    return { motion:'standard', reveal:null, stepped:false }; };
+    slide = slide || {};
+    data = data || (window.SG && SG.data) || {};
+    var defaults = data.defaults || {};
+    var motion = slide.motion || defaults.motion || 'standard';
+    var revealSrc = slide.reveal || defaults.reveal || null;
+    return {
+      motion: motion,
+      reveal: revealSrc ? {style: revealSrc.style || 'appear', unit: revealSrc.unit || 'item'} : null,
+      stepped: !!revealSrc };
+  };
 
-  /* One pass over a freshly built <section>: stamps data-motion, gives every
-     [data-arr] container role="list", and assigns --i to its children in
-     document order (a single counter that continues across every list in
-     the section, so later lists don't restart the stagger at 0). --m-span
-     is the running total, which slice 2's stagger cap divides against.
+  /* Set a custom property by editing the style ATTRIBUTE STRING directly,
+     never via el.style.setProperty(). Some elements this walk touches
+     already carry a hand-authored inline style with a var()-in-shorthand
+     value (e.g. figure's no-image fallback: `background:linear-gradient(
+     135deg,var(--bg-2),var(--bg))`); routing even an unrelated custom
+     property through the CSSOM forces the whole attribute to be re-parsed
+     and re-serialized, and at least one CSS engine in this project's tooling
+     (jsdom's cssstyle) drops values it can't round-trip when it does that —
+     silently deleting the background. Plain string editing can't trigger
+     that class of bug in ANY engine, browsers included, and is idempotent
+     (replaces a prior value for the same property instead of appending). */
+  function setProp(el, name, val){
+    var decls = (el.getAttribute('style')||'').split(';').map(function(s){ return s.trim(); })
+      .filter(function(s){ return s && s.slice(0,s.indexOf(':')).trim()!==name; });
+    decls.push(name+':'+val);
+    el.setAttribute('style', decls.join(';')+';'); }
+
+  /* One pass over a freshly built <section>: stamps data-motion/data-reveal,
+     then walks the whole section in document order assigning role + a single
+     monotonic --i (list children continue the parent's sequence, so a title
+     before a list doesn't reset the count to 0). --m-span is the running
+     total, which the stagger cap (anim.css) divides against — never let it
+     hit 0, calc(x/0) is invalid CSS.
+     List ITEMS are a "blocked" subtree: once inside one, FIELD_ROLE/CLASS_ROLE
+     tagging stops (the item itself is the animated unit via the CSS
+     `[data-role="list"]>*` rule; independently tagging a nested title/label
+     inside it would double-animate the same visual motion). An authored
+     data-role (e.g. group on .cmp) is never blocked — roleOf() reads it
+     before FIELD_ROLE/CLASS_ROLE even run, and the walk still descends into
+     a group's own children (a group can contain further lists/titles).
      Idempotent: safe to call again on the same section. */
   SG.motion.tag = function(sec, resolved){
     resolved = resolved || SG.motion.resolve();
     sec.setAttribute('data-motion', resolved.motion);
+    if(resolved.reveal) sec.setAttribute('data-reveal', resolved.reveal.style);
+    else sec.removeAttribute('data-reveal');
     var i = 0;
-    var lists = sec.querySelectorAll('[data-arr]');
-    for(var li=0; li<lists.length; li++){
-      var list = lists[li], role = SG.motion.roleOf(list);
-      if(role && !list.hasAttribute('data-role')) list.setAttribute('data-role', role);
-      var kids = list.children;
-      for(var k=0; k<kids.length; k++){ kids[k].style.setProperty('--i', String(i++)); }
+    function walk(el, blocked){
+      var kids = el.children;
+      for(var k=0; k<kids.length; k++){
+        var child = kids[k];
+        if(child.hasAttribute('data-arr')){
+          if(!child.hasAttribute('data-role')) child.setAttribute('data-role','list');
+          var items = child.children;
+          for(var ii=0; ii<items.length; ii++){ setProp(items[ii], '--i', String(i++)); }
+          for(var ij=0; ij<items.length; ij++){ walk(items[ij], true); }
+          continue;
+        }
+        if(!blocked){
+          var role = SG.motion.roleOf(child);
+          if(role){
+            if(!child.hasAttribute('data-role')) child.setAttribute('data-role', role);
+            /* chrome never animates, so it never needs --i */
+            if(role!=='chrome') setProp(child, '--i', String(i++));
+          }
+        }
+        walk(child, blocked);
+      }
     }
-    sec.style.setProperty('--m-span', String(i)); };
+    walk(sec, false);
+    setProp(sec, '--m-span', String(Math.max(1,i))); };
 
   function fmtC(n){var a=Math.abs(n),T=[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
     for(var i=0;i<T.length;i++){if(a>=T[i][0])return (n/T[i][0]).toFixed(1).replace(/\.0$/,'')+T[i][1];}

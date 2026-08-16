@@ -529,7 +529,7 @@
         N('ul',{key:base+'.items',arr:base+'.items'},arr(s.items).map(function(x,i){
           return N('li',{bind:base+'.items.'+i,html:rich(x)}); })) ]); }
     return [ kickerN(c.kicker), titleN(c.title),
-      N('div.bna',{key:'bna'},[ col(c.before,'before','before'),
+      N('div.bna',{key:'bna',role:'group'},[ col(c.before,'before','before'),
         N('div.bna-arrow',{html:'&rarr;'}), col(c.after,'after','after') ]) ]; };
 
   /* =====================================================================
