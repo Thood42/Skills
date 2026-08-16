@@ -331,5 +331,86 @@ for(const t of NEVER_ANIMATED){
   ok(sec11.querySelectorAll('[data-step]').length===0, 'no reveal configured -> no data-step markers at all');
 }
 
+// ---------- slice 5: typewriter + word-by-word (SG.motion.split) ----------
+{
+  const twDeck={meta:{title:'tw',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'typewriter'}, content:{title:'T',
+      items:[{title:'Hi there'},{title:'Second'}]}} ]};
+  const dom12=boot(NEW,twDeck); await new Promise(r=>setTimeout(r,400));
+  const w12=dom12.window, d12=w12.document;
+  const sec12=d12.querySelector('#deck .slide');
+  const item0=sec12.querySelector('[data-arr="items"]>*');
+  ok(item0.getAttribute('data-split')==='typewriter', 'activation splits typewriter step units (data-split stamped)');
+  const chars=[].slice.call(item0.querySelectorAll('.ch'));
+  ok(chars.length>0, 'typewriter split produced .ch character spans');
+  // the unit is the WHOLE agenda item — split() walks every text node inside
+  // it, so the padded index ("01") text ahead of the title is part of the
+  // sequence too, in document order: "01" then "Hi there".
+  ok(chars.map(function(c){return c.textContent;}).join('')==='01Hi there',
+    'character spans reconstruct every text node in the unit, in document order, spaces included');
+  const idx=chars.map(function(c){return +c.style.getPropertyValue('--i');});
+  ok(idx.every(function(v,i){return v===i;}), 'character --i is 0..N-1, sequential across the whole unit');
+  const words=[].slice.call(item0.querySelectorAll('.wd'));
+  ok(words.length===3, 'word spans exist too ("01", "Hi", "there") — both span kinds are built regardless of style, so switching styles needs no re-split');
+
+  // idempotent: re-splitting an already-split unit doesn't mangle it
+  w12.SG.motion.split(item0, 'typewriter');
+  const chars2=[].slice.call(item0.querySelectorAll('.ch'));
+  ok(chars2.map(function(c){return c.textContent;}).join('')==='01Hi there',
+    'calling split() again on an already-split unit is a no-op (data-split guard) — text stays intact');
+
+  // never persisted: SG.data has no idea any of this happened
+  ok(JSON.stringify(w12.SG.data.slides[0].content).indexOf('class="ch"')===-1 &&
+     JSON.stringify(w12.SG.data.slides[0].content).indexOf('"Hi there"')!==-1,
+    'the split lives only in the live DOM — SG.data still holds the plain original string');
+
+  // a fresh render starts clean (proves "rebuilt from content each render, never persisted")
+  const dom13=boot(NEW,twDeck); await new Promise(r=>setTimeout(r,400));
+  const item0b=dom13.window.document.querySelector('#deck .slide [data-arr="items"]>*');
+  ok(item0b.querySelectorAll('.ch').length===chars.length,
+    'a completely fresh boot from the same JSON re-splits identically (deterministic, data-driven)');
+}
+{
+  // words style: same span markup, different CSS target (.wd, not .ch)
+  const wordsDeck={meta:{title:'words',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'words'}, content:{title:'T',
+      items:[{title:'One two three'}]}} ]};
+  const dom14=boot(NEW,wordsDeck); await new Promise(r=>setTimeout(r,400));
+  const item=dom14.window.document.querySelector('#deck .slide [data-arr="items"]>*');
+  ok(item.getAttribute('data-split')==='words', 'activation splits word-by-word step units');
+  const words=[].slice.call(item.querySelectorAll('.wd'));
+  // the unit includes the item's own padded index ("01") ahead of the title
+  ok(words.length===4, '4 word spans: "01" (the item index) + "One two three"');
+  ok(words.map(function(w){return w.textContent;}).join(' ')==='01 One two three',
+    'word spans reconstruct every text node in the unit, in document order');
+}
+{
+  // present-mode-only guard: split() refuses while the editor is active.
+  // Slide 0 auto-activates on boot (splitting it before this test can
+  // intercept), so this uses slide 1's still-unactivated, never-split unit.
+  const twDeck2={meta:{title:'tw2',schemaVersion:4}, slides:[
+    {layout:'cover', content:{title:'cover'}},
+    {layout:'agenda', reveal:{style:'typewriter'}, content:{title:'T', items:[{title:'x'}]}} ]};
+  const dom15=boot(NEW,twDeck2); await new Promise(r=>setTimeout(r,400));
+  const w15=dom15.window, d15=w15.document, S15=w15.SG;
+  const item=[].slice.call(d15.querySelectorAll('#deck .slide'))[1].querySelector('[data-arr="items"]>*');
+  ok(!item.hasAttribute('data-split'), 'slide 1 never activated, so its unit was never split yet (sanity check)');
+  d15.body.classList.add('forge-edit');
+  S15.motion.split(item, 'typewriter');
+  ok(item.querySelectorAll('.ch').length===0, 'split() is a no-op while .forge-edit is on document.body');
+  ok(!item.hasAttribute('data-split'), 'no data-split stamped either — refused, not silently skipped mid-way');
+  d15.body.classList.remove('forge-edit');
+  S15.motion.split(item, 'typewriter');
+  ok(item.querySelectorAll('.ch').length>0, 'split() works normally again once .forge-edit is removed');
+}
+{
+  // split() ignores styles that don't need it
+  const appearDeck={meta:{title:'noop',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'appear'}, content:{title:'T', items:[{title:'x'}]}} ]};
+  const dom16=boot(NEW,appearDeck); await new Promise(r=>setTimeout(r,400));
+  const item=dom16.window.document.querySelector('#deck .slide [data-arr="items"]>*');
+  ok(!item.hasAttribute('data-split'), 'appear/wipe/spotlight never call split() — no .ch/.wd markup for styles that don\'t need it');
+}
+
 console.log(pass+' passed, '+fail+' failed');
 if(fail) process.exitCode=1;

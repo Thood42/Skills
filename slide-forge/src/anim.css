@@ -252,8 +252,7 @@
    time, via SG.stepNext() (bound to →/Space/click, unchanged). Stepping
    itself is identical across every style; only how a point ARRIVES differs.
    Two families, and the split is the whole contract:
-     WITHHOLDING (appear, wipe — typewriter/words land in slice 5) hides
-       what's next.
+     WITHHOLDING (appear, wipe, typewriter, words) hides what's next.
      FOCUSING (spotlight) hides nothing; it moves a .live marker instead,
        so the room can see the shape of the whole list while you talk to
        one line of it — the only style that never withholds text from
@@ -282,3 +281,32 @@
    motion, it just doesn't need the transition to be animated. */
 [data-reveal="spotlight"] [data-step]{ opacity:.3; transition:opacity .35s ease }
 [data-reveal="spotlight"] [data-step].live{ opacity:1 }
+
+/* =====================================================================
+   TYPEWRITER + WORDS (v3.6, slice 5) — the two withholding styles that need
+   markup, not just a class. SG.motion.split() wraps a step unit's text (every
+   text node inside it, in reading order) into .wd (word) spans, each holding
+   .ch (character) spans — built once per activation, PRESENT MODE ONLY (see
+   split()'s own doc comment for why), never persisted. Both span kinds exist
+   regardless of which of the two styles is chosen, so a slide can switch
+   between them without re-splitting; only which class the CSS keys off
+   differs. Same functional-hiding rule as [data-step] itself: a real
+   unconditional base, not fill-mode-only, and the shared RESOLVED-STATE
+   block (engine.css) is what un-hides everything (plus silences the caret)
+   under motion:off/reduced-motion/print/static. */
+[data-reveal="typewriter"] [data-step] .ch{ opacity:0 }
+[data-reveal="words"] [data-step] .wd{ opacity:0; display:inline-block }
+@media (prefers-reduced-motion: no-preference){
+  @keyframes mPop{ from{opacity:0} to{opacity:1} }
+  [data-reveal="typewriter"] [data-step].shown .ch{
+    animation:mPop .01s linear both; animation-delay:calc(var(--i,0) * .022s) }
+  [data-reveal="words"] [data-step].shown .wd{
+    animation:mRise .4s var(--m-ease) both; animation-delay:calc(var(--i,0) * .07s) }
+  /* the caret marks the CURRENTLY-typing line — only the live one gets it,
+     and only while there's still something being "typed" (reduced motion
+     resolves everything at once, so nothing is mid-type; see engine.css) */
+  @keyframes mCaret{ 50%{opacity:0} }
+  [data-reveal="typewriter"] [data-step].shown.live::after{
+    content:""; display:inline-block; width:.08em; height:1.05em; background:var(--cyan);
+    vertical-align:-.16em; margin-left:.06em; animation:mCaret .8s step-end infinite }
+}

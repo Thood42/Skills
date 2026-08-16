@@ -92,6 +92,55 @@
      instead. Both advance identically via SG.stepNext(). */
   SG.motion.isFocusing = function(style){ return style==='spotlight'; };
 
+  /* Split a step unit's text into per-word (.wd) spans, each holding
+     per-character (.ch) spans, for the two reveal styles that need
+     something finer than "the whole unit". PRESENT MODE ONLY: refuses
+     while document.body carries .forge-edit, because wrapping the inside
+     of a [data-bind] leaf would fight the editor's contenteditable commit
+     path (which writes an edited element's live text back to the content
+     field on Enter/blur — span markup landing in there would corrupt the
+     deck JSON, not just look wrong). Rebuilt from the unit's OWN live text
+     every time a slide activates (never touches SG.data), so nothing here
+     is ever persisted — the next render starts from data again. Walks
+     every text node inside the unit, not just its direct text, so an
+     item's internal structure (an h3 title, a p description) keeps its
+     own elements; only the text itself is replaced, with one counter
+     continuing in reading order across every text node in the unit.
+     Idempotent via data-split: calling it twice on an already-split unit
+     (its text nodes are now single characters) would double-wrap and
+     mangle them, so a second call is a no-op unless the unit is re-split
+     by a fresh render (which starts from a fresh, unsplit DOM). */
+  SG.motion.split = function(unit, style){
+    if(style!=='typewriter' && style!=='words') return;
+    if(document.body && document.body.classList.contains('forge-edit')) return;
+    if(unit.getAttribute('data-split')===style) return;
+    var ci=0, wi=0;
+    var walker=document.createTreeWalker(unit, NodeFilter.SHOW_TEXT, null);
+    var texts=[], n;
+    while((n=walker.nextNode())) if(n.nodeValue) texts.push(n);
+    texts.forEach(function(textNode){
+      var words=textNode.nodeValue.split(' ');
+      var frag=document.createDocumentFragment();
+      words.forEach(function(w,k){
+        var wd=document.createElement('span'); wd.className='wd';
+        wd.style.setProperty('--i', String(wi++));
+        for(var i=0;i<w.length;i++){
+          var ch=document.createElement('span'); ch.className='ch';
+          ch.style.setProperty('--i', String(ci++)); ch.textContent=w[i];
+          wd.appendChild(ch);
+        }
+        frag.appendChild(wd);
+        if(k<words.length-1){
+          var sp=document.createElement('span'); sp.className='ch';
+          sp.style.setProperty('--i', String(ci++)); sp.textContent=' ';
+          frag.appendChild(sp);
+        }
+      });
+      textNode.parentNode.replaceChild(frag, textNode);
+    });
+    unit.setAttribute('data-split', style);
+  };
+
   /* Set a custom property by editing the style ATTRIBUTE STRING directly,
      never via el.style.setProperty(). Some elements this walk touches
      already carry a hand-authored inline style with a var()-in-shorthand
@@ -187,6 +236,10 @@
        it again, not resume mid-list. */
     if(slide.querySelectorAll){
       slide.querySelectorAll('[data-step]').forEach(function(n){ n.classList.remove('shown','live'); });
+      var revealStyle = slide.getAttribute && slide.getAttribute('data-reveal');
+      if(revealStyle==='typewriter' || revealStyle==='words'){
+        SG.motion.steps(slide).forEach(function(u){ SG.motion.split(u, revealStyle); });
+      }
     }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');

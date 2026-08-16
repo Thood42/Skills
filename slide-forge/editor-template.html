@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 4f051ef75d — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 35c068982a — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -671,8 +671,7 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    time, via SG.stepNext() (bound to →/Space/click, unchanged). Stepping
    itself is identical across every style; only how a point ARRIVES differs.
    Two families, and the split is the whole contract:
-     WITHHOLDING (appear, wipe — typewriter/words land in slice 5) hides
-       what's next.
+     WITHHOLDING (appear, wipe, typewriter, words) hides what's next.
      FOCUSING (spotlight) hides nothing; it moves a .live marker instead,
        so the room can see the shape of the whole list while you talk to
        one line of it — the only style that never withholds text from
@@ -701,6 +700,35 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    motion, it just doesn't need the transition to be animated. */
 [data-reveal="spotlight"] [data-step]{ opacity:.3; transition:opacity .35s ease }
 [data-reveal="spotlight"] [data-step].live{ opacity:1 }
+
+/* =====================================================================
+   TYPEWRITER + WORDS (v3.6, slice 5) — the two withholding styles that need
+   markup, not just a class. SG.motion.split() wraps a step unit's text (every
+   text node inside it, in reading order) into .wd (word) spans, each holding
+   .ch (character) spans — built once per activation, PRESENT MODE ONLY (see
+   split()'s own doc comment for why), never persisted. Both span kinds exist
+   regardless of which of the two styles is chosen, so a slide can switch
+   between them without re-splitting; only which class the CSS keys off
+   differs. Same functional-hiding rule as [data-step] itself: a real
+   unconditional base, not fill-mode-only, and the shared RESOLVED-STATE
+   block (engine.css) is what un-hides everything (plus silences the caret)
+   under motion:off/reduced-motion/print/static. */
+[data-reveal="typewriter"] [data-step] .ch{ opacity:0 }
+[data-reveal="words"] [data-step] .wd{ opacity:0; display:inline-block }
+@media (prefers-reduced-motion: no-preference){
+  @keyframes mPop{ from{opacity:0} to{opacity:1} }
+  [data-reveal="typewriter"] [data-step].shown .ch{
+    animation:mPop .01s linear both; animation-delay:calc(var(--i,0) * .022s) }
+  [data-reveal="words"] [data-step].shown .wd{
+    animation:mRise .4s var(--m-ease) both; animation-delay:calc(var(--i,0) * .07s) }
+  /* the caret marks the CURRENTLY-typing line — only the live one gets it,
+     and only while there's still something being "typed" (reduced motion
+     resolves everything at once, so nothing is mid-type; see engine.css) */
+  @keyframes mCaret{ 50%{opacity:0} }
+  [data-reveal="typewriter"] [data-step].shown.live::after{
+    content:""; display:inline-block; width:.08em; height:1.05em; background:var(--cyan);
+    vertical-align:-.16em; margin-left:.06em; animation:mCaret .8s step-end infinite }
+}
 </style>
 <script>
 (function(){
@@ -797,6 +825,55 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
      instead. Both advance identically via SG.stepNext(). */
   SG.motion.isFocusing = function(style){ return style==='spotlight'; };
 
+  /* Split a step unit's text into per-word (.wd) spans, each holding
+     per-character (.ch) spans, for the two reveal styles that need
+     something finer than "the whole unit". PRESENT MODE ONLY: refuses
+     while document.body carries .forge-edit, because wrapping the inside
+     of a [data-bind] leaf would fight the editor's contenteditable commit
+     path (which writes an edited element's live text back to the content
+     field on Enter/blur — span markup landing in there would corrupt the
+     deck JSON, not just look wrong). Rebuilt from the unit's OWN live text
+     every time a slide activates (never touches SG.data), so nothing here
+     is ever persisted — the next render starts from data again. Walks
+     every text node inside the unit, not just its direct text, so an
+     item's internal structure (an h3 title, a p description) keeps its
+     own elements; only the text itself is replaced, with one counter
+     continuing in reading order across every text node in the unit.
+     Idempotent via data-split: calling it twice on an already-split unit
+     (its text nodes are now single characters) would double-wrap and
+     mangle them, so a second call is a no-op unless the unit is re-split
+     by a fresh render (which starts from a fresh, unsplit DOM). */
+  SG.motion.split = function(unit, style){
+    if(style!=='typewriter' && style!=='words') return;
+    if(document.body && document.body.classList.contains('forge-edit')) return;
+    if(unit.getAttribute('data-split')===style) return;
+    var ci=0, wi=0;
+    var walker=document.createTreeWalker(unit, NodeFilter.SHOW_TEXT, null);
+    var texts=[], n;
+    while((n=walker.nextNode())) if(n.nodeValue) texts.push(n);
+    texts.forEach(function(textNode){
+      var words=textNode.nodeValue.split(' ');
+      var frag=document.createDocumentFragment();
+      words.forEach(function(w,k){
+        var wd=document.createElement('span'); wd.className='wd';
+        wd.style.setProperty('--i', String(wi++));
+        for(var i=0;i<w.length;i++){
+          var ch=document.createElement('span'); ch.className='ch';
+          ch.style.setProperty('--i', String(ci++)); ch.textContent=w[i];
+          wd.appendChild(ch);
+        }
+        frag.appendChild(wd);
+        if(k<words.length-1){
+          var sp=document.createElement('span'); sp.className='ch';
+          sp.style.setProperty('--i', String(ci++)); sp.textContent=' ';
+          frag.appendChild(sp);
+        }
+      });
+      textNode.parentNode.replaceChild(frag, textNode);
+    });
+    unit.setAttribute('data-split', style);
+  };
+
   /* Set a custom property by editing the style ATTRIBUTE STRING directly,
      never via el.style.setProperty(). Some elements this walk touches
      already carry a hand-authored inline style with a var()-in-shorthand
@@ -892,6 +969,10 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
        it again, not resume mid-list. */
     if(slide.querySelectorAll){
       slide.querySelectorAll('[data-step]').forEach(function(n){ n.classList.remove('shown','live'); });
+      var revealStyle = slide.getAttribute && slide.getAttribute('data-reveal');
+      if(revealStyle==='typewriter' || revealStyle==='words'){
+        SG.motion.steps(slide).forEach(function(u){ SG.motion.split(u, revealStyle); });
+      }
     }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');
@@ -1304,7 +1385,9 @@ body.hide-docs .doc-panel{display:none}
 @media print, (prefers-reduced-motion: reduce){
   .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
   [data-role]:not([data-role="list"]):not([data-role="chrome"]),
-  [data-role="list"]>*, [data-step]{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+  [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd{
+    opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+  [data-step].live::after{ content:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
@@ -1312,8 +1395,9 @@ body.hide-docs .doc-panel{display:none}
     transform:none !important; opacity:1 !important; animation:none !important }
 }
 :is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
-  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step]){
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step], [data-step] .ch, [data-step] .wd){
   opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+:is([data-motion="off"], html[data-static]) [data-step].live::after{ content:none !important }
 :is([data-motion="off"], html[data-static]) .sg-typewriter{ width:auto !important; border-right:0 !important }
 :is([data-motion="off"], html[data-static]) :is(.sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,
   .sg-draw rect,.sg-draw ellipse,.sg-draw polygon,.sg-check circle,.sg-check .tick,.chart-line){ stroke-dashoffset:0 !important }

@@ -23,7 +23,7 @@
 - [x] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
 - [x] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
 - [x] Slice 4 — build steps + appear/wipe/spotlight
-- [ ] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
+- [x] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
 - [ ] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
 - [ ] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
 
@@ -252,6 +252,58 @@
     `false`. Spotlight — `[.3,.3,.3] → [1,.3,.3] → [.3,1,.3]`: focus moves, dims back, never hides
     (confirms "focus singular, focus brightest"). `motion:"off"`: every point measured `opacity:"1"`
     immediately, no stepping needed. Console clean on the default deck and `?edit`.
+
+- **Slice 5 done 2026-08-16.** `SG.motion.split(unit, style)` added to `anim.js`: walks every TEXT
+  NODE inside a step unit (not just its direct text, so an item's internal structure — an `h3`
+  title, a `p` description — keeps its own elements; only the text is replaced) and wraps it into
+  `.wd` (word) spans each holding `.ch` (character) spans, one counter continuing in reading order
+  across every text node in the unit. Refuses outright — no partial wrap — while
+  `document.body.classList.contains('forge-edit')`, and is idempotent via a `data-split` stamp (a
+  second call on an already-split unit, whose text nodes are now single characters, would double-wrap
+  and mangle them otherwise). Called from `activate()` once per activation, for every unit
+  `SG.motion.steps()` returns, only when the resolved reveal style is `typewriter`/`words` — never
+  touches `SG.data`, so "rebuilt from content each render, never persisted" holds structurally: a
+  fresh render starts from fresh unsplit DOM every time.
+  - **CSS follows the same "functional hiding needs a real base, not fill-mode-only" rule slice 4
+    established:** `[data-reveal="typewriter"] [data-step] .ch{opacity:0}` and
+    `[data-reveal="words"] [data-step] .wd{opacity:0}` are unconditional; the `mPop`/`mRise`-driven
+    reveal animations are gated inside `@media (prefers-reduced-motion: no-preference)` same as
+    everywhere else. `.ch`/`.wd` (plus the typewriter caret's `::after`) added to engine.css's shared
+    RESOLVED-STATE selector list from slice 3, so motion:off/reduced-motion/print/static all resolve
+    typewriter/word content to fully visible — the same "every point is on the slide from the start,
+    in all five styles" promise, now actually true for all five, not three.
+  - Both span kinds (`.wd` and `.ch`) are always built together regardless of which style is active,
+    so a slide can switch between typewriter and words with no re-split needed — only which CSS
+    selector targets which span kind changes.
+  - **Real jsdom bug found and fixed while writing the assertions, not a product bug:** the first
+    version of the "present-mode-only guard" test set `.forge-edit` on an ALREADY-ACTIVATED slide
+    (slide 0, which auto-activates — and therefore auto-splits — during `boot()`), so the guard was
+    being tested against a unit that was already split before the test could intercept it, and the
+    test couldn't tell "refused" from "already done." Fixed by testing against slide 1's unit, which
+    never activates (only slide 0 does on boot), proving the guard on a genuinely fresh, unsplit unit.
+  - `motion-audit.mjs` grew to **101 assertions**: split() produces correct `.ch`/`.wd` markup that
+    reconstructs the original text (including a subtlety caught by the first test run — the step UNIT
+    is the whole agenda item, so its padded index text ["01"] is part of the split too, ahead of the
+    title, exactly as `split()`'s "every text node in the unit" contract promises); idempotency; the
+    persistence guarantee (`SG.data` never contains span markup, a fresh boot re-splits identically);
+    the `.forge-edit` refusal and recovery; and that appear/wipe/spotlight never call `split()` at all.
+  - Browser-verified, media-query-gate lifted (plus one real editor check with NO override — see
+    below): typewriter — 4 characters ("01Hi"), all hidden before revealing, `[0.022, 0.044,
+    0.066]s` staggered delays after `.shown`; words — 4 word spans ("01","One","two","three"),
+    `[0.07, 0.14, 0.21]s` delays. Confirmed via the resolved-state (no override, real reduced-motion
+    in this pane) that both `.ch` and the caret resolve to `opacity:"1"`/`animationName:"none"`
+    before AND after stepping — nothing left mid-typed. **Verified the `.forge-edit` guard in the
+    actual live editor**, not just simulated: rendered a typewriter slide with
+    `document.body.classList.contains('forge-edit')` already true (the real state after `F.toggle()`),
+    and confirmed zero `.ch` spans and no `data-split` stamp — the guard holds under the real
+    activation path, not just a hand-called `SG.motion.split()`. Console clean on the default deck
+    and `?edit`.
+  - **Testing artifact worth remembering for next time:** leftover `!important`-styled `<style>` tags
+    injected by an earlier verification step in the SAME browser tab can silently outrank a later
+    check's real (also `!important`) resolved-state rule if the injected one has higher specificity —
+    produced one confusing false reading (`animationName` showing `"mPop"` where "none" was expected)
+    that traced back to a forgotten override from several calls earlier in this session, not a bug in
+    the shared RESOLVED-STATE block. Clean up injected `<style>` tags between independent checks.
 
 ## Notes for a fresh session
 
