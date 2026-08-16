@@ -213,13 +213,17 @@
      nothing else would ever clear that clip, stranding the content exactly
      like defect 1. Normalizing it here means it's cleared regardless of
      which system ends up driving the element. */
-  .mrun [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-anim]),
-  .mrun [data-role="list"]>*:not([data-anim]){
+  /* :not([data-step]) — a slide-level reveal (slice 4) takes an element OUT
+     of the automatic all-at-once entrance; its arrival is governed by the
+     REVEAL STYLES block below instead, triggered by SG.stepNext() rather
+     than by the slide becoming active. */
+  .mrun [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-anim]):not([data-step]),
+  .mrun [data-role="list"]>*:not([data-anim]):not([data-step]){
     animation:mRise var(--m-dur) var(--m-ease) both;
     animation-delay:calc(var(--i,0) * var(--m-step-eff));
     clip-path:none;
   }
-  .mrun [data-role="figure"]:not([data-anim]){ animation-name:mWipe }
+  .mrun [data-role="figure"]:not([data-anim]):not([data-step]){ animation-name:mWipe }
 }
 /* Chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
    ambient layer) is matched explicitly and never entrance-animated — but
@@ -242,3 +246,39 @@
    quiets them. */
 [data-motion="calm"] [data-decor],
 [data-motion="off"] [data-decor]{ animation:none !important }
+
+/* =====================================================================
+   REVEAL STYLES (v3.6, slice 4) — stepping through a list one point at a
+   time, via SG.stepNext() (bound to →/Space/click, unchanged). Stepping
+   itself is identical across every style; only how a point ARRIVES differs.
+   Two families, and the split is the whole contract:
+     WITHHOLDING (appear, wipe — typewriter/words land in slice 5) hides
+       what's next.
+     FOCUSING (spotlight) hides nothing; it moves a .live marker instead,
+       so the room can see the shape of the whole list while you talk to
+       one line of it — the only style that never withholds text from
+       someone reading ahead.
+   [data-step] is set by SG.motion.tag() on exactly the elements
+   SG.motion.steps() returns — the SAME list stepNext() walks — so CSS and
+   JS can never disagree about what a "step" is.
+   Unlike mRise/mWipe (pure decorative entrance, deliberately fill-mode-only
+   so killing `animation` never strands anything), this hidden state is
+   FUNCTIONAL: content must stay hidden until the presenter reveals it,
+   independent of motion preference — so it is a real, unconditional rule,
+   and it NEEDS an explicit resolved state under motion:off/reduced-motion/
+   print/static. That's folded into engine.css's shared RESOLVED-STATE
+   block rather than repeated here. */
+[data-step]{ opacity:0 }
+[data-reveal="appear"] [data-step].shown,
+[data-reveal="wipe"] [data-step].shown{ opacity:1 }
+@media (prefers-reduced-motion: no-preference){
+  [data-reveal="appear"] [data-step].shown{ animation:mRise var(--m-dur) var(--m-ease) both }
+  [data-reveal="wipe"] [data-step].shown{ animation:mWipe var(--m-dur) cubic-bezier(.6,.05,.2,1) both }
+}
+
+/* spotlight: nothing is ever hidden — [data-step] as a base is overridden
+   back to a dim-but-visible resting state, and only .live goes full bright.
+   No @media gate: the focus MOVE should still read even under reduced
+   motion, it just doesn't need the transition to be animated. */
+[data-reveal="spotlight"] [data-step]{ opacity:.3; transition:opacity .35s ease }
+[data-reveal="spotlight"] [data-step].live{ opacity:1 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 2666b2be9d — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 4f051ef75d — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -632,13 +632,17 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
      nothing else would ever clear that clip, stranding the content exactly
      like defect 1. Normalizing it here means it's cleared regardless of
      which system ends up driving the element. */
-  .mrun [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-anim]),
-  .mrun [data-role="list"]>*:not([data-anim]){
+  /* :not([data-step]) — a slide-level reveal (slice 4) takes an element OUT
+     of the automatic all-at-once entrance; its arrival is governed by the
+     REVEAL STYLES block below instead, triggered by SG.stepNext() rather
+     than by the slide becoming active. */
+  .mrun [data-role]:not([data-role="list"]):not([data-role="chrome"]):not([data-anim]):not([data-step]),
+  .mrun [data-role="list"]>*:not([data-anim]):not([data-step]){
     animation:mRise var(--m-dur) var(--m-ease) both;
     animation-delay:calc(var(--i,0) * var(--m-step-eff));
     clip-path:none;
   }
-  .mrun [data-role="figure"]:not([data-anim]){ animation-name:mWipe }
+  .mrun [data-role="figure"]:not([data-anim]):not([data-step]){ animation-name:mWipe }
 }
 /* Chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
    ambient layer) is matched explicitly and never entrance-animated — but
@@ -661,6 +665,42 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
    quiets them. */
 [data-motion="calm"] [data-decor],
 [data-motion="off"] [data-decor]{ animation:none !important }
+
+/* =====================================================================
+   REVEAL STYLES (v3.6, slice 4) — stepping through a list one point at a
+   time, via SG.stepNext() (bound to →/Space/click, unchanged). Stepping
+   itself is identical across every style; only how a point ARRIVES differs.
+   Two families, and the split is the whole contract:
+     WITHHOLDING (appear, wipe — typewriter/words land in slice 5) hides
+       what's next.
+     FOCUSING (spotlight) hides nothing; it moves a .live marker instead,
+       so the room can see the shape of the whole list while you talk to
+       one line of it — the only style that never withholds text from
+       someone reading ahead.
+   [data-step] is set by SG.motion.tag() on exactly the elements
+   SG.motion.steps() returns — the SAME list stepNext() walks — so CSS and
+   JS can never disagree about what a "step" is.
+   Unlike mRise/mWipe (pure decorative entrance, deliberately fill-mode-only
+   so killing `animation` never strands anything), this hidden state is
+   FUNCTIONAL: content must stay hidden until the presenter reveals it,
+   independent of motion preference — so it is a real, unconditional rule,
+   and it NEEDS an explicit resolved state under motion:off/reduced-motion/
+   print/static. That's folded into engine.css's shared RESOLVED-STATE
+   block rather than repeated here. */
+[data-step]{ opacity:0 }
+[data-reveal="appear"] [data-step].shown,
+[data-reveal="wipe"] [data-step].shown{ opacity:1 }
+@media (prefers-reduced-motion: no-preference){
+  [data-reveal="appear"] [data-step].shown{ animation:mRise var(--m-dur) var(--m-ease) both }
+  [data-reveal="wipe"] [data-step].shown{ animation:mWipe var(--m-dur) cubic-bezier(.6,.05,.2,1) both }
+}
+
+/* spotlight: nothing is ever hidden — [data-step] as a base is overridden
+   back to a dim-but-visible resting state, and only .live goes full bright.
+   No @media gate: the focus MOVE should still read even under reduced
+   motion, it just doesn't need the transition to be animated. */
+[data-reveal="spotlight"] [data-step]{ opacity:.3; transition:opacity .35s ease }
+[data-reveal="spotlight"] [data-step].live{ opacity:1 }
 </style>
 <script>
 (function(){
@@ -736,6 +776,27 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
       stepped: !!revealSrc };
   };
 
+  /* The ordered step units for a slide: children of the FIRST
+     [data-role="list"] (unit:'item' — a list is almost always what a
+     presenter means by "step through this"), or, when the section has no
+     list at all, its own top-level roled blocks excluding chrome
+     (unit:'block' — e.g. stepping through kicker -> title -> body on a
+     dense text slide). Whichever branch applies is the ONLY source of
+     truth for what a step is: tag() marks exactly these elements with
+     data-step, and the CSS reveal rules target data-step, so JS and CSS
+     structurally cannot disagree. */
+  SG.motion.steps = function(sec){
+    var list = sec.querySelector('[data-role="list"]');
+    if(list) return [].slice.call(list.children);
+    return [].slice.call(sec.children).filter(function(c){
+      var r = c.getAttribute('data-role'); return r && r!=='chrome'; });
+  };
+
+  /* Withholding styles (appear/wipe/typewriter/words) hide what's next;
+     the focusing style (spotlight) hides nothing and moves a .live marker
+     instead. Both advance identically via SG.stepNext(). */
+  SG.motion.isFocusing = function(style){ return style==='spotlight'; };
+
   /* Set a custom property by editing the style ATTRIBUTE STRING directly,
      never via el.style.setProperty(). Some elements this walk touches
      already carry a hand-authored inline style with a var()-in-shorthand
@@ -796,7 +857,19 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
       }
     }
     walk(sec, false);
-    setProp(sec, '--m-span', String(Math.max(1,i))); };
+    setProp(sec, '--m-span', String(Math.max(1,i)));
+    /* Slide-level reveal (slice 4): mark the step units data-step so the
+       CSS reveal rules and SG.stepNext() both key off the exact same set
+       SG.motion.steps() computes. Untagged (no leftover data-step) when the
+       slide isn't stepped, so an edit that removes a slide's reveal doesn't
+       leave stale markers behind on re-tag. */
+    var wasStepped = sec.hasAttribute('data-reveal');
+    if(wasStepped){
+      SG.motion.steps(sec).forEach(function(u,idx){ u.setAttribute('data-step', String(idx)); });
+    } else {
+      [].slice.call(sec.querySelectorAll('[data-step]')).forEach(function(u){
+        u.removeAttribute('data-step'); u.classList.remove('shown','live'); });
+    } };
 
   function fmtC(n){var a=Math.abs(n),T=[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
     for(var i=0;i<T.length;i++){if(a>=T[i][0])return (n/T[i][0]).toFixed(1).replace(/\.0$/,'')+T[i][1];}
@@ -813,6 +886,13 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
        yet (the very first DOMContentLoaded tick, before SG.render has run),
        and document has no classList. */
     if(slide.classList){ slide.classList.remove('mrun'); void slide.offsetWidth; slide.classList.add('mrun'); }
+    /* slide-level reveal (slice 4): every (re)activation restarts the walk
+       from the top, matching how entrance motion itself replays on
+       re-entry — a presenter returning to a slide expects to step through
+       it again, not resume mid-list. */
+    if(slide.querySelectorAll){
+      slide.querySelectorAll('[data-step]').forEach(function(n){ n.classList.remove('shown','live'); });
+    }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');
       /* build steps only apply when the deck opts in (defaults.buildSteps);
@@ -839,6 +919,7 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
     slide.classList.remove('mrun');
     slide.querySelectorAll('.sg-onenter,.sg-draw').forEach(function(n){n.classList.remove('run');});
     slide.querySelectorAll('.sg-count').forEach(function(n){n.textContent='0';});
+    slide.querySelectorAll('[data-step]').forEach(function(n){n.classList.remove('shown','live');});
   }
   function wire(root){
     /* accept a whole deck OR a single .slide section (targeted re-render) */
@@ -1223,7 +1304,7 @@ body.hide-docs .doc-panel{display:none}
 @media print, (prefers-reduced-motion: reduce){
   .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
   [data-role]:not([data-role="list"]):not([data-role="chrome"]),
-  [data-role="list"]>*{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+  [data-role="list"]>*, [data-step]{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
@@ -1231,7 +1312,7 @@ body.hide-docs .doc-panel{display:none}
     transform:none !important; opacity:1 !important; animation:none !important }
 }
 :is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
-  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*){
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step]){
   opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
 :is([data-motion="off"], html[data-static]) .sg-typewriter{ width:auto !important; border-right:0 !important }
 :is([data-motion="off"], html[data-static]) :is(.sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,
@@ -2434,20 +2515,41 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     refresh(); fit();
   }
 
-  /* ---------- click-triggered animation steps (build steps) ----------
-     Elements whose animation trigger is "click" carry data-anim-trigger/step.
-     Forward navigation plays the next pending step (lowest step number first,
-     ties together) before leaving the slide. Going back just navigates. */
+  /* ---------- build steps ----------
+     Two independent step sources, tried in order:
+     1. LEGACY per-element click-trigger authoring (data-anim-trigger="click"
+        + data-anim-step), gated behind defaults.buildSteps — unchanged.
+     2. NEW (v3.6 slice 4): a slide-level `reveal`. SG.motion.steps(sec) is
+        the ordered unit list; SG.motion.tag() already marked exactly those
+        elements data-step, so "how many are done" is just "how many carry
+        .shown" — no separate counter to keep in sync. Withholding styles
+        (appear/wipe) and the focusing style (spotlight) advance identically
+        here; only the CSS decides how a revealed point looks.
+     Forward navigation plays the next pending step before leaving the
+     slide; going back just navigates (stepping never runs in reverse). */
   SG.stepNext=function(){
-    if(!(SG.data&&SG.data.defaults&&SG.data.defaults.buildSteps)) return false;  /* toggle: off by default */
     var sec=D.querySelector('.slide.active'); if(!sec) return false;
-    var pend=[].slice.call(sec.querySelectorAll('[data-anim-trigger="click"]'))
-      .filter(function(n){ return !n.classList.contains('run'); });
-    if(!pend.length) return false;
-    var next=Math.min.apply(0,pend.map(function(n){ return +n.getAttribute('data-anim-step')||0; }));
-    pend.filter(function(n){ return (+n.getAttribute('data-anim-step')||0)===next; })
-      .forEach(function(n){ n.classList.remove('run'); void n.offsetWidth; n.classList.add('run'); });
-    return true; };
+    if(SG.data&&SG.data.defaults&&SG.data.defaults.buildSteps){
+      var pend=[].slice.call(sec.querySelectorAll('[data-anim-trigger="click"]'))
+        .filter(function(n){ return !n.classList.contains('run'); });
+      if(pend.length){
+        var next=Math.min.apply(0,pend.map(function(n){ return +n.getAttribute('data-anim-step')||0; }));
+        pend.filter(function(n){ return (+n.getAttribute('data-anim-step')||0)===next; })
+          .forEach(function(n){ n.classList.remove('run'); void n.offsetWidth; n.classList.add('run'); });
+        return true;
+      }
+    }
+    if(sec.hasAttribute('data-reveal') && SG.motion){
+      var units=SG.motion.steps(sec);
+      var doneCount=units.filter(function(u){ return u.classList.contains('shown'); }).length;
+      if(doneCount<units.length){
+        units.forEach(function(u){ u.classList.remove('live'); });
+        var u=units[doneCount];
+        u.classList.add('shown'); u.classList.add('live');
+        return true;
+      }
+    }
+    return false; };
 
   /* ---------- export / import / pdf ---------- */
   SG.exportJSON=function(){

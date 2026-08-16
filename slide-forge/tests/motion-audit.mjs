@@ -264,5 +264,72 @@ for(const t of NEVER_ANIMATED){
   ok(!!rail && rail.hasAttribute('data-decor'), 'the decorative rail carries data-decor, the narrowed selector\'s actual target');
 }
 
+// ---------- slice 4: slide-level reveal (appear/wipe/spotlight) ----------
+{
+  const stepDeck={meta:{title:'steps',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'appear'}, content:{title:'T',
+      items:[{title:'a'},{title:'b'},{title:'c'}]}} ]};
+  const dom8=boot(NEW,stepDeck); await new Promise(r=>setTimeout(r,400));
+  const w8=dom8.window, d8=w8.document, S8=w8.SG;
+  const sec8=d8.querySelector('#deck .slide');
+  ok(sec8.getAttribute('data-reveal')==='appear', 'reveal.style stamped on the section');
+  const items8=[].slice.call(sec8.querySelectorAll('[data-arr="items"]>*'));
+  ok(items8.every(function(u,i){ return u.getAttribute('data-step')===String(i); }),
+    'SG.motion.tag marks list children data-step in order');
+  ok(items8.every(function(u){ return !u.classList.contains('shown'); }),
+    'nothing is shown before the first step');
+
+  // SG.stepNext() reveals one unit per call, in order, then falls through
+  ok(S8.stepNext()===true, 'stepNext() reveals the first point');
+  ok(items8[0].classList.contains('shown') && items8[0].classList.contains('live'), 'point 0 is shown + live');
+  ok(!items8[1].classList.contains('shown'), 'point 1 still hidden');
+  ok(S8.stepNext()===true, 'stepNext() reveals the second point');
+  ok(items8[1].classList.contains('shown') && items8[1].classList.contains('live'), 'point 1 is shown + live');
+  ok(!items8[0].classList.contains('live'), 'live moves off point 0 once point 1 is current');
+  ok(items8[0].classList.contains('shown'), 'point 0 stays shown (withholding never re-hides)');
+  ok(S8.stepNext()===true, 'stepNext() reveals the third (last) point');
+  ok(S8.stepNext()===false, 'stepNext() returns false once exhausted, so navigation can proceed');
+}
+{
+  // spotlight is focusing: nothing is ever hidden, only .live moves
+  ok(SG.motion.isFocusing('spotlight')===true, 'isFocusing("spotlight") is true');
+  ok(SG.motion.isFocusing('appear')===false && SG.motion.isFocusing('wipe')===false,
+    'appear/wipe are withholding, not focusing');
+  const spotDeck={meta:{title:'spot',schemaVersion:4}, slides:[
+    {layout:'agenda', reveal:{style:'spotlight'}, content:{title:'T',
+      items:[{title:'a'},{title:'b'}]}} ]};
+  const dom9=boot(NEW,spotDeck); await new Promise(r=>setTimeout(r,400));
+  const w9=dom9.window, d9=w9.document, S9=w9.SG;
+  const sec9=d9.querySelector('#deck .slide');
+  ok(sec9.getAttribute('data-reveal')==='spotlight', 'spotlight stamped on the section');
+  S9.stepNext();
+  const items9=[].slice.call(sec9.querySelectorAll('[data-arr="items"]>*'));
+  ok(items9[1].getAttribute('data-step')!=null, 'point 1 still carries data-step under spotlight — CSS (not JS) is what makes it visible, opacity:.3 not display:none');
+}
+{
+  // motion:"off" cascades to reveal too — resolve() computes both from the
+  // same slide/defaults, so a slide can't end up "off" but still stepping
+  // through hidden content.
+  const offStepDeck={meta:{title:'offstep',schemaVersion:4}, slides:[
+    {layout:'agenda', motion:'off', reveal:{style:'appear'}, content:{title:'T',
+      items:[{title:'a'},{title:'b'}]}} ]};
+  const dom10=boot(NEW,offStepDeck); await new Promise(r=>setTimeout(r,400));
+  const w10=dom10.window, d10=w10.document;
+  const sec10=d10.querySelector('#deck .slide');
+  const items10=[].slice.call(sec10.querySelectorAll('[data-arr="items"]>*'));
+  ok(items10.every(function(u){ return w10.getComputedStyle(u).opacity==='1'; }),
+    'motion:"off" + reveal: every point resolves visible from the start (not stepped-and-hidden)');
+}
+{
+  // un-stepping a slide (no reveal) leaves no stale data-step behind
+  const noStepDeck={meta:{title:'nostep',schemaVersion:4}, slides:[
+    {layout:'agenda', content:{title:'T', items:[{title:'a'},{title:'b'}]}} ]};
+  const dom11=boot(NEW,noStepDeck); await new Promise(r=>setTimeout(r,400));
+  const d11=dom11.window.document;
+  const sec11=d11.querySelector('#deck .slide');
+  ok(!sec11.hasAttribute('data-reveal'), 'no reveal configured -> no data-reveal stamped');
+  ok(sec11.querySelectorAll('[data-step]').length===0, 'no reveal configured -> no data-step markers at all');
+}
+
 console.log(pass+' passed, '+fail+' failed');
 if(fail) process.exitCode=1;

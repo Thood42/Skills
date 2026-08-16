@@ -22,7 +22,7 @@
 - [x] Slice 1 — tracer: one role end to end; the 6 never-animated lists stagger
 - [x] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
 - [x] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
-- [ ] Slice 4 — build steps + appear/wipe/spotlight
+- [x] Slice 4 — build steps + appear/wipe/spotlight
 - [ ] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
 - [ ] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
 - [ ] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
@@ -199,6 +199,59 @@
     correctly silenced) and `data-motion` stayed `"standard"` (orthogonal to ambient, as designed).
     Also verified the preset table's decor column directly: same agenda's `.rail` →
     `calm:"none", standard:"sheen", off:"none"`. Console clean on the default deck and `?edit`.
+
+- **Slice 4 done 2026-08-16.** `SG.motion.steps(sec)` (children of the first `[data-role="list"]`,
+  falling back to the section's own top-level roled blocks when there's no list) and
+  `SG.motion.isFocusing(style)` (`spotlight` → true) added to `anim.js`. `tag()` now marks exactly
+  what `steps()` returns with `data-step="N"` whenever a slide resolves a `reveal` — the SAME
+  function both CSS and `stepNext()` key off, so they cannot disagree about what a step is — and
+  strips any stale `data-step`/`.shown`/`.live` when a slide's reveal is removed. `SG.stepNext()`
+  (`engine.js`) gained a second source after the untouched legacy per-element path: walk
+  `SG.motion.steps(sec)`, count how many already carry `.shown` (no separate counter to keep in
+  sync — the DOM state IS the progress), reveal the next one with `.shown`+`.live`, move `.live` off
+  the rest. Returns `false` once exhausted, so the existing →/Space/click handlers fall through to
+  slide navigation unchanged. `activate()`/`deactivate()` both reset `.shown`/`.live` so stepping
+  replays from the top every time a slide is (re)entered, matching how entrance motion already
+  behaves on re-entry.
+  - **The CSS split, exactly per the architecture's contract:** `appear`/`wipe` (withholding) reuse
+    `mRise`/`mWipe` — literally "the deck's ordinary entrance, reused," per the Gate 1 mockup — under
+    a real, unconditional `[data-step]{opacity:0}` base (deliberately NOT fill-mode-only like pure
+    decorative entrance, because this hiding is functional: content must stay hidden until revealed
+    regardless of motion preference). `spotlight` (focusing) never sets `opacity:0` at all — baseline
+    `.3`, `.live` → `1` — so nothing is ever hidden, only dimmed. Existing entrance rules gained
+    `:not([data-step])` so a stepped list's children stop double-driving (automatic all-at-once entrance
+    AND stepped reveal fighting over the same `animation` property) — anything NOT part of the stepped
+    unit (a title above the list, say) is unaffected and still enters normally on activation.
+  - **This is the feature slice 3's shared resolved-state block was actually built for.** Unlike
+    mRise/mWipe, `[data-step]`'s hidden state is a plain unconditional rule (not media-query-gated),
+    so under REAL reduced-motion it would otherwise strand withheld content forever — added `[data-step]`
+    to engine.css's shared resolved-state selector list (both the print/reduced-motion media block and
+    the `:is([data-motion="off"], html[data-static])` list) so it resolves to fully visible in all four
+    contexts, matching the Gate 1 mockup's explicit promise: "with motion off — or reduced motion — every
+    point is on the slide from the start, in all five styles."
+  - `tests/editor-ops.mjs`'s two `schemaVersion===3` literal assertions (from slice 3's schema bump)
+    updated to 4; 253/253 still. `motion-audit.mjs` grew to **85 assertions**: `data-step` ordering,
+    the shown/live progression through a 3-item list via real `SG.stepNext()` calls (not simulated),
+    `stepNext()` returning `false` once exhausted, `isFocusing()`, spotlight keeping `data-step` on
+    every element (CSS opacity does the hiding job, not JS/DOM presence), `motion:"off"`+`reveal`
+    resolving every point visible from the start, and no stale `data-step` left behind when a slide
+    has no reveal configured.
+  - **jsdom limitation encountered again, same root cause as slice 3:** jsdom never matches
+    `@media (prefers-reduced-motion: no-preference)`, so it ALSO always resolves `[data-step]` to
+    `opacity:1` via the reduced-motion branch of the shared resolved-state block — meaning computed-
+    opacity assertions about the WITHHOLDING mechanism itself (hidden until `.shown`) can't be written
+    in jsdom without also being true under `[data-motion="off"]`. `motion-audit.mjs`'s stepping tests
+    therefore assert the `.shown`/`.live` CLASS progression (mechanism-independent of which CSS rule
+    ultimately resolves them) plus the resolved-computed-opacity for the *off* case specifically; the
+    actual "hidden until revealed under real no-preference" computed-opacity proof was done in a real
+    browser instead, using the same lift-out-of-the-media-query technique as every other motion
+    verification in this plan.
+  - Browser-verified, real `SG.stepNext()` calls (not simulated) with the media-query gate lifted:
+    appear — `[0,0,0] → [1,0,0] → … → [1,1,1]`, `animationName:"mRise"` on the just-revealed point;
+    wipe — same progression, `animationName:"mWipe"`; a 4th `stepNext()` call past the end returned
+    `false`. Spotlight — `[.3,.3,.3] → [1,.3,.3] → [.3,1,.3]`: focus moves, dims back, never hides
+    (confirms "focus singular, focus brightest"). `motion:"off"`: every point measured `opacity:"1"`
+    immediately, no stepping needed. Console clean on the default deck and `?edit`.
 
 ## Notes for a fresh session
 

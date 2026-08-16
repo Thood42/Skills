@@ -346,7 +346,7 @@ body.hide-docs .doc-panel{display:none}
 @media print, (prefers-reduced-motion: reduce){
   .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
   [data-role]:not([data-role="list"]):not([data-role="chrome"]),
-  [data-role="list"]>*{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+  [data-role="list"]>*, [data-step]{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
@@ -354,7 +354,7 @@ body.hide-docs .doc-panel{display:none}
     transform:none !important; opacity:1 !important; animation:none !important }
 }
 :is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
-  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*){
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*, [data-step]){
   opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
 :is([data-motion="off"], html[data-static]) .sg-typewriter{ width:auto !important; border-right:0 !important }
 :is([data-motion="off"], html[data-static]) :is(.sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,

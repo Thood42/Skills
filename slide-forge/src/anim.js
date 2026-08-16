@@ -71,6 +71,27 @@
       stepped: !!revealSrc };
   };
 
+  /* The ordered step units for a slide: children of the FIRST
+     [data-role="list"] (unit:'item' — a list is almost always what a
+     presenter means by "step through this"), or, when the section has no
+     list at all, its own top-level roled blocks excluding chrome
+     (unit:'block' — e.g. stepping through kicker -> title -> body on a
+     dense text slide). Whichever branch applies is the ONLY source of
+     truth for what a step is: tag() marks exactly these elements with
+     data-step, and the CSS reveal rules target data-step, so JS and CSS
+     structurally cannot disagree. */
+  SG.motion.steps = function(sec){
+    var list = sec.querySelector('[data-role="list"]');
+    if(list) return [].slice.call(list.children);
+    return [].slice.call(sec.children).filter(function(c){
+      var r = c.getAttribute('data-role'); return r && r!=='chrome'; });
+  };
+
+  /* Withholding styles (appear/wipe/typewriter/words) hide what's next;
+     the focusing style (spotlight) hides nothing and moves a .live marker
+     instead. Both advance identically via SG.stepNext(). */
+  SG.motion.isFocusing = function(style){ return style==='spotlight'; };
+
   /* Set a custom property by editing the style ATTRIBUTE STRING directly,
      never via el.style.setProperty(). Some elements this walk touches
      already carry a hand-authored inline style with a var()-in-shorthand
@@ -131,7 +152,19 @@
       }
     }
     walk(sec, false);
-    setProp(sec, '--m-span', String(Math.max(1,i))); };
+    setProp(sec, '--m-span', String(Math.max(1,i)));
+    /* Slide-level reveal (slice 4): mark the step units data-step so the
+       CSS reveal rules and SG.stepNext() both key off the exact same set
+       SG.motion.steps() computes. Untagged (no leftover data-step) when the
+       slide isn't stepped, so an edit that removes a slide's reveal doesn't
+       leave stale markers behind on re-tag. */
+    var wasStepped = sec.hasAttribute('data-reveal');
+    if(wasStepped){
+      SG.motion.steps(sec).forEach(function(u,idx){ u.setAttribute('data-step', String(idx)); });
+    } else {
+      [].slice.call(sec.querySelectorAll('[data-step]')).forEach(function(u){
+        u.removeAttribute('data-step'); u.classList.remove('shown','live'); });
+    } };
 
   function fmtC(n){var a=Math.abs(n),T=[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
     for(var i=0;i<T.length;i++){if(a>=T[i][0])return (n/T[i][0]).toFixed(1).replace(/\.0$/,'')+T[i][1];}
@@ -148,6 +181,13 @@
        yet (the very first DOMContentLoaded tick, before SG.render has run),
        and document has no classList. */
     if(slide.classList){ slide.classList.remove('mrun'); void slide.offsetWidth; slide.classList.add('mrun'); }
+    /* slide-level reveal (slice 4): every (re)activation restarts the walk
+       from the top, matching how entrance motion itself replays on
+       re-entry — a presenter returning to a slide expects to step through
+       it again, not resume mid-list. */
+    if(slide.querySelectorAll){
+      slide.querySelectorAll('[data-step]').forEach(function(n){ n.classList.remove('shown','live'); });
+    }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');
       /* build steps only apply when the deck opts in (defaults.buildSteps);
@@ -174,6 +214,7 @@
     slide.classList.remove('mrun');
     slide.querySelectorAll('.sg-onenter,.sg-draw').forEach(function(n){n.classList.remove('run');});
     slide.querySelectorAll('.sg-count').forEach(function(n){n.textContent='0';});
+    slide.querySelectorAll('[data-step]').forEach(function(n){n.classList.remove('shown','live');});
   }
   function wire(root){
     /* accept a whole deck OR a single .slide section (targeted re-render) */

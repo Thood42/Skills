@@ -736,20 +736,41 @@
     refresh(); fit();
   }
 
-  /* ---------- click-triggered animation steps (build steps) ----------
-     Elements whose animation trigger is "click" carry data-anim-trigger/step.
-     Forward navigation plays the next pending step (lowest step number first,
-     ties together) before leaving the slide. Going back just navigates. */
+  /* ---------- build steps ----------
+     Two independent step sources, tried in order:
+     1. LEGACY per-element click-trigger authoring (data-anim-trigger="click"
+        + data-anim-step), gated behind defaults.buildSteps — unchanged.
+     2. NEW (v3.6 slice 4): a slide-level `reveal`. SG.motion.steps(sec) is
+        the ordered unit list; SG.motion.tag() already marked exactly those
+        elements data-step, so "how many are done" is just "how many carry
+        .shown" — no separate counter to keep in sync. Withholding styles
+        (appear/wipe) and the focusing style (spotlight) advance identically
+        here; only the CSS decides how a revealed point looks.
+     Forward navigation plays the next pending step before leaving the
+     slide; going back just navigates (stepping never runs in reverse). */
   SG.stepNext=function(){
-    if(!(SG.data&&SG.data.defaults&&SG.data.defaults.buildSteps)) return false;  /* toggle: off by default */
     var sec=D.querySelector('.slide.active'); if(!sec) return false;
-    var pend=[].slice.call(sec.querySelectorAll('[data-anim-trigger="click"]'))
-      .filter(function(n){ return !n.classList.contains('run'); });
-    if(!pend.length) return false;
-    var next=Math.min.apply(0,pend.map(function(n){ return +n.getAttribute('data-anim-step')||0; }));
-    pend.filter(function(n){ return (+n.getAttribute('data-anim-step')||0)===next; })
-      .forEach(function(n){ n.classList.remove('run'); void n.offsetWidth; n.classList.add('run'); });
-    return true; };
+    if(SG.data&&SG.data.defaults&&SG.data.defaults.buildSteps){
+      var pend=[].slice.call(sec.querySelectorAll('[data-anim-trigger="click"]'))
+        .filter(function(n){ return !n.classList.contains('run'); });
+      if(pend.length){
+        var next=Math.min.apply(0,pend.map(function(n){ return +n.getAttribute('data-anim-step')||0; }));
+        pend.filter(function(n){ return (+n.getAttribute('data-anim-step')||0)===next; })
+          .forEach(function(n){ n.classList.remove('run'); void n.offsetWidth; n.classList.add('run'); });
+        return true;
+      }
+    }
+    if(sec.hasAttribute('data-reveal') && SG.motion){
+      var units=SG.motion.steps(sec);
+      var doneCount=units.filter(function(u){ return u.classList.contains('shown'); }).length;
+      if(doneCount<units.length){
+        units.forEach(function(u){ u.classList.remove('live'); });
+        var u=units[doneCount];
+        u.classList.add('shown'); u.classList.add('live');
+        return true;
+      }
+    }
+    return false; };
 
   /* ---------- export / import / pdf ---------- */
   SG.exportJSON=function(){
