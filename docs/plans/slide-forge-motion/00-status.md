@@ -24,7 +24,7 @@
 - [x] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
 - [x] Slice 4 — build steps + appear/wipe/spotlight
 - [x] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
-- [ ] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
+- [x] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
 - [ ] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
 
 ## Progress log
@@ -304,6 +304,44 @@
     produced one confusing false reading (`animationName` showing `"mPop"` where "none" was expected)
     that traced back to a forgotten override from several calls earlier in this session, not a bug in
     the shared RESOLVED-STATE block. Clean up injected `<style>` tags between independent checks.
+
+- **Slice 6 done 2026-08-16.** `F.setMotion(preset,slideIdx)` / `F.setReveal(style,slideIdx)` added to
+  `editor.js`, mirroring `F.setPersonality`'s exact contract: `slideIdx` omitted writes
+  `data.defaults.*`, given writes that one slide's override, empty string clears back to inherit, one
+  `F.do()` = one undo, an unknown value is refused (returns `false`) leaving the current value alone.
+  Two new constant tables, `MOTIONS` (standard/calm/expressive/off) and `REVEALS` (blank "all at
+  once" + appear/wipe/typewriter/words/spotlight), next to the existing `AMBIENTS`/`LAYOUTS`. UI: a
+  **Motion** + **Reveal** select added to `deckSettings()` (shared by the sidebar AND the ⚙ Deck
+  modal — one function, both surfaces, like every other deck-wide control) right after the existing
+  "Build steps" checkbox; the same pair added to `slidePanel()` immediately after the existing
+  **Ambient** select, the slide-level one prefixed with an "Inherit" option. A resolved-cascade
+  readout (`SG.motion.resolve(slide,SG.data)`) sits right below those two selects, naming which
+  level each value actually came from ("this slide" / "deck default" / "built-in") — placed next to
+  the controls that drive it rather than folded into the separate per-element "Animations on this
+  slide" list further down, which is about `overrides[key].anim`, a different (and lower-precedence)
+  knob entirely.
+  - `tests/editor-ops.mjs` grew a new MOTION + REVEAL block (279/279 total, +26 assertions) covering:
+    the cascade end-to-end (deck default reaching every slide, a slide override winning over it,
+    each slide resolving independently), refusal of an unknown value, clear-restores-inherit +undo,
+    exactly one undo snapshot per call, no `forge-`-prefixed chrome on the resolved section (the
+    "downloaded .html carries the settings with no editor chrome" proof), and a full save→reload
+    round-trip (export `SG.data`, boot a fresh dom from that JSON, confirm both the deck default and
+    the per-slide override survive).
+  - **One tracing mistake caught before it shipped:** the round-trip test's first draft asserted the
+    wrong resolved values on the re-booted deck — a leftover per-slide `motion` override from an
+    earlier undo in the same test was still in state when `setMotion('off')` was called at the DECK
+    level afterward, so slide 1 was never going to resolve to `"off"` (its own override always wins).
+    Traced the actual sequence of calls through by hand and fixed the assertions to the real expected
+    state (slide 0: deck defaults; slide 1: its own motion override + the deck's reveal default)
+    rather than loosening the test to whatever the code happened to produce.
+  - Browser-verified in the live editor: both Motion/Reveal selects render with the right option sets
+    in the right places (slide-level Motion carries "Inherit" + 4 presets; deck-level Motion has no
+    inherit option, defaulting to "standard"); the Deck-settings ⚙ modal renders its own live copy of
+    the same controls (2 Motion selects found on the page, sidebar + modal); changing the slide-level
+    Motion select end-to-end set `slides[0].motion`, updated the LIVE section's `data-motion`
+    attribute, and `Forge.undoOp()` correctly reverted it; the resolved-cascade readout showed
+    exactly `"Resolved: motion standard (built-in), no reveal (all at once)"` after that undo.
+    Console clean throughout.
 
 ## Notes for a fresh session
 
