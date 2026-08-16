@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 67ce8cbf23 — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build c5c103e549 — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -591,6 +591,27 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
   .sg-check.run circle{animation:sgCheckDraw .6s ease forwards}
   .sg-check.run .tick{animation:sgCheckDraw .4s ease .55s forwards}
 }
+
+/* =====================================================================
+   MOTION SYSTEM (v3.6) — role-driven entrance. See docs/plans/slide-forge-
+   motion. A preset is a handful of custom properties; every role reads the
+   same ones, which is what makes drift structurally impossible. This slice
+   ships only the "standard" preset and the list stagger; calm/expressive/off
+   and the rest of the role vocabulary land in slice 2.
+   Deliberately NOT given a persistent "hidden" rule outside this query or
+   outside animation:...both — unlike the legacy .sg-fade-rise pattern above,
+   that means killing `animation` (ambient:"none", print) leaves these
+   elements at their natural visible state instead of stranding them. */
+[data-motion]{ --m-dur:.7s; --m-dist:26px; --m-step:.08s; --m-cap:.9s;
+  --m-ease:cubic-bezier(.2,.7,.2,1) }
+
+@media (prefers-reduced-motion: no-preference){
+  @keyframes mRise{from{opacity:0;transform:translateY(var(--m-dist))}to{opacity:1;transform:none}}
+  .mrun [data-role="list"]>*:not([data-anim]){
+    animation:mRise var(--m-dur) var(--m-ease) both;
+    animation-delay:calc(var(--i,0) * var(--m-step));
+  }
+}
 </style>
 <script>
 (function(){
@@ -598,6 +619,51 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
      AND during static capture, so headless renders show the final frame, not a
      frozen mid-animation. (See the SG block in <head>.) */
   var R = (window.SG && SG.static) || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* =====================================================================
+     SG.motion (v3.6) — role-driven entrance motion. JS never picks an
+     animation; it only resolves a preset/reveal and stamps data-role + --i
+     so anim.css can do the rest (see docs/plans/slide-forge-motion). This
+     slice: the tracer — resolve() is hardcoded, roleOf() only recognizes an
+     already-authored data-role or a data-arr container ("list"). Slice 2
+     widens both into the full vocabulary. */
+  window.SG = window.SG || {};
+  SG.motion = SG.motion || {};
+  SG.motion.ROLES = ['title','kicker','lead','body','meta','list','group',
+                      'figure','number','quote','chrome'];
+
+  /* Resolve one element's role. Precedence: authored data-role > data-arr
+     container ("list") > null (not animated). Widened in slice 2. */
+  SG.motion.roleOf = function(node){
+    var r = node.getAttribute && node.getAttribute('data-role');
+    if(r) return r;
+    if(node.hasAttribute && node.hasAttribute('data-arr')) return 'list';
+    return null; };
+
+  /* The deck -> slide cascade. Hardcoded to 'standard' until slice 2 reads
+     defaults.motion / slide.motion. Never reads the DOM. */
+  SG.motion.resolve = function(slide, data){
+    return { motion:'standard', reveal:null, stepped:false }; };
+
+  /* One pass over a freshly built <section>: stamps data-motion, gives every
+     [data-arr] container role="list", and assigns --i to its children in
+     document order (a single counter that continues across every list in
+     the section, so later lists don't restart the stagger at 0). --m-span
+     is the running total, which slice 2's stagger cap divides against.
+     Idempotent: safe to call again on the same section. */
+  SG.motion.tag = function(sec, resolved){
+    resolved = resolved || SG.motion.resolve();
+    sec.setAttribute('data-motion', resolved.motion);
+    var i = 0;
+    var lists = sec.querySelectorAll('[data-arr]');
+    for(var li=0; li<lists.length; li++){
+      var list = lists[li], role = SG.motion.roleOf(list);
+      if(role && !list.hasAttribute('data-role')) list.setAttribute('data-role', role);
+      var kids = list.children;
+      for(var k=0; k<kids.length; k++){ kids[k].style.setProperty('--i', String(i++)); }
+    }
+    sec.style.setProperty('--m-span', String(i)); };
+
   function fmtC(n){var a=Math.abs(n),T=[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
     for(var i=0;i<T.length;i++){if(a>=T[i][0])return (n/T[i][0]).toFixed(1).replace(/\.0$/,'')+T[i][1];}
     return String(Math.round(n));}
@@ -606,6 +672,13 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
     (function step(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/dur),e=1-Math.pow(1-p,3);
       el.textContent=render(to*e);if(p<1)requestAnimationFrame(step);})(performance.now());}
   function activate(slide){
+    /* v3.6 motion system: one class on the section drives every [data-role]
+       rule (see anim.css). Toggled the same way as .sg-onenter->.run below,
+       so re-entering a slide replays the entrance. Guarded: wire()'s
+       "standalone" fallback calls activate(document) when no .slide exists
+       yet (the very first DOMContentLoaded tick, before SG.render has run),
+       and document has no classList. */
+    if(slide.classList){ slide.classList.remove('mrun'); void slide.offsetWidth; slide.classList.add('mrun'); }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');
       /* build steps only apply when the deck opts in (defaults.buildSteps);
@@ -629,6 +702,7 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
   }
   function deactivate(slide){
     /* reset entrance state so it replays next time the slide is shown */
+    slide.classList.remove('mrun');
     slide.querySelectorAll('.sg-onenter,.sg-draw').forEach(function(n){n.classList.remove('run');});
     slide.querySelectorAll('.sg-count').forEach(function(n){n.textContent='0';});
   }
@@ -1544,6 +1618,10 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         if(k==='key') n.setAttribute('data-el',v);
         else if(k==='bind') n.setAttribute('data-bind',v);
         else if(k==='arr') n.setAttribute('data-arr',v);
+        /* explicit branch, not a generic setAttribute fallthrough: attrs.role
+           is the v3.6 motion role, and must never emit an ARIA role instead
+           (see docs/plans/slide-forge-motion/03-program-design.md). */
+        else if(k==='role') n.setAttribute('data-role',v);
         else if(k==='html') n.innerHTML=v;
         else if(k==='text') n.textContent=v;
         else if(k==='style') n.setAttribute('style',v);
@@ -2095,7 +2173,9 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);
         SG.rng=SG.makeRng(parseInt(data.meta.seed,10)||1); } }
     deck.innerHTML='';
-    slides.forEach(function(s,i){ deck.appendChild(buildSection(s,i,total,defAmb,data.brand)); });
+    slides.forEach(function(s,i){ var sec=buildSection(s,i,total,defAmb,data.brand);
+      if(SG.motion) SG.motion.tag(sec, SG.motion.resolve(s,data));
+      deck.appendChild(sec); });
     /* re-attach entrance-animation observers to the fresh slide nodes; without
        this the first shown slide keeps .sg-onenter elements at their hidden base */
     if(SG.wireAnims) SG.wireAnims(deck);
@@ -2109,6 +2189,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     if(!old||secs.length!==slides.length){ SG.render(deck,data); return null; }
     var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
     var sec=buildSection(slides[i],i,slides.length,defAmb,data.brand);
+    if(SG.motion) SG.motion.tag(sec, SG.motion.resolve(slides[i],data));
     if(old.classList.contains('active')) sec.classList.add('active');
     old.parentNode.replaceChild(sec,old);
     if(SG.wireAnims) SG.wireAnims(sec);

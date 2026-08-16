@@ -172,3 +172,24 @@
   .sg-check.run circle{animation:sgCheckDraw .6s ease forwards}
   .sg-check.run .tick{animation:sgCheckDraw .4s ease .55s forwards}
 }
+
+/* =====================================================================
+   MOTION SYSTEM (v3.6) — role-driven entrance. See docs/plans/slide-forge-
+   motion. A preset is a handful of custom properties; every role reads the
+   same ones, which is what makes drift structurally impossible. This slice
+   ships only the "standard" preset and the list stagger; calm/expressive/off
+   and the rest of the role vocabulary land in slice 2.
+   Deliberately NOT given a persistent "hidden" rule outside this query or
+   outside animation:...both — unlike the legacy .sg-fade-rise pattern above,
+   that means killing `animation` (ambient:"none", print) leaves these
+   elements at their natural visible state instead of stranding them. */
+[data-motion]{ --m-dur:.7s; --m-dist:26px; --m-step:.08s; --m-cap:.9s;
+  --m-ease:cubic-bezier(.2,.7,.2,1) }
+
+@media (prefers-reduced-motion: no-preference){
+  @keyframes mRise{from{opacity:0;transform:translateY(var(--m-dist))}to{opacity:1;transform:none}}
+  .mrun [data-role="list"]>*:not([data-anim]){
+    animation:mRise var(--m-dur) var(--m-ease) both;
+    animation-delay:calc(var(--i,0) * var(--m-step));
+  }
+}

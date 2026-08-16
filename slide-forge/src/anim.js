@@ -3,6 +3,51 @@
      AND during static capture, so headless renders show the final frame, not a
      frozen mid-animation. (See the SG block in <head>.) */
   var R = (window.SG && SG.static) || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* =====================================================================
+     SG.motion (v3.6) — role-driven entrance motion. JS never picks an
+     animation; it only resolves a preset/reveal and stamps data-role + --i
+     so anim.css can do the rest (see docs/plans/slide-forge-motion). This
+     slice: the tracer — resolve() is hardcoded, roleOf() only recognizes an
+     already-authored data-role or a data-arr container ("list"). Slice 2
+     widens both into the full vocabulary. */
+  window.SG = window.SG || {};
+  SG.motion = SG.motion || {};
+  SG.motion.ROLES = ['title','kicker','lead','body','meta','list','group',
+                      'figure','number','quote','chrome'];
+
+  /* Resolve one element's role. Precedence: authored data-role > data-arr
+     container ("list") > null (not animated). Widened in slice 2. */
+  SG.motion.roleOf = function(node){
+    var r = node.getAttribute && node.getAttribute('data-role');
+    if(r) return r;
+    if(node.hasAttribute && node.hasAttribute('data-arr')) return 'list';
+    return null; };
+
+  /* The deck -> slide cascade. Hardcoded to 'standard' until slice 2 reads
+     defaults.motion / slide.motion. Never reads the DOM. */
+  SG.motion.resolve = function(slide, data){
+    return { motion:'standard', reveal:null, stepped:false }; };
+
+  /* One pass over a freshly built <section>: stamps data-motion, gives every
+     [data-arr] container role="list", and assigns --i to its children in
+     document order (a single counter that continues across every list in
+     the section, so later lists don't restart the stagger at 0). --m-span
+     is the running total, which slice 2's stagger cap divides against.
+     Idempotent: safe to call again on the same section. */
+  SG.motion.tag = function(sec, resolved){
+    resolved = resolved || SG.motion.resolve();
+    sec.setAttribute('data-motion', resolved.motion);
+    var i = 0;
+    var lists = sec.querySelectorAll('[data-arr]');
+    for(var li=0; li<lists.length; li++){
+      var list = lists[li], role = SG.motion.roleOf(list);
+      if(role && !list.hasAttribute('data-role')) list.setAttribute('data-role', role);
+      var kids = list.children;
+      for(var k=0; k<kids.length; k++){ kids[k].style.setProperty('--i', String(i++)); }
+    }
+    sec.style.setProperty('--m-span', String(i)); };
+
   function fmtC(n){var a=Math.abs(n),T=[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
     for(var i=0;i<T.length;i++){if(a>=T[i][0])return (n/T[i][0]).toFixed(1).replace(/\.0$/,'')+T[i][1];}
     return String(Math.round(n));}
@@ -11,6 +56,13 @@
     (function step(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/dur),e=1-Math.pow(1-p,3);
       el.textContent=render(to*e);if(p<1)requestAnimationFrame(step);})(performance.now());}
   function activate(slide){
+    /* v3.6 motion system: one class on the section drives every [data-role]
+       rule (see anim.css). Toggled the same way as .sg-onenter->.run below,
+       so re-entering a slide replays the entrance. Guarded: wire()'s
+       "standalone" fallback calls activate(document) when no .slide exists
+       yet (the very first DOMContentLoaded tick, before SG.render has run),
+       and document has no classList. */
+    if(slide.classList){ slide.classList.remove('mrun'); void slide.offsetWidth; slide.classList.add('mrun'); }
     slide.querySelectorAll('.sg-onenter').forEach(function(n){
       n.classList.remove('run');
       /* build steps only apply when the deck opts in (defaults.buildSteps);
@@ -34,6 +86,7 @@
   }
   function deactivate(slide){
     /* reset entrance state so it replays next time the slide is shown */
+    slide.classList.remove('mrun');
     slide.querySelectorAll('.sg-onenter,.sg-draw').forEach(function(n){n.classList.remove('run');});
     slide.querySelectorAll('.sg-count').forEach(function(n){n.textContent='0';});
   }

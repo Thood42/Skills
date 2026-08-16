@@ -19,9 +19,21 @@ function norm(n,w){
      only shifts every slide's later children (pager, progress, …) by one
      index and cascades into a wall of spurious diffs unrelated to layouts. */
   if(n.classList.contains('doc-panel')) return null;
-  const cls=[...n.classList].filter(c=>!/^forge-/.test(c)).sort();
+  /* 'mrun' is the v3.6 motion run-flag (see the style/attrs comment below) */
+  const cls=[...n.classList].filter(c=>!/^forge-/.test(c)&&c!=='mrun').sort();
   const attrs={};
-  for(const a of n.attributes) if(!/^(data-el|data-bind|data-arr|class)$/.test(a.name)) attrs[a.name]=a.value;
+  /* v3.6 motion pass: data-role/data-motion/data-reveal/data-decor are new
+     structural attributes the v2 fixture never had, and --i/--m-span are new
+     custom properties riding the (otherwise real) style attribute — none of
+     it is a rendering-fidelity question, so it's out of scope for this test's
+     actual question (did the v3 rewrite keep every LAYOUT faithful to v2?).
+     tests/motion-audit.mjs asserts exactly what this stops seeing. */
+  for(const a of n.attributes){
+    if(/^(data-el|data-bind|data-arr|class|data-role|data-decor|data-motion|data-reveal)$/.test(a.name)) continue;
+    let v=a.value;
+    if(a.name==='style') v=v.replace(/--i:[^;]*;?/g,'').replace(/--m-span:[^;]*;?/g,'').trim();
+    attrs[a.name]=v;
+  }
   const kids=[...n.childNodes].map(c=>norm(c,w)).filter(x=>x!==null&&x!=='');
   return {t:n.tagName,c:cls,a:attrs,k:kids};
 }

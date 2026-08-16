@@ -86,6 +86,10 @@
         if(k==='key') n.setAttribute('data-el',v);
         else if(k==='bind') n.setAttribute('data-bind',v);
         else if(k==='arr') n.setAttribute('data-arr',v);
+        /* explicit branch, not a generic setAttribute fallthrough: attrs.role
+           is the v3.6 motion role, and must never emit an ARIA role instead
+           (see docs/plans/slide-forge-motion/03-program-design.md). */
+        else if(k==='role') n.setAttribute('data-role',v);
         else if(k==='html') n.innerHTML=v;
         else if(k==='text') n.textContent=v;
         else if(k==='style') n.setAttribute('style',v);
@@ -637,7 +641,9 @@
       if(data.meta.seed!=null){ D.documentElement.setAttribute('data-seed',data.meta.seed);
         SG.rng=SG.makeRng(parseInt(data.meta.seed,10)||1); } }
     deck.innerHTML='';
-    slides.forEach(function(s,i){ deck.appendChild(buildSection(s,i,total,defAmb,data.brand)); });
+    slides.forEach(function(s,i){ var sec=buildSection(s,i,total,defAmb,data.brand);
+      if(SG.motion) SG.motion.tag(sec, SG.motion.resolve(s,data));
+      deck.appendChild(sec); });
     /* re-attach entrance-animation observers to the fresh slide nodes; without
        this the first shown slide keeps .sg-onenter elements at their hidden base */
     if(SG.wireAnims) SG.wireAnims(deck);
@@ -651,6 +657,7 @@
     if(!old||secs.length!==slides.length){ SG.render(deck,data); return null; }
     var defAmb=(data.defaults&&data.defaults.ambient)||'auto';
     var sec=buildSection(slides[i],i,slides.length,defAmb,data.brand);
+    if(SG.motion) SG.motion.tag(sec, SG.motion.resolve(slides[i],data));
     if(old.classList.contains('active')) sec.classList.add('active');
     old.parentNode.replaceChild(sec,old);
     if(SG.wireAnims) SG.wireAnims(sec);

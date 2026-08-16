@@ -19,13 +19,70 @@
   would have piled late elements onto the ceiling and re-created the collision this feature fixes.
 
 ## Slices
-- [ ] Slice 1 — tracer: one role end to end; the 6 never-animated lists stagger
+- [x] Slice 1 — tracer: one role end to end; the 6 never-animated lists stagger
 - [ ] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
 - [ ] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
 - [ ] Slice 4 — build steps + appear/wipe/spotlight
 - [ ] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
 - [ ] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
 - [ ] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
+
+## Progress log
+- **Slice 1 done 2026-08-16.** `SG.motion` module (skeleton) added to `src/anim.js`: `ROLES`,
+  `roleOf()` (authored `data-role` > `[data-arr]` → `list` > null), `resolve()` (hardcoded
+  `{motion:'standard',reveal:null,stepped:false}` — the real cascade is slice 2), and `tag(sec,
+  resolved)`, which stamps `data-motion` on the section, gives every `[data-arr]` container
+  `role="list"`, and walks its children assigning a single monotonic `--i` counter that continues
+  across every list in the section (so a second list doesn't restart the stagger at 0), plus
+  `--m-span` (the running total) for slice 2's stagger cap. `engine.js`'s `N()` gained an explicit
+  `role:` → `data-role` branch (kept separate from the generic `setAttribute` fallthrough so it can
+  never collide with a real ARIA `role`); `SG.render`/`SG.renderSlide` call `SG.motion.tag()` right
+  after `buildSection()`, before `wireAnims`. `anim.js`'s `activate()` toggles `.mrun` on the section
+  the same way it toggles `.sg-onenter`→`.run`, so re-entering a slide replays the entrance;
+  `deactivate()` removes it. One CSS rule in `anim.css`: `.mrun [data-role="list"]>*:not([data-anim])
+  { animation:mRise var(--m-dur) var(--m-ease) both; animation-delay:calc(var(--i,0)*var(--m-step)) }`
+  inside the existing `@media (prefers-reduced-motion: no-preference)` gate, with `[data-motion]`
+  supplying the standard preset's numbers (`--m-dur:.7s;--m-dist:26px;--m-step:.08s`).
+  - **Found and fixed a real bug during this slice, not a pre-existing one:** `anim.js`'s `wire()`
+    has a "standalone" fallback — `activate(document)` — used when zero `.slide` sections exist yet
+    (the first `DOMContentLoaded` tick fires before `SG.boot()`'s `SG.render()`, since anim.js
+    registers its listener earlier in load order than editor.js's). Unconditionally toggling
+    `.mrun` there threw (`document.classList` is undefined), caught by `tests/parity.mjs`'s jsdom
+    error console before it even got to diffing. Fixed by guarding on `slide.classList`.
+  - **Deliberately did NOT add a persistent hidden-state rule** (unlike legacy `.sg-fade-rise{opacity:0}`,
+    which lives outside the `.run` gate and is exactly what defect 1 exploits). `animation:...both`
+    inside the `.mrun` rule is the only source of the hidden "from" state, so killing `animation`
+    (`ambient:"none"`, print, `prefers-reduced-motion:reduce`) leaves these new elements at their
+    natural visible opacity instead of stranding them — verified empirically below. This means the
+    NEW role system starts immune to defect 1 by construction; slice 3's fix is still needed for the
+    legacy `sg-*` classes.
+  - `tests/parity.mjs`: extended `norm()`'s attr-skip to `data-role|data-decor|data-motion|data-reveal`,
+    added a `style`-attribute special case stripping `--i:`/`--m-span:` tokens (real `style` content —
+    e.g. per-slide theme vars — still compares), and excluded the new `mrun` class from the classList
+    diff. Baseline confirmed back at **7** (was 8 before the `document.classList` fix above surfaced
+    as a real diff-adjacent jsdom error). `editor-ops.mjs` untouched, still 253/253.
+  - `tests/motion-audit.mjs` **created** (new file, the Gate-1-metric test file) with the slice-1
+    scope: the 6 previously-silent layouts (`stat-grid`, `timeline`, `comparison`, `pipeline`,
+    `before-after`, plus `media-split` via a standalone deck since it's not in `RICH_DECK`) each get
+    `role="list"` and populated `--i` once activated; a 9-item agenda gets 9 distinct, strictly
+    increasing `--i` values (the old bug: items 1,7,8,9 collided at delay 0); `--m-span` reflects the
+    count; `SG.motion.tag` is idempotent. **32/32 pass.**
+  - `scripts/build.py`: `BUDGET = 500 * 1024` (Gate 2 decision), shipped in this slice per the slice
+    plan so the build stays green from the first commit. Built template: **448 KB raw / 130 KB
+    gzipped** (budget 500 KB) — comfortably under, `build.py --check` clean.
+  - **Browser-verified** at the shared preview server (`localhost:8901`, root = the outer repo, so
+    worktree files load via `/.claude/worktrees/00-status-plan-implementation-b30051/...` — a
+    from-scratch `python -m http.server` in the worktree silently loses the port to that existing
+    server and serves stale content; lost time to this once, don't repeat it). A 9-stat `stat-grid`
+    slide: `data-role="list"` on the grid, `--m-span:"9"`, `--i` 0..8 on the cards, `.mrun` added on
+    activation. The Browser pane here reports `prefers-reduced-motion:reduce` (documented trap from
+    the Gate 1 mockup session), so the `mRise` rule's own media guard correctly makes
+    `animationName:"none"` — injecting the same rule without the guard confirmed delays land exactly
+    at `0, .08, .16, …, .64s` (9 distinct, monotonic, matching `--m-step:.08s`) with `animation-
+    name:"mRise"`. Confirming the anti-defect-1 property: under the real (reduced-motion) condition,
+    all 9 items measured `opacity:"1"` — nothing stranded. Console clean on the default deck and on
+    `?edit`. Screenshots unavailable this session (Browser pane not compositing, same as prior
+    sessions) — proof above is measured values.
 
 ## Notes for a fresh session
 
