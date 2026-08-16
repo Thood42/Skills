@@ -21,7 +21,7 @@
 ## Slices
 - [x] Slice 1 — tracer: one role end to end; the 6 never-animated lists stagger
 - [x] Slice 2 — full role vocabulary + cascade + 4 presets + stagger cap → **metric 31 → 0**
-- [ ] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
+- [x] Slice 3 — real "off": shared resolved-state block, narrowed ambient, migration v3→v4
 - [ ] Slice 4 — build steps + appear/wipe/spotlight
 - [ ] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
 - [ ] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
@@ -149,6 +149,56 @@
     measurement almost exactly), expressive 1.171s (cap 1.2s). `data-motion` cascades correctly
     (`defaults.motion` on the section, per-slide `motion` override wins). Console clean on the default
     deck and on `?edit`.
+
+- **Slice 3 done 2026-08-16.** `SG.SCHEMA_VERSION` 3→4; `SG.migrate` now also handles v<4: any slide
+  with `ambient==="none"` gets `motion:"off"` too, same for `defaults.ambient`, preserving the OLD
+  destructive meaning as intent rather than dropping it. `engine.css`'s print block split in two:
+  layout/page rules stay under `@media print`; the "resolve every entrance effect to its finished
+  state" declarations became a genuinely SHARED block reused by 4 contexts —
+  `@media print, (prefers-reduced-motion: reduce)` (one block, since both are "don't move things"
+  signals) and `:is([data-motion="off"], html[data-static]) :is(...)` (one selector list, since an
+  attribute on the section and one on `<html>` don't need two copies of the same 9 declarations). The
+  duplicate chart-bar print rule at the old line ~462 was folded in and removed. `ambient:"none"`'s
+  selector narrowed from `.slide[data-ambient="none"] *` to
+  `.slide[data-ambient="none"] .amb, .slide[data-ambient="none"] [data-decor]` — defect 1's literal
+  fix. All 13 decorative loops (`.orb`×5, `.big-index`, `.stat`, `.hero-num`, `.vs-rail`,
+  `.quote-mark`, `.caret`, `.code-sweep`, `.tl-spark`, `.tl-dot.now`, `.pipe-packet`, `.rail`) tagged
+  `data-decor` at build time (`.chart-grid`, the 13th name in the CSS, turned out to be dead code —
+  no element in the codebase has ever carried that class; left alone, matches nothing either way).
+  New CSS: `[data-motion="calm"] [data-decor], [data-motion="off"] [data-decor]{animation:none}` — the
+  preset table's "decor loops: off/on" column, which slice 2 hadn't wired up yet.
+  `editor-ops.mjs`'s two hardcoded `schemaVersion===3` assertions updated to 4 (253/253 still).
+  `motion-audit.mjs` grew to **66 assertions**: `SCHEMA_VERSION===4`; the migration (slide-level,
+  defaults-level, untouched-when-never-none, and NOT re-applied to an already-v4 doc — that pairing
+  becomes a deliberate per-slide choice going forward, not an implied one); `motion:"off"` resolves
+  every entrance element to `opacity:1`/`animationName:"none"` (defect 1, inverted — this part IS
+  testable in jsdom, since `[data-motion="off"]` is a plain attribute selector, not gated behind the
+  reduced-motion media query); the narrowed ambient selector's actual target (`data-decor` present,
+  `data-motion` untouched — orthogonal by design).
+  - **Found and fixed a self-inflicted regression while wiring `[data-decor]`, before it ever left this
+    slice:** the natural instinct was `[data-role="chrome"]{animation:none!important}` as an absolute
+    backstop guaranteeing chrome never animates. But 5 of the 13 decorative loops (`.vs-rail`,
+    `.quote-mark`, `.rail`, `.tl-spark`, `.code-sweep`) are ALSO chrome-classified via `CLASS_ROLE`
+    (slice 2) — so that backstop was killing their pre-existing continuous loops unconditionally,
+    under every motion/ambient setting, not just calm/off. Root cause: chrome was already excluded
+    from ever MATCHING the entrance rule in the first place (`:not([data-role="chrome"])` in the
+    positive selector), so the extra absolute rule was redundant for its stated purpose and only added
+    collateral damage. Removed it; the structural exclusion alone is the whole guarantee.
+  - **Real jsdom limitation, not a product bug:** confirmed by direct test that jsdom's CSS engine
+    never matches `@media (prefers-reduced-motion: no-preference)` (mirrors its `matchMedia` mock,
+    which always reports `matches:false`) — so entrance animations literally never fire in the Node
+    suite regardless of ambient/motion settings, making the defect-1 regression untestable there by
+    construction. Split the audit accordingly: what's testable in jsdom (the `[data-motion="off"]`
+    plain-attribute-selector path, the migration) lives in `motion-audit.mjs`; the actual "ambient:
+    none under real no-preference doesn't strand content" proof was done in a real browser instead
+    (below), matching how this codebase has verified motion since the Gate 1 mockups.
+  - Browser-verified, unconditional-rule injection (same lift-out-of-the-media-query method as Gate 1):
+    an agenda slide with `ambient:"none"` and `motion` left at its default — title and all 3 items
+    measured `opacity:"1"`, `animationName:"mRise"` (entrance fully intact, nothing stranded), while
+    `.rail` (the slide's `data-decor` element) measured `animationName:"none"` (background/decor
+    correctly silenced) and `data-motion` stayed `"standard"` (orthogonal to ambient, as designed).
+    Also verified the preset table's decor column directly: same agenda's `.rail` →
+    `calm:"none", standard:"sheen", off:"none"`. Console clean on the default deck and `?edit`.
 
 ## Notes for a fresh session
 

@@ -221,7 +221,24 @@
   }
   .mrun [data-role="figure"]:not([data-anim]){ animation-name:mWipe }
 }
-/* chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
-   ambient layer) is matched explicitly and never entrance-animated — this
-   sits outside the media query so it holds under every motion preference. */
-[data-role="chrome"]{ animation:none !important }
+/* Chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
+   ambient layer) is matched explicitly and never entrance-animated — but
+   that guarantee is already structural: the general rule above excludes
+   [data-role="list"] and [data-role="chrome"] from its own selector, so
+   chrome is simply never MATCHED, never given `animation` in the first
+   place. There is deliberately no separate `animation:none!important`
+   backstop here — several chrome elements (.vs-rail, .quote-mark, .rail,
+   .tl-spark, .code-sweep) carry their OWN pre-existing continuous
+   decorative loop from deck.css, and a blanket !important kill would nuke
+   those too, not just entrance motion. (Found while wiring [data-decor]
+   for slice 3 — an earlier version of this rule did exactly that.) */
+
+/* DECORATIVE LOOPS (deck.css's 13 always-on infinite animations, tagged
+   [data-decor] at build time) respect the motion dial: off under calm/off,
+   on under standard/expressive — matching the preset table in
+   02-architecture.md. ambient:"none" ALSO silences them (see the narrowed
+   .slide[data-ambient="none"] rule below) — decor loops are background
+   texture, the same category as the .amb layer, regardless of which knob
+   quiets them. */
+[data-motion="calm"] [data-decor],
+[data-motion="off"] [data-decor]{ animation:none !important }

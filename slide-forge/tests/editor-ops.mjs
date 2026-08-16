@@ -75,7 +75,7 @@ legacy.slides[1].overrides={'b3.0':{x:42,rot:-2},'b1':{color:'#123456'},'b9.9':{
 const dom2=boot(NEW,legacy); await new Promise(r=>setTimeout(r,500));
 const w2=dom2.window, S2=w2.SG;
 const ov2=S2.data.slides[1].overrides;
-ok(S2.data.meta.schemaVersion===3,'schema stamped v3');
+ok(S2.data.meta.schemaVersion===4,'schema stamped v4');
 ok(ov2&&ov2['items.0']&&ov2['items.0'].x===42,'legacy b3.0 -> items.0');
 ok(ov2&&ov2['kicker']&&ov2['kicker'].color==='#123456','legacy b1 -> kicker');
 ok(!ov2['b9.9'],'unmappable legacy key dropped');
@@ -85,7 +85,7 @@ ok(dom2.window.document.querySelectorAll('#deck .slide')[1].querySelector('[data
 
 // ---------- deck JSON round-trip stays valid ----------
 const rt=JSON.parse(JSON.stringify(SG.data));
-ok(rt.slides.length===26&&rt.meta.schemaVersion===3,'data round-trips');
+ok(rt.slides.length===26&&rt.meta.schemaVersion===4,'data round-trips');
 
 // =====================================================================
 // MEDIA PLAN (2026-07-31) — asset registry v2, links, embeds.

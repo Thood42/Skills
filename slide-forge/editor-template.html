@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides — theme gallery</title>
 
-<!-- slide-forge v3 build 9fadbcda5d — built by scripts/build.py; edit src/*, not this file -->
+<!-- slide-forge v3 build 2666b2be9d — built by scripts/build.py; edit src/*, not this file -->
 <!-- Libraries this deck uses (vendored locally). bundle.py reads this list to
      stage/inline only what's referenced. Leave empty if the deck is pure-bespoke. -->
 <meta name="deck-libs" content="">
@@ -640,10 +640,27 @@ pre .c{color:var(--faint); font-style:italic} pre .n{color:#ffcf7a}
   }
   .mrun [data-role="figure"]:not([data-anim]){ animation-name:mWipe }
 }
-/* chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
-   ambient layer) is matched explicitly and never entrance-animated — this
-   sits outside the media query so it holds under every motion preference. */
-[data-role="chrome"]{ animation:none !important }
+/* Chrome (rails, quote marks, timeline tracks, pagers, progress bars, the
+   ambient layer) is matched explicitly and never entrance-animated — but
+   that guarantee is already structural: the general rule above excludes
+   [data-role="list"] and [data-role="chrome"] from its own selector, so
+   chrome is simply never MATCHED, never given `animation` in the first
+   place. There is deliberately no separate `animation:none!important`
+   backstop here — several chrome elements (.vs-rail, .quote-mark, .rail,
+   .tl-spark, .code-sweep) carry their OWN pre-existing continuous
+   decorative loop from deck.css, and a blanket !important kill would nuke
+   those too, not just entrance motion. (Found while wiring [data-decor]
+   for slice 3 — an earlier version of this rule did exactly that.) */
+
+/* DECORATIVE LOOPS (deck.css's 13 always-on infinite animations, tagged
+   [data-decor] at build time) respect the motion dial: off under calm/off,
+   on under standard/expressive — matching the preset table in
+   02-architecture.md. ambient:"none" ALSO silences them (see the narrowed
+   .slide[data-ambient="none"] rule below) — decor loops are background
+   texture, the same category as the .amb layer, regardless of which knob
+   quiets them. */
+[data-motion="calm"] [data-decor],
+[data-motion="off"] [data-decor]{ animation:none !important }
 </style>
 <script>
 (function(){
@@ -1185,17 +1202,51 @@ body.hide-docs .doc-panel{display:none}
   .slide:last-child{ page-break-after:auto; break-after:auto }
   .slide *{ animation:none !important; transition:none !important }
   .deck-ui, .doc-panel{ display:none !important }
-  /* resolve entrance/hidden states so animation-revealed content is visible in the PDF
-     (the JS beforeprint handler fills count-ups/rings; these cover the CSS-only ones) */
-  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span{ opacity:1 !important }
-  .sg-reveal-wipe{ clip-path:none !important }
+}
+
+/* =====================================================================
+   SHARED RESOLVED-STATE (v3.6, slice 3) — the "finished" appearance of
+   every entrance effect this file knows about, both the legacy sg-* library
+   and the v3.6 role system, consumed by FOUR contexts: print (above),
+   prefers-reduced-motion:reduce, [data-motion="off"], and SG.static capture
+   (html[data-static]). One list, kept in sync by hand — grep RESOLVED-STATE
+   if you add a new entrance effect anywhere in this file.
+   Print and reduced-motion share a media block (an OS-level "please don't
+   move things" signal and "don't animate the PDF" are the same ask); off
+   and static share a selector list keyed off :is() so a section-scoped
+   attribute and a document-scoped one don't need two full copies of the
+   same nine declarations. This is what slice 3 promised: ambient:"none"
+   used to be the only way to quiet a slide, and it stranded content at its
+   hidden base (defect 1) because these declarations only ever ran for
+   print. motion:"off" now runs them too, so it actually resolves to
+   visible instead of invisible. ===================================== */
+@media print, (prefers-reduced-motion: reduce){
+  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]),
+  [data-role="list"]>*{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
+  .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
+    transform:none !important; opacity:1 !important; animation:none !important }
 }
+:is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*){
+  opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+:is([data-motion="off"], html[data-static]) .sg-typewriter{ width:auto !important; border-right:0 !important }
+:is([data-motion="off"], html[data-static]) :is(.sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,
+  .sg-draw rect,.sg-draw ellipse,.sg-draw polygon,.sg-check circle,.sg-check .tick,.chart-line){ stroke-dashoffset:0 !important }
+:is([data-motion="off"], html[data-static]) :is(.chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop){
+  transform:none !important; opacity:1 !important; animation:none !important }
 
-/* ambient override: a slide may set "ambient":"none" to silence motion */
-.slide[data-ambient="none"] *{ animation:none !important }
+/* ambient override: a slide may set "ambient":"none" to silence the
+   BACKGROUND layer only — narrowed from `*` (which used to ALSO kill
+   entrance motion and strand content at its hidden base: defect 1).
+   `motion` is the separate, correct knob for element motion now; SG.migrate
+   preserves an old deck's intent — ambient:"none" used to mean "silence
+   everything" — by also setting motion:"off" once, on load (v3->v4). */
+.slide[data-ambient="none"] .amb,
+.slide[data-ambient="none"] [data-decor]{ animation:none !important }
 
 /* =====================================================================
    CONFIGURABLE AMBIENTS  —  pick one per slide from the JSON with
@@ -1319,10 +1370,8 @@ body.hide-docs .doc-panel{display:none}
   .chart-anim.run .cpop{ transform-box:fill-box; transform-origin:center; animation:cpopIn .5s cubic-bezier(.2,.7,.2,1) both; }
   /* .cline paths draw via the shared .sg-draw machinery on the wrapper */
 }
-@media print{
-  .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
-    transform:none !important; opacity:1 !important; animation:none !important; }
-}
+/* print/off/reduced-motion/static resolved state for chart bars now lives
+   in the shared RESOLVED-STATE block above (slice 3) */
 
 /* ---- table layout ---- */
 .tbl-wrap{ flex:1; margin-top:34px; min-height:0; display:flex; flex-direction:column; }
@@ -1671,8 +1720,14 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
      v3 changes override IDENTITY: keys are authored content paths instead of
      positional b0/b0.1 tags. Old positional keys are remapped lazily at first
      decorate (the editor replays the old block walk against the fresh DOM) —
-     flagged here via SG._legacyKeys. raw slides keep positional keys. */
-  SG.SCHEMA_VERSION = 3;
+     flagged here via SG._legacyKeys. raw slides keep positional keys.
+     v4 (v3.6 motion overhaul, slice 3): ambient:"none" used to mean "silence
+     EVERYTHING" (destructively — see defect 1 in docs/plans/slide-forge-
+     motion/00-status.md). After narrowing it to mean "no background layer
+     only", a deck that asked for quiet would suddenly animate again unless
+     its intent is carried forward: any slide (or defaults) with
+     ambient:"none" also gets motion:"off", once, on load. */
+  SG.SCHEMA_VERSION = 4;
   SG.migrate = function(data){ if(!data||typeof data!=='object') return data;
     var m = data.meta = data.meta || {};
     var v = parseInt(m.schemaVersion,10) || 1;
@@ -1680,6 +1735,10 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       SG._legacyKeys = (data.slides||[]).some(function(s){
         return s.overrides && s.layout!=='raw' &&
           Object.keys(s.overrides).some(function(k){ return /^b\d/.test(k); }); });
+    }
+    if(v < 4){
+      if(data.defaults && data.defaults.ambient==='none') data.defaults.motion='off';
+      (data.slides||[]).forEach(function(s){ if(s.ambient==='none') s.motion='off'; });
     }
     m.schemaVersion = SG.SCHEMA_VERSION;
     return data; };
@@ -1955,7 +2014,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
 
   L.cover=function(c){
     return [
-      N('div.orb.a',{key:'orb0'}), N('div.orb.b',{key:'orb1'}), N('div.orb.c',{key:'orb2'}),
+      N('div.orb.a',{key:'orb0','data-decor':''}), N('div.orb.b',{key:'orb1','data-decor':''}), N('div.orb.c',{key:'orb2','data-decor':''}),
       kickerN(c.kicker),
       N('h1.title.sg-fade-rise.sg-onenter',{key:'title'},[
         H(rich(c.title||'')),
@@ -1970,7 +2029,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   /* agenda -> sections.js (rail + titleband + agenda) */
 
   L.divider=function(c){
-    return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
+    return [ N('div.big-index',{key:'index',bind:'index',text:c.index||'','data-decor':''}),
       N('h1.title',{key:'title',bind:'title'},
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
@@ -1989,8 +2048,8 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       N('div.code-stage',{key:'stage'},[
         N('div.code-panel',{key:'panel'},[
           N('div.code-bar',{key:'bar'},[N('span.dotrow',{html:'<i></i><i></i><i></i>'}),c.filename||'']),
-          N('div.code-sweep'),
-          N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
+          N('div.code-sweep',{'data-decor':''}),
+          N('pre',{key:'code',html:(c.code||'')+'<span class="caret" data-decor></span>'}) ]),
         c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
   /* timeline -> sections.js (titleband + timeline) */
@@ -2003,13 +2062,13 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
         N('h3',{bind:P+'.title',html:rich(n.title)}),
         n.desc?N('p',{bind:P+'.desc',html:rich(n.desc)}):null ]));
       if(i<nodes.length-1) kids.push(N('div.pipe-conn',{key:'conn.'+i},
-        N('div.pipe-packet',{style:'animation-delay:'+(i*0.6)+'s'}))); });
+        N('div.pipe-packet',{style:'animation-delay:'+(i*0.6)+'s','data-decor':''}))); });
     if(c.loop) kids.push(N('div.pipe-loop',{key:'loop',bind:'loop',text:c.loop}));
     return [ kickerN(c.kicker), titleN(c.title), N('div.pipe',{key:'pipe',arr:'nodes'},kids) ]; };
 
   L.closing=function(c){
     var check='<svg class="sg-check sg-onenter" viewBox="0 0 52 52" width="30" height="30" fill="none" stroke="var(--mint)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="26" cy="26" r="24"></circle><path class="tick" d="M16 27 L23 34 L37 18"></path></svg>';
-    return [ N('div.orb.b',{key:'orb0',style:'opacity:.30'}), N('div.orb.c',{key:'orb1'}),
+    return [ N('div.orb.b',{key:'orb0',style:'opacity:.30','data-decor':''}), N('div.orb.c',{key:'orb1','data-decor':''}),
       kickerN(c.kicker),
       N('h1.title',{key:'title'},[ H(rich(c.title||'')),
         c.accent?' ':null,
@@ -2585,7 +2644,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
               +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
           : esc(s.value);
-        return N('div.stat',{key:P},[
+        return N('div.stat',{key:P,'data-decor':''},[
           N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
           N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; }
   };
@@ -2597,7 +2656,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     fields:['quote','by','subtitle'],
     defaults:{quote:'A line worth putting on a slide.', by:'Attribution'},
     build:function(c,b){ b=b||'';
-      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;'}),
+      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;','data-decor':''}),
         N('blockquote.sg-reveal-wipe.sg-onenter',{bind:b+'quote',html:rich(c.quote)}),
         c.by?N('div.by',{key:b+'by'},[N('div.line'),
           N('span',{key:b+'by.text',bind:b+'by',html:rich(c.by)})]):null,
@@ -2616,7 +2675,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
       var hero = c.count!=null
         ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
         : esc(c.value);
-      return [ N('div.hero-num',{key:b+'num',html:hero}),
+      return [ N('div.hero-num',{key:b+'num',html:hero,'data-decor':''}),
         c.subtitle?N('p.subtitle',{bind:b+'subtitle',html:rich(c.subtitle)}):null ]; }
   };
 
@@ -2668,7 +2727,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
           N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
             return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
       return [ N('div.cmp',{key:b+'cmp',role:'group'},[ col(c.left,'sup','left'),
-        N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
+        N('div.vs-rail',{key:b+'vs','data-decor':''},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
         col(c.right,'uns','right') ]) ]; }
   };
 
@@ -2693,11 +2752,11 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
     defaults:{items:[{year:'2024',title:'Then'},{year:'2026',title:'Now',now:true}]},
     build:function(c,b){ b=b||'';
       return [ N('div.timeline',{key:b+'timeline'},[
-        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-track'), N('div.tl-spark',{'data-decor':''}),
         N('div.tl-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(it,i){ var P=b+'items.'+i;
           return N('div.tl-item',{key:P},[
             N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
-            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot','data-decor':it.now?'':undefined}),
             N('div.ev',{key:P+'.ev'},[
               N('b',{bind:P+'.title',html:rich(it.title)}),
               it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; }
@@ -2768,7 +2827,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:19p
   L.editorial     = function(c){ return [kickerN(c.kicker,'')].concat(S.prose.build(c,'')); };
   /* the rail is slide chrome (absolutely positioned against the section), not
      part of the agenda section */
-  L.agenda        = function(c){ return [N('div.rail',{key:'rail'})]
+  L.agenda        = function(c){ return [N('div.rail',{key:'rail','data-decor':''})]
                                    .concat(S.titleband.build(c,''), S.agenda.build(c,'')); };
   /* media-split is the one classic that is ALREADY two sections — it just wraps
      them in a grid that decides which side the picture takes */

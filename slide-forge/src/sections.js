@@ -70,7 +70,7 @@
           ? '<span class="sg-count" data-to="'+esc(s.count)+'" data-dur="1300"'
               +(s.fmt?' data-fmt="'+esc(s.fmt)+'"':'')+'>0</span>'
           : esc(s.value);
-        return N('div.stat',{key:P},[
+        return N('div.stat',{key:P,'data-decor':''},[
           N('div.num',{key:P+'.num',html:num+(s.unit?'<small>'+esc(s.unit)+'</small>':'')}),
           N('div.lbl',{bind:P+'.label',html:rich(s.label)}) ]); })) ]; }
   };
@@ -82,7 +82,7 @@
     fields:['quote','by','subtitle'],
     defaults:{quote:'A line worth putting on a slide.', by:'Attribution'},
     build:function(c,b){ b=b||'';
-      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;'}),
+      return [ N('div.quote-mark',{key:b+'mark',html:'&ldquo;','data-decor':''}),
         N('blockquote.sg-reveal-wipe.sg-onenter',{bind:b+'quote',html:rich(c.quote)}),
         c.by?N('div.by',{key:b+'by'},[N('div.line'),
           N('span',{key:b+'by.text',bind:b+'by',html:rich(c.by)})]):null,
@@ -101,7 +101,7 @@
       var hero = c.count!=null
         ? '<span class="sg-count" data-to="'+esc(c.count)+'" data-dur="1800"'+(c.fmt?' data-fmt="'+esc(c.fmt)+'"':'')+'>0</span>'
         : esc(c.value);
-      return [ N('div.hero-num',{key:b+'num',html:hero}),
+      return [ N('div.hero-num',{key:b+'num',html:hero,'data-decor':''}),
         c.subtitle?N('p.subtitle',{bind:b+'subtitle',html:rich(c.subtitle)}):null ]; }
   };
 
@@ -153,7 +153,7 @@
           N('ul',{key:b+base+'.items',arr:b+base+'.items'},arr(side.items).map(function(x,i){
             return N('li',{bind:b+base+'.items.'+i,html:rich(x)}); })) ]); }
       return [ N('div.cmp',{key:b+'cmp',role:'group'},[ col(c.left,'sup','left'),
-        N('div.vs-rail',{key:b+'vs'},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
+        N('div.vs-rail',{key:b+'vs','data-decor':''},N('div.vs-badge',{key:b+'badge',bind:b+'badge',text:c.badge||'VS'})),
         col(c.right,'uns','right') ]) ]; }
   };
 
@@ -178,11 +178,11 @@
     defaults:{items:[{year:'2024',title:'Then'},{year:'2026',title:'Now',now:true}]},
     build:function(c,b){ b=b||'';
       return [ N('div.timeline',{key:b+'timeline'},[
-        N('div.tl-track'), N('div.tl-spark'),
+        N('div.tl-track'), N('div.tl-spark',{'data-decor':''}),
         N('div.tl-items',{key:b+'items',arr:b+'items'},arr(c.items).map(function(it,i){ var P=b+'items.'+i;
           return N('div.tl-item',{key:P},[
             N('div.yr',{bind:P+'.year',text:it.year==null?'':it.year}),
-            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot'}),
+            N('div.tl-dot'+(it.now?'.now':''),{key:P+'.dot','data-decor':it.now?'':undefined}),
             N('div.ev',{key:P+'.ev'},[
               N('b',{bind:P+'.title',html:rich(it.title)}),
               it.desc?N('span',{bind:P+'.desc',html:rich(it.desc)}):null ]) ]); })) ]) ]; }
@@ -253,7 +253,7 @@
   L.editorial     = function(c){ return [kickerN(c.kicker,'')].concat(S.prose.build(c,'')); };
   /* the rail is slide chrome (absolutely positioned against the section), not
      part of the agenda section */
-  L.agenda        = function(c){ return [N('div.rail',{key:'rail'})]
+  L.agenda        = function(c){ return [N('div.rail',{key:'rail','data-decor':''})]
                                    .concat(S.titleband.build(c,''), S.agenda.build(c,'')); };
   /* media-split is the one classic that is ALREADY two sections — it just wraps
      them in a grid that decides which side the picture takes */

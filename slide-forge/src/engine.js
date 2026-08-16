@@ -22,8 +22,14 @@
      v3 changes override IDENTITY: keys are authored content paths instead of
      positional b0/b0.1 tags. Old positional keys are remapped lazily at first
      decorate (the editor replays the old block walk against the fresh DOM) —
-     flagged here via SG._legacyKeys. raw slides keep positional keys. */
-  SG.SCHEMA_VERSION = 3;
+     flagged here via SG._legacyKeys. raw slides keep positional keys.
+     v4 (v3.6 motion overhaul, slice 3): ambient:"none" used to mean "silence
+     EVERYTHING" (destructively — see defect 1 in docs/plans/slide-forge-
+     motion/00-status.md). After narrowing it to mean "no background layer
+     only", a deck that asked for quiet would suddenly animate again unless
+     its intent is carried forward: any slide (or defaults) with
+     ambient:"none" also gets motion:"off", once, on load. */
+  SG.SCHEMA_VERSION = 4;
   SG.migrate = function(data){ if(!data||typeof data!=='object') return data;
     var m = data.meta = data.meta || {};
     var v = parseInt(m.schemaVersion,10) || 1;
@@ -31,6 +37,10 @@
       SG._legacyKeys = (data.slides||[]).some(function(s){
         return s.overrides && s.layout!=='raw' &&
           Object.keys(s.overrides).some(function(k){ return /^b\d/.test(k); }); });
+    }
+    if(v < 4){
+      if(data.defaults && data.defaults.ambient==='none') data.defaults.motion='off';
+      (data.slides||[]).forEach(function(s){ if(s.ambient==='none') s.motion='off'; });
     }
     m.schemaVersion = SG.SCHEMA_VERSION;
     return data; };
@@ -306,7 +316,7 @@
 
   L.cover=function(c){
     return [
-      N('div.orb.a',{key:'orb0'}), N('div.orb.b',{key:'orb1'}), N('div.orb.c',{key:'orb2'}),
+      N('div.orb.a',{key:'orb0','data-decor':''}), N('div.orb.b',{key:'orb1','data-decor':''}), N('div.orb.c',{key:'orb2','data-decor':''}),
       kickerN(c.kicker),
       N('h1.title.sg-fade-rise.sg-onenter',{key:'title'},[
         H(rich(c.title||'')),
@@ -321,7 +331,7 @@
   /* agenda -> sections.js (rail + titleband + agenda) */
 
   L.divider=function(c){
-    return [ N('div.big-index',{key:'index',bind:'index',text:c.index||''}),
+    return [ N('div.big-index',{key:'index',bind:'index',text:c.index||'','data-decor':''}),
       N('h1.title',{key:'title',bind:'title'},
         N('span.sg-kinetic.sg-onenter',{html:kinetic(c.title||'')})),
       c.subtitle?N('p.subtitle',{bind:'subtitle',html:rich(c.subtitle)}):null ]; };
@@ -340,8 +350,8 @@
       N('div.code-stage',{key:'stage'},[
         N('div.code-panel',{key:'panel'},[
           N('div.code-bar',{key:'bar'},[N('span.dotrow',{html:'<i></i><i></i><i></i>'}),c.filename||'']),
-          N('div.code-sweep'),
-          N('pre',{key:'code',html:(c.code||'')+'<span class="caret"></span>'}) ]),
+          N('div.code-sweep',{'data-decor':''}),
+          N('pre',{key:'code',html:(c.code||'')+'<span class="caret" data-decor></span>'}) ]),
         c.caption?N('p.code-cap',{bind:'caption',html:rich(c.caption)}):null ]) ]; };
 
   /* timeline -> sections.js (titleband + timeline) */
@@ -354,13 +364,13 @@
         N('h3',{bind:P+'.title',html:rich(n.title)}),
         n.desc?N('p',{bind:P+'.desc',html:rich(n.desc)}):null ]));
       if(i<nodes.length-1) kids.push(N('div.pipe-conn',{key:'conn.'+i},
-        N('div.pipe-packet',{style:'animation-delay:'+(i*0.6)+'s'}))); });
+        N('div.pipe-packet',{style:'animation-delay:'+(i*0.6)+'s','data-decor':''}))); });
     if(c.loop) kids.push(N('div.pipe-loop',{key:'loop',bind:'loop',text:c.loop}));
     return [ kickerN(c.kicker), titleN(c.title), N('div.pipe',{key:'pipe',arr:'nodes'},kids) ]; };
 
   L.closing=function(c){
     var check='<svg class="sg-check sg-onenter" viewBox="0 0 52 52" width="30" height="30" fill="none" stroke="var(--mint)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="26" cy="26" r="24"></circle><path class="tick" d="M16 27 L23 34 L37 18"></path></svg>';
-    return [ N('div.orb.b',{key:'orb0',style:'opacity:.30'}), N('div.orb.c',{key:'orb1'}),
+    return [ N('div.orb.b',{key:'orb0',style:'opacity:.30','data-decor':''}), N('div.orb.c',{key:'orb1','data-decor':''}),
       kickerN(c.kicker),
       N('h1.title',{key:'title'},[ H(rich(c.title||'')),
         c.accent?' ':null,

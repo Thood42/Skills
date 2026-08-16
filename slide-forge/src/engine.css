@@ -325,17 +325,51 @@ body.hide-docs .doc-panel{display:none}
   .slide:last-child{ page-break-after:auto; break-after:auto }
   .slide *{ animation:none !important; transition:none !important }
   .deck-ui, .doc-panel{ display:none !important }
-  /* resolve entrance/hidden states so animation-revealed content is visible in the PDF
-     (the JS beforeprint handler fills count-ups/rings; these cover the CSS-only ones) */
-  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span{ opacity:1 !important }
-  .sg-reveal-wipe{ clip-path:none !important }
+}
+
+/* =====================================================================
+   SHARED RESOLVED-STATE (v3.6, slice 3) — the "finished" appearance of
+   every entrance effect this file knows about, both the legacy sg-* library
+   and the v3.6 role system, consumed by FOUR contexts: print (above),
+   prefers-reduced-motion:reduce, [data-motion="off"], and SG.static capture
+   (html[data-static]). One list, kept in sync by hand — grep RESOLVED-STATE
+   if you add a new entrance effect anywhere in this file.
+   Print and reduced-motion share a media block (an OS-level "please don't
+   move things" signal and "don't animate the PDF" are the same ask); off
+   and static share a selector list keyed off :is() so a section-scoped
+   attribute and a document-scoped one don't need two full copies of the
+   same nine declarations. This is what slice 3 promised: ambient:"none"
+   used to be the only way to quiet a slide, and it stranded content at its
+   hidden base (defect 1) because these declarations only ever ran for
+   print. motion:"off" now runs them too, so it actually resolves to
+   visible instead of invisible. ===================================== */
+@media print, (prefers-reduced-motion: reduce){
+  .sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]),
+  [data-role="list"]>*{ opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
   .sg-typewriter{ width:auto !important; border-right:0 !important }
   .sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,.sg-draw rect,.sg-draw ellipse,.sg-draw polygon,
   .sg-check circle,.sg-check .tick,.chart-line{ stroke-dashoffset:0 !important }
+  .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
+    transform:none !important; opacity:1 !important; animation:none !important }
 }
+:is([data-motion="off"], html[data-static]) :is(.sg-fade-rise, .sg-stagger>*, .sg-kinetic span, .sg-reveal-wipe,
+  [data-role]:not([data-role="list"]):not([data-role="chrome"]), [data-role="list"]>*){
+  opacity:1 !important; transform:none !important; clip-path:none !important; animation:none !important }
+:is([data-motion="off"], html[data-static]) .sg-typewriter{ width:auto !important; border-right:0 !important }
+:is([data-motion="off"], html[data-static]) :is(.sg-draw path,.sg-draw line,.sg-draw polyline,.sg-draw circle,
+  .sg-draw rect,.sg-draw ellipse,.sg-draw polygon,.sg-check circle,.sg-check .tick,.chart-line){ stroke-dashoffset:0 !important }
+:is([data-motion="off"], html[data-static]) :is(.chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop){
+  transform:none !important; opacity:1 !important; animation:none !important }
 
-/* ambient override: a slide may set "ambient":"none" to silence motion */
-.slide[data-ambient="none"] *{ animation:none !important }
+/* ambient override: a slide may set "ambient":"none" to silence the
+   BACKGROUND layer only — narrowed from `*` (which used to ALSO kill
+   entrance motion and strand content at its hidden base: defect 1).
+   `motion` is the separate, correct knob for element motion now; SG.migrate
+   preserves an old deck's intent — ambient:"none" used to mean "silence
+   everything" — by also setting motion:"off" once, on load (v3->v4). */
+.slide[data-ambient="none"] .amb,
+.slide[data-ambient="none"] [data-decor]{ animation:none !important }
 
 /* =====================================================================
    CONFIGURABLE AMBIENTS  —  pick one per slide from the JSON with
@@ -459,10 +493,8 @@ body.hide-docs .doc-panel{display:none}
   .chart-anim.run .cpop{ transform-box:fill-box; transform-origin:center; animation:cpopIn .5s cubic-bezier(.2,.7,.2,1) both; }
   /* .cline paths draw via the shared .sg-draw machinery on the wrapper */
 }
-@media print{
-  .chart-anim .cbar,.chart-anim .cbarh,.chart-anim .cfade,.chart-anim .cpop{
-    transform:none !important; opacity:1 !important; animation:none !important; }
-}
+/* print/off/reduced-motion/static resolved state for chart bars now lives
+   in the shared RESOLVED-STATE block above (slice 3) */
 
 /* ---- table layout ---- */
 .tbl-wrap{ flex:1; margin-top:34px; min-height:0; display:flex; flex-direction:column; }

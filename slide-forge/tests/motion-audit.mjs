@@ -190,5 +190,79 @@ for(const t of NEVER_ANIMATED){
   ok(s4[1].getAttribute('data-motion')==='expressive', 'per-slide motion override stamped on the section');
 }
 
+// ---------- slice 3: schema v4, migration, "off" resolves everything ----------
+// jsdom never matches `@media (prefers-reduced-motion: no-preference)` (its
+// matchMedia mock returns false and its CSS engine agrees — confirmed while
+// building this), so it can only prove the parts of defect 1's fix that
+// AREN'T behind that query: [data-motion="off"]'s resolved state (a plain
+// attribute selector) and the migration/schema-version data layer. The
+// actual "ambient:none no longer strands content under real no-preference"
+// regression was verified in a real browser instead — see 00-status.md.
+{
+  ok(SG.SCHEMA_VERSION===4, 'SCHEMA_VERSION is 4');
+}
+{
+  // a pre-v4 doc with ambient:"none" (slide-level) picks up motion:"off"
+  const legacy1={meta:{schemaVersion:3}, slides:[
+    {layout:'stat-grid', ambient:'none', content:{title:'T',stats:[{value:'1',label:'a'}]}} ]};
+  const migrated1=SG.migrate(JSON.parse(JSON.stringify(legacy1)));
+  ok(migrated1.slides[0].motion==='off', 'v3->v4 migration: slide ambient:"none" also sets motion:"off"');
+  ok(migrated1.slides[0].ambient==='none', 'migration preserves the ambient key itself (background stays off too)');
+  ok(migrated1.meta.schemaVersion===4, 'migration stamps schemaVersion 4');
+
+  // ...and for defaults.ambient:"none"
+  const legacy2={meta:{schemaVersion:3}, defaults:{ambient:'none'}, slides:[
+    {layout:'stat-grid', content:{title:'T',stats:[{value:'1',label:'a'}]}} ]};
+  const migrated2=SG.migrate(JSON.parse(JSON.stringify(legacy2)));
+  ok(migrated2.defaults.motion==='off', 'v3->v4 migration: defaults.ambient:"none" also sets defaults.motion:"off"');
+
+  // a deck that never had ambient:"none" is untouched by the migration
+  const legacy3={meta:{schemaVersion:3}, slides:[
+    {layout:'stat-grid', content:{title:'T',stats:[{value:'1',label:'a'}]}} ]};
+  const migrated3=SG.migrate(JSON.parse(JSON.stringify(legacy3)));
+  ok(migrated3.slides[0].motion===undefined, 'migration leaves motion untouched when ambient was never "none"');
+
+  // already-v4 decks are left alone (migration only runs once, for v<4)
+  const already={meta:{schemaVersion:4}, slides:[
+    {layout:'stat-grid', ambient:'none', content:{title:'T',stats:[{value:'1',label:'a'}]}} ]};
+  const notRemigrated=SG.migrate(JSON.parse(JSON.stringify(already)));
+  ok(notRemigrated.slides[0].motion===undefined,
+    'a v4 doc with ambient:"none" is NOT auto-given motion:"off" — that pairing is now a deliberate choice, not an implied one');
+}
+{
+  // motion:"off" — defect 1, inverted: every roled element resolves to
+  // visible with zero animation, not stranded at its hidden base.
+  const offDeck={meta:{title:'off',schemaVersion:4}, slides:[
+    {layout:'stat-grid', motion:'off', content:{title:'T',stats:[
+      {value:'1',label:'a'},{value:'2',label:'b'},{value:'3',label:'c'}]}} ]};
+  const dom6=boot(NEW,offDeck); await new Promise(r=>setTimeout(r,400));
+  const w6=dom6.window, d6=w6.document;
+  const sec6=d6.querySelector('#deck .slide');
+  ok(sec6.getAttribute('data-motion')==='off', 'motion:"off" stamped on the section');
+  const title6=sec6.querySelector('h1.title');
+  const items6=[].slice.call(sec6.querySelectorAll('[data-arr="stats"]>*'));
+  const all6=[title6].concat(items6);
+  ok(all6.every(function(el){ return w6.getComputedStyle(el).opacity==='1'; }),
+    'motion:"off": every entrance element resolves to opacity 1 (nothing stranded)');
+  ok(all6.every(function(el){ return w6.getComputedStyle(el).animationName==='none'; }),
+    'motion:"off": zero animations, on any element the role system would otherwise touch');
+}
+{
+  // the narrowed ambient selector no longer reaches [data-decor] with the
+  // universal `*` — verify structurally: build with ambient:"none" (no
+  // motion override) and confirm decor elements are individually targeted
+  // (data-decor present) while an ordinary content element is not, which is
+  // what makes ".amb, [data-decor]" the correct narrow instead of "*".
+  const ambDeck={meta:{title:'amb',schemaVersion:4}, slides:[
+    {layout:'agenda', ambient:'none', content:{title:'T',items:[{title:'i0'},{title:'i1'}]}} ]};
+  const dom7=boot(NEW,ambDeck); await new Promise(r=>setTimeout(r,400));
+  const d7=dom7.window.document;
+  const sec7=d7.querySelector('#deck .slide');
+  ok(sec7.getAttribute('data-ambient')==='none', 'ambient:"none" still stamps data-ambient (background layer opts out)');
+  ok(sec7.getAttribute('data-motion')!=='off', 'ambient:"none" alone (schemaVersion 4, no migration) does NOT imply motion:"off" — orthogonal by design');
+  const rail=sec7.querySelector('.rail');
+  ok(!!rail && rail.hasAttribute('data-decor'), 'the decorative rail carries data-decor, the narrowed selector\'s actual target');
+}
+
 console.log(pass+' passed, '+fail+' failed');
 if(fail) process.exitCode=1;
