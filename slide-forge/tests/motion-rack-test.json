@@ -1,0 +1,155 @@
+{
+  "meta": {"title": "Motion rack test — 10 real-world slides, motion decided deliberately", "seed": 7, "schemaVersion": 4},
+  "personality": "blueprint",
+  "defaults": {"motion": "standard"},
+  "slides": [
+    {
+      "layout": "composed",
+      "motion": "expressive",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "1 · Conference keynote opener", "title": "The problem, in one number and one sentence"}},
+        {"type": "row", "size": 1, "items": [
+          {"type": "bignum", "size": 1, "content": {"value": "68%", "subtitle": "of engineering time goes to work nobody asked for"}},
+          {"type": "bullets", "size": 1, "content": {
+            "body": "Every team we surveyed described the same shape: a backlog that grows from the inside, faster than anything gets shipped.",
+            "items": ["Unplanned work crowds out planned work", "The backlog is a symptom, not the disease", "The fix is upstream of the sprint"]}}
+        ]}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "motion": "calm",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "2 · Board deck — quarterly review", "title": "Revenue, and the one line that explains it"}},
+        {"type": "chart", "size": 3, "content": {
+          "type": "bar", "note": "ARR, $M",
+          "data": {"labels": ["Q1", "Q2", "Q3", "Q4"], "series": [{"name": "ARR", "values": [12, 19, 17, 26]}]}}},
+        {"type": "stats", "content": {"stats": [
+          {"value": "+53%", "label": "Year on year"},
+          {"value": "26", "unit": "M", "label": "Q4 exit ARR"},
+          {"value": "1.4x", "label": "Net revenue retention"}
+        ]}}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "motion": "expressive",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "3 · Product launch", "title": "What it looks like, and why it matters"}},
+        {"type": "row", "size": 1, "items": [
+          {"type": "media", "size": 3, "content": {"image": "product-shot"}},
+          {"type": "bullets", "size": 2, "content": {
+            "items": ["Opens in the browser, nothing to install", "Edits save back to the same file", "Works offline, on a plane, in a SCIF"]}}
+        ]},
+        {"type": "quote", "content": {"quote": "It stopped feeling like a tool and started feeling like a document.", "by": "Design partner, week two"}}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "4 · Strategy offsite", "title": "Two roads, and what each one costs"}},
+        {"type": "comparison", "size": 2, "content": {
+          "left": {"tag": "Build", "title": "Own the platform", "items": ["18 months to parity", "Hiring 12 engineers", "Nothing to unwind later"]},
+          "right": {"tag": "Buy", "title": "License and integrate", "items": ["6 weeks to first value", "$1.8M/yr, escalating", "Migration debt from day one"]},
+          "badge": "VS"}},
+        {"type": "bullets", "content": {
+          "body": "The decision is not build-versus-buy. It is whether we can afford eighteen months of not shipping."}}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "motion": "calm",
+      "reveal": {"style": "appear"},
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "5 · Incident review", "title": "What happened, minute by minute"}},
+        {"type": "timeline", "size": 1, "content": {"items": [
+          {"year": "14:02", "title": "Deploy", "desc": "Config change ships"},
+          {"year": "14:09", "title": "First alert", "desc": "p99 latency doubles"},
+          {"year": "14:31", "title": "Rollback", "desc": "Traffic recovers"},
+          {"year": "15:00", "title": "All clear", "now": true}
+        ]}},
+        {"type": "table", "size": 2, "content": {
+          "columns": ["", "Detected", "Mitigated", "Resolved"],
+          "rows": [["Target", "5 min", "15 min", "60 min"], ["Actual", "7 min", "29 min", "58 min"]],
+          "options": {"highlightCol": 2},
+          "note": "Detection was fine. Mitigation was not."}}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "reveal": {"style": "spotlight"},
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "6 · Research readout", "title": "What we heard, and how often"}},
+        {"type": "row", "size": 1, "items": [
+          {"type": "stats", "size": 1, "content": {"stats": [
+            {"count": 24, "label": "interviews"},
+            {"count": 3, "label": "themes that held across every one"}
+          ]}},
+          {"type": "prose", "size": 2, "content": {
+            "lead": "Three things came up unprompted in more than half the sessions.",
+            "columns": [
+              {"head": "Trust", "body": "Nobody trusted a number they could not trace back to a source."},
+              {"head": "Speed", "body": "Anything over four seconds was described as broken, not slow."},
+              {"head": "Control", "body": "People wanted to change the output, not just accept it."}
+            ]}}
+        ]}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "reveal": {"style": "wipe"},
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "7 · All-hands", "title": "Here is the plan for the next two quarters"}},
+        {"type": "row", "size": 1, "items": [
+          {"type": "agenda", "size": 2, "content": {"items": [
+            {"title": "Land the migration", "desc": "Q1 — everything off the old cluster"},
+            {"title": "Open the API", "desc": "Q1 — private beta with six design partners"},
+            {"title": "Ship self-serve", "desc": "Q2 — the whole point of the first two"},
+            {"title": "Hire ahead of it", "desc": "Q2 — four roles, already open"}
+          ]}},
+          {"type": "quote", "size": 1, "content": {
+            "quote": "Two quarters. Four things. Nothing else.",
+            "by": "The whole strategy"}}
+        ]}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "8 · Sales QBR", "title": "Where the pipeline actually is"}},
+        {"type": "row", "size": 1, "items": [
+          {"type": "chart", "size": 1, "content": {
+            "type": "donut", "title": "By stage",
+            "data": {"labels": ["Qualified", "Proposal", "Committed"], "series": [{"name": "Pipeline", "values": [42, 27, 19]}]}}},
+          {"type": "chart", "size": 1, "content": {
+            "type": "line", "title": "By month",
+            "data": {"labels": ["Jan", "Feb", "Mar", "Apr"], "series": [{"name": "Closed", "values": [4, 6, 5, 11]}]}}}
+        ]},
+        {"type": "stats", "content": {"stats": [
+          {"value": "$88M", "label": "Total pipeline"},
+          {"value": "3.2x", "label": "Coverage against target"}
+        ]}}
+      ]}
+    },
+    {
+      "layout": "composed",
+      "content": {"sections": [
+        {"type": "titleband", "content": {"kicker": "9 · Design review", "title": "Before, after, and the reason"}},
+        {"type": "row", "size": 2, "items": [
+          {"type": "media", "size": 1, "content": {"image": "before-shot"}},
+          {"type": "media", "size": 1, "content": {"image": "after-shot"}}
+        ]},
+        {"type": "bullets", "content": {
+          "body": "The change is one thing: the primary action stopped being a link and started being a button.",
+          "items": ["Task completion went from 61% to 89%", "Support tickets on that flow dropped to zero"]}}
+      ]}
+    },
+    {
+      "layout": "quote",
+      "content": {
+        "quote": "If you can't explain the number, don't put it on the slide.",
+        "by": "10 · Closing line — a classic layout, used as-is"
+      }
+    }
+  ]
+}

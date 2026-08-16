@@ -566,3 +566,42 @@ reach was verified in a real browser and recorded in `docs/plans/slide-forge-com
 composed geometry (no bounding box crosses 1280x720, row weights landing at 713/357), the
 neighbours-make-room insert, personality font precedence and measured token deltas, and the preset
 thumbnails. Rebuild the browser fixture with `python tests/make-demo.py`.
+
+## Motion + reveal (v3.6) — element motion is now a real dial, not a side effect of the slide shape
+
+Full field reference: `references/motion.md`. This section is the editor's-eye view.
+
+**Two selects, same shape as Theme/Personality.** The Slide panel gets **Motion** and **Reveal**
+right after the existing **Ambient** select; **Deck settings** (sidebar and the **⚙ Deck** modal)
+gets the same pair as the deck-wide default. Slide-level Motion carries an **Inherit** option;
+Reveal's blank option means "no stepping, show everything at once." Both write through
+`F.setMotion(preset, slideIdx)` / `F.setReveal(style, slideIdx)` — `slideIdx` omitted targets
+`data.defaults`, given targets that one slide — one `F.do()` per call, so it undoes like everything
+else. A **Resolved: motion X (…), reveal Y (…)** line sits right under the two selects, naming which
+level the value actually came from (`this slide` / `deck default` / `built-in`), so the cascade is
+never a mystery.
+
+**`Ambient` no longer touches element motion.** Before v3.6, `"ambient":"none"` was the only way to
+quiet a slide, and it silenced entrance motion right along with the background layer — the exact bug
+this release fixes (a slide set to "none" could strand text at 0% opacity forever). `Ambient` now
+means background texture ONLY; **Motion** is the correct, orthogonal knob for calming or killing
+element motion, and its `off` setting actually leaves everything visible rather than hidden.
+A deck saved before v3.6 is migrated once on load: any `ambient:"none"` you find also picks up
+`motion:"off"`, so an old deck's quiet intent survives the split without you doing anything.
+
+**Every title, list, figure and quote now moves the same way, everywhere** — because it comes from
+what the element *is* (its role: title, list, figure, quote, chrome…), derived from the same
+authored `data-el`/`data-bind`/`data-arr` identity the rest of the editor already reads, not from
+which of the 31 layouts happened to draw it. Nothing about selecting, dragging, resizing or
+overriding a single element's animation (the existing per-element **Animation** field, above) changed
+— an explicit per-element override still wins over the role system for that one element, same as it
+always has.
+
+**Build steps, reconsidered.** The old **Build steps** checkbox (deck-wide, per-element `On click`
+triggers) still exists and still works exactly as before. **Reveal** is the new, additive way to get
+the same effect at the SLIDE level with no per-element authoring at all: pick a style and the slide's
+list (or, lacking one, its top-level blocks) steps through on → / Space / click automatically. The
+five styles split into two families worth knowing when picking one: **appear / wipe / typewriter /
+word by word** hide what's next; **spotlight** hides nothing and only moves which line is bright —
+the one to reach for when the room needs to see the whole shape of a list while you talk through it
+point by point.

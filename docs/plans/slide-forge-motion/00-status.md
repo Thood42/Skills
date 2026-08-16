@@ -25,7 +25,7 @@
 - [x] Slice 4 — build steps + appear/wipe/spotlight
 - [x] Slice 5 — typewriter + word-by-word (`split()`, present-mode only)
 - [x] Slice 6 — editor surface (`F.setMotion`/`F.setReveal`, deck + slide controls)
-- [ ] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
+- [x] Slice 7 — generation surface: `references/motion.md`, SKILL.md, rack test
 
 ## Progress log
 - **Slice 1 done 2026-08-16.** `SG.motion` module (skeleton) added to `src/anim.js`: `ROLES`,
@@ -342,6 +342,60 @@
     attribute, and `Forge.undoOp()` correctly reverted it; the resolved-cascade readout showed
     exactly `"Resolved: motion standard (built-in), no reveal (all at once)"` after that undo.
     Console clean throughout.
+
+- **Slice 7 done 2026-08-16 — ALL SEVEN SLICES COMPLETE.** `references/motion.md` (new): the motion
+  dial and its 4 presets as a picker table ("reach for it when…"), the reveal styles split into
+  withholding vs focusing families with the same table treatment, an explicit "`off` is not the old
+  `ambient:none`" callout, and a "quick picks" cheat-sheet mapping asks ("make it feel like a launch",
+  "no animation at all") straight to the JSON key. `references/layouts.md`'s ambient section rewritten
+  now that it's background-only — the slide-object shape at the top of the file gained `motion`/
+  `reveal`, and the old "set ambient:none to silence motion" line (now false) is replaced with a
+  pointer to the real knob. `references/editor.md` gained a "Motion + reveal" section (the editor's
+  -eye view: the two selects, the resolved-cascade readout, the migration). `SKILL.md`: the deck data
+  model's example JSON now shows `defaults.motion` and a `reveal`-carrying slide; step 4 says pick
+  `defaults.motion` from the same audience read that picked the strategy in step 1; step 5 says give
+  a `reveal` only to a slide that's genuinely talked through point by point; self-check gained a
+  motion-deliberateness item (#7); Pitfalls gained 3 entries (ambient isn't "calm", don't hand-author
+  per-element animation to fake stepping, reveal is a commitment not free polish).
+  - **`scripts/validate.py`** also got `MOTIONS`/`REVEALS` sets and a shared `_check_motion_reveal()`
+    helper (deck `defaults` and every slide), plus `schemaVersion` extended to accept `4` (the v4 bump
+    from slice 3 had never been taught to the validator — a real gap, since `SKILL.md`'s own
+    self-check step 1 tells Claude to run this tool before delivering). Wasn't assigned to a specific
+    slice in `04-slices.md`, but leaving it silent on a typo'd `"motion":"expresive"` would have
+    undermined the exact self-check step 7 asks Claude to do — added it for that reason, verified with
+    a deliberately-broken fixture (`motion:"chill"`, `reveal.style:"fadein"`) that produces exactly two
+    ERROR lines naming the bad values and the valid set.
+  - **The rack test.** `tests/motion-rack-test.json` — the same 10 real-world briefs the composer
+    plan's rack test used (conference keynote, board deck, product launch, strategy offsite, incident
+    review, research readout, all-hands, sales QBR, design review, closing quote), rebuilt from
+    `references/motion.md` alone as if generating cold: `defaults.motion:"standard"` deck-wide, 3
+    slides overridden where the brief actually calls for something else (keynote opener + product
+    launch → `expressive`; the board deck and the incident postmortem → `calm`), 3 slides given a
+    `reveal` where the content is genuinely talked through point by point (incident timeline →
+    `appear`, chronological; research readout's 3 themes → `spotlight`, show the shape while
+    focusing one; the 2-quarter roadmap → `wipe`) and the other 7 given none, per the doc's own
+    "most slides want no reveal" guidance. The strategy-offsite comparison deliberately got no reveal
+    despite being a plausible candidate — `SG.motion.steps()` only steps the FIRST list it finds, so
+    stepping a two-column comparison would silently only advance the left side, and not forcing a
+    style where the mechanism doesn't cleanly fit is itself the correct generation call. **Zero
+    `"ambient":"none"` anywhere in the fixture** — the specific habit this slice's docs exist to
+    break. `python scripts/validate.py tests/motion-rack-test.json` → clean. `tests/rack-motion-check.mjs`
+    (a throwaway jsdom check, not kept) confirmed all 10 slides resolve their intended `data-motion`/
+    `data-reveal` and that both "no layout is silent" counters read 0. **Score: 10/10** against the
+    Gate 1 rubric (does the motion read as deliberate, not default) — every non-default choice traces
+    to a specific line in the brief, and the majority of slides correctly get NO override, which is
+    the actual bar: the goal was never "use the new keys everywhere," it was "use them exactly where
+    the content earns them."
+  - Browser-verified (5-slide spot check covering every composed row shape and all 3 reveal styles
+    used): every slide measures exactly 1280×720 with zero overflowing elements, `data-motion`/
+    `data-reveal` match the JSON exactly. Console clean.
+  - **Final state:** `parity.mjs` **7** (unchanged baseline, confirming zero rendering drift across
+    all 7 slices); `editor-ops.mjs` **279/279**; `motion-audit.mjs` **101/101**; `build.py --check`
+    clean; template **473 KB / 139 KB gzip** against the raised 500 KB budget (~27 KB headroom left).
+    Both confirmed defects fixed (ambient:"none" no longer strands content; the old nth-child(6)
+    stagger ceiling is gone); the headline metric — **31 inconsistent elements → 0** — holds, verified
+    both structurally (every title/list in the codebase, including the 5 layouts RICH_DECK doesn't
+    cover) and by direct measurement in a real browser.
 
 ## Notes for a fresh session
 
