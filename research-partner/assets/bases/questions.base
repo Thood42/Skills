@@ -1,0 +1,24 @@
+# questions.base — the work queue, for you and for the next agent session.
+filters:
+  and:
+    - 'note-type == "question"'
+formulas:
+  age_days: '(today() - created).days'
+properties:
+  priority:
+    displayName: "P"
+views:
+  - type: table
+    name: Open
+    filters: 'status == "open"'
+    order: [file.name, priority, formula.age_days, about]
+    groupBy:
+      property: priority
+      direction: ASC
+  - type: list
+    name: Researching
+    filters: 'status == "researching"'
+  - type: table
+    name: Answered
+    filters: 'status == "answered"'
+    order: [file.name, answered-by, updated]

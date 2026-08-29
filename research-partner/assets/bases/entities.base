@@ -1,0 +1,34 @@
+# entities.base — "Who and what is in this graph, and which nodes are load-bearing."
+# degree is a best-effort formula (outgoing + incoming links); Bases' exact link/backlink
+# accessor names should be spot-checked once this vault is on Obsidian 1.13+ (see kg doctor).
+filters:
+  and:
+    - 'note-type == "entity"'
+formulas:
+  degree: 'file.links.length + file.backlinks.length'
+properties:
+  entity-type:
+    displayName: "Type"
+  degree:
+    displayName: "Degree"
+views:
+  - type: table
+    name: All entities
+    order: [file.name, entity-type, formula.degree, aliases]
+    sort:
+      - property: formula.degree
+        direction: DESC
+    groupBy:
+      property: entity-type
+      direction: ASC
+  - type: cards
+    name: People
+    filters: 'entity-type == "person"'
+    order: [file.name, entity-type]
+  - type: list
+    name: Recently touched
+    order: [file.name, entity-type]
+    sort:
+      - property: file.mtime
+        direction: DESC
+    limit: 25

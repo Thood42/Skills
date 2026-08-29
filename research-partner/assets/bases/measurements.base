@@ -1,0 +1,22 @@
+# measurements.base — "The numbers I'm betting a career decision on, and how stale they are."
+#
+# DESIGN NOTE: Bases queries files, not rows inside a file, and a Measurements table is
+# markdown content inside a concept note (kept there deliberately per spec-1 SS3.4 — visible
+# and hand-editable in Obsidian, compiled back out by `kg build`). This view therefore lists
+# NOTES THAT CONTAIN a Measurements section, not one row per individual measurement — open a
+# note to see its actual figures. For a true one-row-per-measurement view, query
+# `.kg/measurements.json` or `.kg/graph.sqlite` directly (Spec 2 territory).
+filters:
+  and:
+    - 'note-type == "concept"'
+    - 'file.hasProperty("about")'
+formulas:
+  measurement_count: 'file.body.contains("## Measurements") ? 1 : 0'
+views:
+  - type: table
+    name: Notes with measurements
+    filters: 'formula.measurement_count > 0'
+    order: [file.name, tags, updated]
+    sort:
+      - property: updated
+        direction: DESC

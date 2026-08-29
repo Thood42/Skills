@@ -1,0 +1,32 @@
+# sources.base — "How good is my evidence base."
+formulas:
+  cited_by_count: 'file.backlinks.length'
+filters:
+  and:
+    - 'note-type == "source"'
+properties:
+  tier:
+    displayName: "Tier"
+  source-type:
+    displayName: "Type"
+  formula.cited_by_count:
+    displayName: "Cited by"
+views:
+  - type: table
+    name: By tier
+    order: [file.name, tier, source-type, year, formula.cited_by_count]
+    groupBy:
+      property: tier
+      direction: ASC
+  - type: table
+    name: By source-type
+    order: [file.name, source-type, tier, year]
+    groupBy:
+      property: source-type
+      direction: ASC
+  - type: table
+    name: Cited by N
+    order: [file.name, formula.cited_by_count, tier]
+    sort:
+      - property: formula.cited_by_count
+        direction: DESC

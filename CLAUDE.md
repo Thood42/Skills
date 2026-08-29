@@ -1,7 +1,11 @@
 # CLAUDE.md
 
-Workspace for **self-contained HTML presentation Skills**. Each deliverable is a single `.html`
-file that opens in any browser offline, with no install/server/build step.
+Workspace for custom Claude Skills. Two skills live here: **slide-forge**, which builds
+self-contained HTML presentations (a single `.html` file, opens offline, no install/server/build
+step), and **research-partner**, which bootstraps Obsidian-based research vaults backed by a
+queryable knowledge graph. They are independent — different languages, different deliverables,
+no shared code. Most of this file documents slide-forge, which is the actively developed one;
+see the `research-partner/` section near the end for that skill.
 
 ## Layout
 
@@ -11,6 +15,7 @@ slides-editor-plan.md   architecture & decision record — READ §1.2, §3.2, §
 slide-forge-design-critique.md  2026-07-06 design review that led to the v3 engine (§10 ADR)
 slide-forge-media-plan.md  images/diagrams/links/sandboxed embeds — READ before touching media (§11 ADR)
 slide-forge-editor-ux-plan.md  2026-07-31 design handoff behind the v4 editor UX — READ before editor-UI work
+research-partner/       Obsidian research-vault bootstrapper + SQLite knowledge graph (separate skill)
 README.md               short index (the skill + plan docs); this file is the source of truth
 *.skill                 gitignored build artifacts (zips); rebuilt separately, not tracked
 ```
@@ -238,3 +243,29 @@ Full design: `slide-forge-media-plan.md`. Implemented in dependency order (asset
   in this workspace. A phantom `.git/index.lock` (stat says exists, unlink says ENOENT) also blocked
   git; worked around via `GIT_INDEX_FILE=/tmp/... + commit-tree + update-ref`. If git locks up in a
   future session, delete `.git\index.lock` from the Windows side.
+
+## `research-partner/` (2026-08-29 — imported)
+
+A separate skill, unrelated to slide-forge: bootstraps a scoped research project into a
+persistent, queryable Obsidian vault and keeps it alive across sessions. Imported wholesale from
+another project rather than developed in this workspace — treat `research-partner/SKILL.md` as
+the source of truth for it, not this file.
+
+- **Deliverable:** an Obsidian vault of atomic markdown notes (the only source of truth) compiled
+  by `scripts/kg/` into a SQLite knowledge graph (`.kg/graph.sqlite` + JSON views) with hybrid
+  BM25 + vector + graph retrieval, served over MCP so a fresh `cd project && claude` picks up
+  graph tools automatically. An `AGENTS.md` template makes later sessions resumable without
+  re-running the bootstrap.
+- **Seven phases** (`SKILL.md`): migration (only for vaults on the older flat-JSON layout) →
+  environment/plugin-stack probe → interview scoping → scope lock-in + question seeding →
+  baseline build (parallel research subagents write notes, then `kg build`/`kg generate`
+  compile+verify+cluster) → emission (AGENTS.md, dashboard, MCP wiring) → growth loop and
+  maintenance for resumed sessions. `references/hardening-ledger.md` is required reading before
+  writing a note — it documents the hard invariants this design depends on (mostly invisible to
+  code review, only visible once a human opens the vault) and the rule that enforces each one.
+- **Stack:** Python 3 (`scripts/kg/` — parse/build/ingest/embed/retrieve/analytics/doctor/
+  mcp_server/migrate), no JS, no HTML deliverable — this skill does not touch slide-forge's
+  engine, build pipeline, or tests, and slide-forge's Node/PowerShell test instructions above do
+  not apply to it.
+- Not yet exercised in this workspace (no vault has been bootstrapped from here yet); verify
+  against `SKILL.md`'s own phases before relying on it end-to-end.
