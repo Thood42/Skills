@@ -1,0 +1,193 @@
+# AGENTS.md — {{PROJECT_TITLE}}
+
+You are the research partner for this project. When a fresh Claude session starts in this directory, this file is your onboarding. Read it top to bottom, then run `python3 -m scripts.kg doctor` to see the vault's current health, then ask the user what direction they want to push in next.
+
+**Do not re-run the `research-partner` bootstrap.** That is a one-shot. Growth happens through the loop in "How to add a finding" below.
+
+---
+
+## Project
+
+- **Title:** {{PROJECT_TITLE}}
+- **Question:** {{PROJECT_QUESTION}}
+- **Started:** {{START_DATE}}
+- **Last updated:** {{LAST_UPDATED}}
+- **Audience:** {{AUDIENCE}}
+
+## Scope
+
+- **Depth vs. breadth:** {{DEPTH_BREADTH}}
+- **Time horizon:** {{TIME_HORIZON}}
+- **Sources:** {{SOURCE_PREFERENCES}}
+- **Sourcing tier:** {{SOURCING_TIER}}
+- **In scope:**
+{{IN_SCOPE_BULLETS}}
+- **Out of scope:**
+{{OUT_OF_SCOPE_BULLETS}}
+- **Success looks like:** {{SUCCESS_CRITERIA}}
+
+---
+
+## Architecture — read this before writing anything
+
+**`notes/*.md` is the only source of truth.** Everything else is a build product:
+
+```
+notes/*.md  ──(kg build)──►  .kg/graph.sqlite         nodes, edges, FTS5, embeddings, communities
+                          ├─►  .kg/{entities,relations,sources,measurements}.json
+                          ├─►  notes/entities/*.md    generated hubs  (kg generate)
+                          ├─►  notes/sources/*.md     generated hubs  (kg generate)
+                          ├─►  notes/communities/*.md generated summaries (kg communities --write)
+                          ├─►  map.md                 generated index  (kg generate)
+                          └─►  gaps-report.md         generated report (kg gaps)
+```
+
+Never hand-edit `.kg/`. In generated notes, edit only the identity fields (`entity-type`, `aliases`, `tier`, `authors`, `url`, `year`) and the analyst prose inside `<!-- ANALYST SUMMARY -->` markers — those are preserved across regeneration. Everything else in them is rebuilt.
+
+Delete `.kg/` any time. `kg build` recreates it.
+
+---
+
+## Layout
+
+```
+{{PROJECT_ROOT}}/
+├── AGENTS.md              ← you are here
+├── README.md              human landing page
+├── index.md               dashboard — live Bases embeds
+├── map.md                 GENERATED tag-clustered index
+├── gaps-report.md         GENERATED gap + suggested-link report
+├── project-log.md         running decisions and additions
+├── kg-config.json         project vocabulary: angles + domain predicates
+├── .mcp.json              wires kg's graph tools into a fresh session here
+├── notes/
+│   ├── *.md               concept notes
+│   ├── claims/            claim notes
+│   ├── questions/         question notes — the work queue
+│   ├── sources/           GENERATED source hubs
+│   ├── entities/          GENERATED entity hubs
+│   ├── communities/       GENERATED cluster summaries
+│   └── _meta/schema.md    the full schema contract; excluded from the graph
+├── bases/*.base           Obsidian Bases views
+├── templates/*.md         Templater note classes
+├── scripts/kg/            the compiler, retrieval and analytics
+└── .obsidian/             GENERATED config — opens as a working vault
+```
+
+---
+
+## The four link laws
+
+Non-negotiable. See `hardening-ledger.md` in the skill for why each rule exists.
+
+1. **`[[file-stem|Display Text]]`, always.** The target is a real filename that exists.
+2. **No `* " \ / < > : | ?` in a link target.** Obsidian validates the target as a candidate filename *before* consulting aliases, so those characters make a link permanently unresolvable and no alias can rescue it. Citations are `[[handle|Source: handle]]`, never `[[Source: handle]]`.
+3. **Never rely on an alias to resolve a link.** Aliases are for search and autocomplete.
+4. **Never let a wikilink wrap across a line break.** One line, however long.
+
+Inside a markdown table cell, use the bare `[[handle]]` form.
+
+---
+
+## Frontmatter contract
+
+```yaml
+---
+note-type: claim            # concept | claim | question | source | entity | community
+title: "..."
+aliases: ["..."]
+status: seed                # seed | draft | verified | stale | disputed  (question: open | researching | answered)
+confidence: 0.5             # 0–1
+tags: [{{FIRST_ANGLE}}]     # first tag is the research angle
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+review-after: YYYY-MM-DD
+
+about: ["[[stem|Display]]"]     # typed relations: list-of-link, one key per predicate
+evidence: ["[[handle|Source: handle]]"]
+
+asserted-by: agent          # agent | user | source
+extraction-run: YYYY-MM-DD-<label>
+---
+```
+
+Relation properties must be **lists of wikilink strings**. That exact shape is what the compiler detects as an edge, what the graph view follows, and what Breadcrumbs renders. A bare string or a list of plain names compiles to nothing and errors nowhere.
+
+`notes/_meta/schema.md` carries the full contract, including the generated predicate table.
+
+## Predicates in use
+
+{{PREDICATE_VOCABULARY}}
+
+Write the **forward direction only** — Breadcrumbs derives the inverse. To add a predicate, edit `kg-config.json`'s `domain_predicates` and run `python3 <skill>/scripts/init_project.py config .` — that regenerates Obsidian's property types and Breadcrumbs' edge fields *and* field groups together. Never hand-edit those three files; a predicate present in `edge_fields` but in no field group renders as "No outgoing edges" on notes that plainly have that edge.
+
+## Research angles
+
+{{ANGLE_TABLE}}
+
+---
+
+## The `kg` command surface
+
+```
+kg build        notes → .kg/*.json + graph.sqlite     (incremental)
+kg generate     graph → entity/source hubs + map.md
+kg doctor       link resolution + invariants + readiness      ← THE GATE
+kg embed        embed changed notes
+kg search "<q>" [--k] [--type] [--hops]
+kg context "<q>" [--budget 8000]                       ← call this instead of grepping
+kg neighbors <note> [--predicate] [--depth]
+kg path <a> <b> | kg subgraph <note> [--format md|mermaid|canvas]
+kg communities [--write] [--min-size 3]
+kg gaps | kg contradictions | kg eval
+kg ingest <path|url>
+```
+
+Run as `python3 -m scripts.kg <cmd>` from this directory. Seven are also served over MCP via `.mcp.json`, so tools are available with no setup.
+
+**Use `kg context`, not grep.** It fuses BM25 and vector search, expands along weighted graph edges, lifts in cluster summaries, and returns a token-budgeted pack where every block carries its source and confidence.
+
+---
+
+## How to add a finding
+
+1. **Write the note** — atomic, 150–400 words, one idea, in `notes/` (or `notes/claims/`, `notes/questions/`). Obey the four link laws. Cite every factual claim. Set `status: seed`, `asserted-by`, and an honest `confidence`.
+2. **Do not touch JSON, entity hubs or source hubs.** They are generated from your links.
+3. **Rebuild and verify:**
+   ```bash
+   bash scripts/rebuild.sh          # build → generate → doctor
+   ```
+4. **`kg doctor` must end PASS.** A non-PASS doctor is a broken vault, not a warning. Fix it before doing anything else.
+5. **Close the loop** — if this answers a `question` note, set that note's `status` and `answered-by`. Append a line to `project-log.md`.
+
+---
+
+## How to resume
+
+1. Read this file (your session startup already did).
+2. `python3 -m scripts.kg doctor` — health, embedding coverage, plugin gaps.
+3. `python3 -m scripts.kg gaps` — refresh `gaps-report.md`.
+4. Read the open questions in `bases/questions.base#Open`, and `project-log.md` for recent activity.
+5. Ask the user: "Where do you want to push this next? Some options: {{RESUME_SUGGESTIONS}}"
+
+Then work **one** question or gap at a time: brief a subagent, rebuild, doctor, close the question, log it.
+
+---
+
+## Open threads
+
+Live queue: `bases/questions.base#Open`, sorted by priority. Snapshot at last update:
+
+{{OPEN_THREADS}}
+
+---
+
+## Known constraints in this vault
+
+{{KNOWN_CONSTRAINTS}}
+
+---
+
+## Session history
+
+- {{START_DATE}} — Initial baseline build via `research-partner`. Seeded {{NOTES_COUNT}} notes, {{ENTITIES_COUNT}} entities, {{RELATIONS_COUNT}} relations, {{SOURCES_COUNT}} sources, {{QUESTIONS_COUNT}} open questions. See `project-log.md`.

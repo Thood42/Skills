@@ -1,0 +1,17 @@
+# inbox.base — Phase D ingestion queue (spec-2-phase-CD-retrieval.md §3.3).
+# Everything `kg ingest` writes lands here at status: seed, pending a human
+# promote (rewrite the claim properly, set a real tier/confidence/status) or
+# reject (delete the note). Nothing here counts as real evidence yet.
+filters:
+  and:
+    - 'status == "seed"'
+    - 'note-type == "source" || note-type == "claim"'
+views:
+  - type: table
+    name: Needs review
+    order: [file.name, note-type, title, extraction-run, created]
+    groupBy:
+      property: note-type
+    sort:
+      - property: created
+        direction: DESC

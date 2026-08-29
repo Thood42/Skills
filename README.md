@@ -1,7 +1,9 @@
 # Claude Skills Workspace
 
-Development workspace for custom Claude Skills that generate **self-contained HTML
-presentations** — one `.html` file, opens offline in any browser, no install.
+Development workspace for custom Claude Skills. Two skills live here today:
+**slide-forge**, which generates self-contained HTML presentations, and
+**research-partner**, which bootstraps Obsidian-based research vaults with a
+queryable knowledge graph.
 
 ## Structure
 
@@ -19,6 +21,11 @@ Skills/
 ├── slide-forge-design-critique.md  2026-07-06 design review that motivated the v3 engine
 ├── slide-forge-media-plan.md       plan: images/diagrams, links, sandboxed iframe embeds
 ├── slide-forge-editor-ux-plan.md   design handoff behind the v4 editor UX overhaul
+├── research-partner/               Obsidian research-vault bootstrapper + knowledge graph
+│   ├── SKILL.md                    seven-phase workflow: probe → interview → build → emit → grow
+│   ├── scripts/                    init_project.py · scripts/kg/ (compiler, retrieval, MCP server)
+│   ├── references/                 kg-schema · retrieval · interview-guide · hardening-ledger · …
+│   └── assets/                     note/base templates, Obsidian config, AGENTS.md template
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```
 

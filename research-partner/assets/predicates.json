@@ -1,0 +1,78 @@
+{
+  "_comment": [
+    "The single predicate registry for research-partner.",
+    "",
+    "Three files have to agree about the predicate vocabulary or the vault quietly",
+    "half-works: .obsidian/types.json (so Obsidian types the properties),",
+    ".obsidian/plugins/breadcrumbs/data.json (so Breadcrumbs renders typed edges),",
+    "and AGENTS.md (so agents write the right keys). Hand-maintained as three separate",
+    "lists, they diverge. Instead they are all GENERATED from",
+    "this file by scripts/init_project.py. Edit here, re-run `init_project.py config",
+    "<root>`, never hand-edit the three outputs.",
+    "",
+    "bucket / inverse_bucket are Breadcrumbs field-group assignments. This is not",
+    "cosmetic: Breadcrumbs' Matrix, Trail and Prev/Next views read ONLY the ups /",
+    "downs / sames / nexts / prevs groups. A predicate declared in edge_fields but",
+    "left out of every group renders as 'No outgoing edges' on a note that plainly",
+    "has that edge. That was a real bug found by opening the vault in Obsidian.",
+    "",
+    "A predicate with inverse: null is symmetric (contradicts, competes-with) --",
+    "Breadcrumbs gets one field, and the implied-relation rule closes it back."
+  ],
+
+  "buckets": {
+    "ups": "Toward context: the broader thing this note sits inside or depends on.",
+    "downs": "Toward detail: the narrower things that sit inside this one.",
+    "sames": "Lateral: argumentative and bibliographic links between peers.",
+    "nexts": "Forward in time or sequence.",
+    "prevs": "Backward in time or sequence."
+  },
+
+  "core": [
+    { "label": "about",        "inverse": "about-of",     "bucket": "ups",   "inverse_bucket": "downs",
+      "group": "structural",   "description": "This note is about that entity or concept. The workhorse edge." },
+    { "label": "part-of",      "inverse": "has-part",     "bucket": "ups",   "inverse_bucket": "downs",
+      "group": "structural",   "description": "Compositional containment. Drives the Breadcrumbs trail." },
+    { "label": "instance-of",  "inverse": "has-instance", "bucket": "ups",   "inverse_bucket": "downs",
+      "group": "structural",   "description": "This is a specific case of that general kind." },
+    { "label": "precedes",     "inverse": "follows",      "bucket": "nexts", "inverse_bucket": "prevs",
+      "group": "structural",   "description": "Temporal or causal ordering." },
+
+    { "label": "supports",     "inverse": "supported-by", "bucket": "sames", "inverse_bucket": "sames",
+      "group": "epistemic",    "description": "This claim raises the credibility of that one." },
+    { "label": "contradicts",  "inverse": null,           "bucket": "sames", "inverse_bucket": null,
+      "group": "epistemic",    "description": "Symmetric. The single most valuable edge in a research corpus." },
+    { "label": "qualifies",    "inverse": "qualified-by", "bucket": "sames", "inverse_bucket": "sames",
+      "group": "epistemic",    "description": "Narrows the scope of that claim without refuting it." },
+    { "label": "evidence",     "inverse": "evidence-for", "bucket": "downs", "inverse_bucket": "ups",
+      "group": "epistemic",    "description": "Points at the source note backing this note's assertions." },
+    { "label": "raises",       "inverse": "raised-by",    "bucket": "downs", "inverse_bucket": "ups",
+      "group": "epistemic",    "description": "This note opens that question." },
+    { "label": "answers",      "inverse": "answered-by",  "bucket": "downs", "inverse_bucket": "ups",
+      "group": "epistemic",    "description": "This note closes, or partly closes, that question." },
+
+    { "label": "authored-by",  "inverse": "author-of",    "bucket": "ups",   "inverse_bucket": "downs",
+      "group": "bibliographic","description": "Source -> person entity." },
+    { "label": "published-by", "inverse": "publisher-of", "bucket": "ups",   "inverse_bucket": "downs",
+      "group": "bibliographic","description": "Source -> organization entity." },
+    { "label": "cites",        "inverse": "cited-by",     "bucket": "sames", "inverse_bucket": "sames",
+      "group": "bibliographic","description": "Source -> source." }
+  ],
+
+  "domain_examples": {
+    "_comment": [
+      "NOT shipped into a new project. These are domain predicates from a worked example",
+      "project (indie-game economics) added on top of core, kept here only as an",
+      "illustration of the shape. Phase 3 proposes 0-6 domain predicates for the",
+      "project at hand and writes them into kg-config.json's `domain_predicates`."
+    ],
+    "predicates": [
+      { "label": "case-study-of", "inverse": "has-case-study", "bucket": "ups",   "inverse_bucket": "downs",
+        "group": "domain", "description": "A named worked example of a general pattern." },
+      { "label": "benchmark-for", "inverse": "benchmarked-by", "bucket": "ups",   "inverse_bucket": "downs",
+        "group": "domain", "description": "A number that serves as a reference point for that thing." },
+      { "label": "competes-with", "inverse": null,             "bucket": "sames", "inverse_bucket": null,
+        "group": "domain", "description": "Symmetric rivalry between entities." }
+    ]
+  }
+}

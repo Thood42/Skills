@@ -1,0 +1,329 @@
+{
+  "choices": [
+    {
+      "id": "9887019d-1ee9-45ad-9b0a-5f36cb639c36",
+      "name": "New claim",
+      "type": "Template",
+      "templatePath": "templates/claim.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": true,
+        "folders": [
+          "notes/claims"
+        ],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveFile": false
+      },
+      "appendLink": false,
+      "openFileInNewTab": {
+        "enabled": true,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default",
+      "fileExistsBehavior": {
+        "kind": "prompt"
+      },
+      "fileOpening": {
+        "location": "split",
+        "direction": "vertical",
+        "focus": true,
+        "mode": "default"
+      }
+    },
+    {
+      "id": "d47c9aea-5dd4-4793-9e1c-b2f8ab80986f",
+      "name": "New question",
+      "type": "Template",
+      "templatePath": "templates/question.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": true,
+        "folders": [
+          "notes/questions"
+        ],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveFile": false
+      },
+      "appendLink": false,
+      "openFileInNewTab": {
+        "enabled": true,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default",
+      "fileExistsBehavior": {
+        "kind": "prompt"
+      },
+      "fileOpening": {
+        "location": "split",
+        "direction": "vertical",
+        "focus": true,
+        "mode": "default"
+      }
+    },
+    {
+      "id": "fbd2b9ad-7c92-429c-9e23-bf45437eb685",
+      "name": "Log a source",
+      "type": "Template",
+      "templatePath": "templates/source.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": true,
+        "folders": [
+          "notes/sources"
+        ],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveFile": false
+      },
+      "appendLink": false,
+      "openFileInNewTab": {
+        "enabled": true,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default",
+      "fileExistsBehavior": {
+        "kind": "prompt"
+      },
+      "fileOpening": {
+        "location": "split",
+        "direction": "vertical",
+        "focus": true,
+        "mode": "default"
+      }
+    },
+    {
+      "id": "5159afc2-d974-42d3-8f34-a1f9dbd902a7",
+      "name": "Log a measurement",
+      "type": "Capture",
+      "_comment": "Appends one row to the ACTIVE note's ## Measurements table -- open the subject note first, then run this macro. Prompts for each column in turn.",
+      "captureToActiveFile": true,
+      "createFileIfItDoesntExist": {
+        "enabled": false,
+        "createWithTemplate": false,
+        "template": ""
+      },
+      "format": {
+        "enabled": true,
+        "format": "| {{VALUE:predicate}} | {{VALUE:value}} | [[{{VALUE:source}}]] | {{VALUE:asof}} | {{VALUE:context}} |"
+      },
+      "prepend": false,
+      "appendLink": false,
+      "task": false,
+      "insertAfter": {
+        "enabled": true,
+        "after": "## Measurements",
+        "insertAtEnd": true,
+        "considerSubsections": false
+      },
+      "newLineCapture": {
+        "enabled": false,
+        "direction": "below"
+      },
+      "fileOpening": {
+        "location": "tab",
+        "direction": "vertical",
+        "mode": "default",
+        "focus": true
+      }
+    }
+  ],
+  "inputPrompt": "single-line",
+  "persistInputPromptDrafts": true,
+  "useSelectionAsCaptureValue": true,
+  "searchNestedChoices": true,
+  "templateFolderLauncherRow": "bottom",
+  "devMode": false,
+  "templateFolderPaths": [
+    "templates"
+  ],
+  "announceUpdates": "none",
+  "version": "2.23.0",
+  "globalVariables": {},
+  "onePageInputEnabled": false,
+  "disableOnlineFeatures": true,
+  "enableUriCallbacks": false,
+  "enableRibbonIcon": false,
+  "showCaptureNotification": true,
+  "showInputCancellationNotification": false,
+  "enableTemplatePropertyTypes": false,
+  "dateAliases": {
+    "t": "today",
+    "tm": "tomorrow",
+    "yd": "yesterday",
+    "nw": "next week",
+    "nm": "next month",
+    "ny": "next year",
+    "lw": "last week",
+    "lm": "last month",
+    "ly": "last year"
+  },
+  "ai": {
+    "defaultModel": "Ask me",
+    "defaultSystemPrompt": "",
+    "promptTemplatesFolderPath": "",
+    "showAssistant": false,
+    "providers": [
+      {
+        "id": "openai",
+        "name": "OpenAI",
+        "endpoint": "https://api.openai.com/v1",
+        "kind": "openai",
+        "apiKey": "",
+        "models": [
+          {
+            "name": "gpt-5.5",
+            "maxTokens": 1050000,
+            "maxOutputTokens": 128000,
+            "supportsTemperature": false
+          },
+          {
+            "name": "gpt-5.4",
+            "maxTokens": 1050000,
+            "maxOutputTokens": 128000,
+            "supportsTemperature": false
+          },
+          {
+            "name": "gpt-5.4-mini",
+            "maxTokens": 400000,
+            "maxOutputTokens": 128000,
+            "supportsTemperature": false
+          },
+          {
+            "name": "gpt-5.4-nano",
+            "maxTokens": 400000,
+            "maxOutputTokens": 128000,
+            "supportsTemperature": false
+          },
+          {
+            "name": "gpt-4.1",
+            "maxTokens": 1047576,
+            "maxOutputTokens": 32768,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gpt-4.1-mini",
+            "maxTokens": 1047576,
+            "maxOutputTokens": 32768,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gpt-4o",
+            "maxTokens": 128000,
+            "maxOutputTokens": 16384,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gpt-4o-mini",
+            "maxTokens": 128000,
+            "maxOutputTokens": 16384,
+            "supportsTemperature": true
+          },
+          {
+            "name": "o3",
+            "maxTokens": 200000,
+            "maxOutputTokens": 100000,
+            "supportsTemperature": false
+          },
+          {
+            "name": "o4-mini",
+            "maxTokens": 200000,
+            "maxOutputTokens": 100000,
+            "supportsTemperature": false
+          }
+        ],
+        "autoSyncModels": true,
+        "modelSource": "modelsDev"
+      },
+      {
+        "id": "gemini",
+        "name": "Gemini",
+        "endpoint": "https://generativelanguage.googleapis.com",
+        "kind": "gemini",
+        "apiKey": "",
+        "models": [
+          {
+            "name": "gemini-3.5-flash",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-3.1-pro-preview",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-3.1-flash-lite",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-3-pro-preview",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-3-flash-preview",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-2.5-pro",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-2.5-flash",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          },
+          {
+            "name": "gemini-2.5-flash-lite",
+            "maxTokens": 1048576,
+            "maxOutputTokens": 65536,
+            "supportsTemperature": true
+          }
+        ],
+        "autoSyncModels": true,
+        "modelSource": "modelsDev"
+      }
+    ]
+  },
+  "migrations": {
+    "migrateToMacroIDFromEmbeddedMacro": true,
+    "useQuickAddTemplateFolder": true,
+    "incrementFileNameSettingMoveToDefaultBehavior": true,
+    "mutualExclusionInsertAfterAndInsertAtEnd": true,
+    "consolidateFileExistsBehavior": true,
+    "repairTemplateFileExistsBehavior": true,
+    "mutualExclusionInsertAfterAndWriteToBottomOfFile": true,
+    "setVersionAfterUpdateModalRelease": true,
+    "addDefaultAIProviders": true,
+    "removeMacroIndirection": true,
+    "migrateFileOpeningSettings": true,
+    "backfillFileOpeningDefaults": true,
+    "setProviderModelDiscoveryMode": true,
+    "migrateProviderApiKeysToSecretStorage": true,
+    "migrateToMultipleTemplateFolders": true,
+    "refreshStaleDefaultModelSeeds": true,
+    "pinAiModelRefs": true
+  },
+  "_comment": "Best-effort QuickAdd config seeded by Spec 1 Phase B, before the plugin was ever installed in this vault -- SPOT-CHECK after installing QuickAdd (Obsidian >=1.13). Field names match the Choice schema current as of QuickAdd 1.x; if the installed version differs, recreate these four choices via the QuickAdd Settings UI instead using templates/{claim,question,source}.md and the Capture type for measurements. kg doctor does not check QuickAdd config."
+}

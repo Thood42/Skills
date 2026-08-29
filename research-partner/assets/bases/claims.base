@@ -1,0 +1,23 @@
+# claims.base — "What do I actually believe, and where does the evidence fight itself."
+# Currently empty (no claim notes yet — Phase A introduced the class, migration didn't
+# fabricate any). Renders an empty table until the first claim is authored via QuickAdd.
+filters:
+  and:
+    - 'note-type == "claim"'
+views:
+  - type: table
+    name: By status
+    order: [file.name, stance, status, confidence, about]
+    groupBy:
+      property: status
+      direction: ASC
+  - type: table
+    name: By confidence
+    order: [file.name, stance, confidence, status]
+    sort:
+      - property: confidence
+        direction: DESC
+  - type: table
+    name: Disputed
+    filters: 'contradicts.length > 0'
+    order: [file.name, stance, contradicts, confidence]

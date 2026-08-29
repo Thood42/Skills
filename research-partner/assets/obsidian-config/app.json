@@ -1,0 +1,18 @@
+{
+  "legacyEditor": false,
+  "livePreview": true,
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest",
+  "showUnsupportedFiles": false,
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "attachments",
+  "showLineNumber": false,
+  "readableLineLength": true,
+  "strictLineBreaks": false,
+  "promptDelete": true,
+  "userIgnoreFilters": [
+    "inbox/",
+    "scripts/",
+    "_to_delete/"
+  ]
+}

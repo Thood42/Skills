@@ -1,0 +1,41 @@
+{
+  "data_version": 2,
+  "command_timeout": 5,
+  "templates_folder": "templates",
+  "templates_pairs": [],
+  "trigger_on_file_creation_mode": "folder",
+  "auto_jump_to_cursor": false,
+  "jump_to_cursor_after_file_name": false,
+  "shell_path": "",
+  "user_scripts_folder": "",
+  "folder_templates": [
+    {
+      "folder": "notes/claims",
+      "template": "templates/claim.md"
+    },
+    {
+      "folder": "notes/questions",
+      "template": "templates/question.md"
+    },
+    {
+      "folder": "notes/sources",
+      "template": "templates/source.md"
+    },
+    {
+      "folder": "notes/entities",
+      "template": "templates/entity.md"
+    },
+    {
+      "folder": "notes/communities",
+      "template": "templates/community.md"
+    }
+  ],
+  "file_templates": [],
+  "syntax_highlighting": true,
+  "syntax_highlighting_mobile": false,
+  "enabled_templates_hotkeys": [],
+  "startup_templates": [],
+  "intellisense_render": "1",
+  "ignore_folders_on_creation": [],
+  "_comment": "Best-effort Templater config seeded by Spec 1 Phase B, before the plugin was ever installed in this vault -- SPOT-CHECK after installing (Settings -> Templater). Only the settings needed to point it at templates/ are set; everything else is Templater's own default."
+}

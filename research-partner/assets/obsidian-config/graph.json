@@ -1,0 +1,93 @@
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": true,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "tag:#market-reality",
+      "color": {
+        "a": 1,
+        "rgb": 5017087
+      }
+    },
+    {
+      "query": "tag:#transition",
+      "color": {
+        "a": 1,
+        "rgb": 3129201
+      }
+    },
+    {
+      "query": "tag:#craft",
+      "color": {
+        "a": 1,
+        "rgb": 15902298
+      }
+    },
+    {
+      "query": "tag:#marketing",
+      "color": {
+        "a": 1,
+        "rgb": 13073919
+      }
+    },
+    {
+      "query": "tag:#dissent",
+      "color": {
+        "a": 1,
+        "rgb": 16739179
+      }
+    },
+    {
+      "query": "tag:#case-study",
+      "color": {
+        "a": 1,
+        "rgb": 16765286
+      }
+    },
+    {
+      "query": "[note-type: entity]",
+      "color": {
+        "a": 1,
+        "rgb": 10133670
+      }
+    },
+    {
+      "query": "[note-type: claim]",
+      "color": {
+        "a": 1,
+        "rgb": 2541274
+      }
+    },
+    {
+      "query": "[note-type: question]",
+      "color": {
+        "a": 1,
+        "rgb": 15490984
+      }
+    },
+    {
+      "query": "[note-type: source]",
+      "color": {
+        "a": 1,
+        "rgb": 9268835
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": -0.6,
+  "nodeSizeMultiplier": 1.4,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.42,
+  "repelStrength": 11.5,
+  "linkStrength": 0.62,
+  "linkDistance": 190,
+  "scale": 0.40252081649375415,
+  "close": false
+}

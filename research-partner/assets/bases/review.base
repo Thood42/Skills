@@ -1,0 +1,14 @@
+# review.base — maintenance queue.
+filters:
+  or:
+    - 'status == "stale"'
+    - 'and':
+        - 'note-type == "concept"'
+        - 'review-after <= today()'
+views:
+  - type: table
+    name: Due for review
+    order: [file.name, note-type, status, review-after, confidence]
+    sort:
+      - property: review-after
+        direction: ASC
