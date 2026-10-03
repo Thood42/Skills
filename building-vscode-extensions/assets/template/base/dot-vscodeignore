@@ -1,0 +1,13 @@
+# Allowlist: exclude everything, then re-include only what ships in the VSIX.
+# vsce applies "!" re-includes after every exclude, regardless of order, so re-include
+# precisely (dist/**/*.js, not dist/**) rather than excluding afterwards.
+# Verify with: npx vsce ls --no-dependencies
+**
+!dist/**/*.js
+!media/**
+!package.json
+!package.nls*.json
+!l10n/**
+!README.md
+!CHANGELOG.md
+!LICENSE.md

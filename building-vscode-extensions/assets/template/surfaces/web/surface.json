@@ -1,0 +1,29 @@
+{
+  "description": "Web extension target (vscode.dev / github.dev): browser bundle from the same entry point, browser test run via @vscode/test-web.",
+  "imports": [],
+  "features": [],
+  "dependencies": [],
+  "devDependencies": ["@vscode/test-web"],
+  "merge": {
+    "package.json": {
+      "browser": "./dist/web/extension.js",
+      "scripts": {
+        "test:web": "npm run compile && node esbuild.mjs --web-tests && vscode-test-web --browserType=chromium --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=out/web/test/index.js ./test-fixtures/workspace"
+      }
+    },
+    "dot-vscode/launch.json": {
+      "configurations": [
+        {
+          "name": "Run Web Extension",
+          "type": "extensionHost",
+          "debugWebWorkerHost": true,
+          "request": "launch",
+          "args": ["--extensionDevelopmentPath=${workspaceFolder}", "--extensionDevelopmentKind=web"],
+          "outFiles": ["${workspaceFolder}/dist/web/**/*.js"],
+          "preLaunchTask": "${defaultBuildTask}"
+        }
+      ]
+    }
+  },
+  "agentsNotes": "- **Web** (`browser` entry): the same `src/extension.ts` is bundled for the web worker host. Shared code may not import Node built-ins (ESLint + vsx-check BRW-001); Node-only code goes in `src/node/` behind a capability check, and file I/O uses `vscode.workspace.fs`. Run `npm run test:web` before merging changes that touch shared code."
+}

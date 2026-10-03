@@ -1,0 +1,136 @@
+# Azure Pipelines for Part Lookup
+#
+#   PRs and main  -> Validate (Linux + Windows)
+#   tag v<semver> -> Validate -> Package (mechanical release gate) -> Publish (human approval) -> Azure Artifacts
+#
+# One-time setup (Azure DevOps):
+#   1. Feed DevTools/vscode-extensions: grant "Feed Publisher (Contributor)" to "<project> Build Service (<org>)"
+#      and "Project Collection Build Service (<org>)" (Feed settings > Permissions).
+#   2. Pipelines > Environments > "part-lookup-release": add an Approvals check. That approval is the
+#      human sign-off of the release gate.
+trigger:
+  branches:
+    include: [main]
+  tags:
+    include: ['v*']
+
+pr:
+  branches:
+    include: [main]
+
+variables:
+  # Toolchain Node for building/testing (vsce and @vscode/test-cli need >= 22). This is not the
+  # extension host's Node; that one is fixed by the VS Code version.
+  nodeVersion: '22.x'
+  feed: 'DevTools/vscode-extensions'
+  universalPackage: 'acme-devtools.part-lookup'
+  npm_config_cache: $(Pipeline.Workspace)/.npm
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: validate
+        strategy:
+          matrix:
+            linux:
+              imageName: ubuntu-latest
+              integrationCommand: xvfb-run -a npm run test:integration
+            windows:
+              imageName: windows-latest
+              integrationCommand: npm run test:integration
+        pool:
+          vmImage: $(imageName)
+        steps:
+          - task: UseNode@1
+            inputs:
+              version: $(nodeVersion)
+          - task: Cache@2
+            displayName: Cache npm
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(npm_config_cache)
+          # If npm packages must come from an internal Azure Artifacts feed, commit an .npmrc that
+          # points at it and uncomment:
+          # - task: npmAuthenticate@0
+          #   inputs:
+          #     workingFile: .npmrc
+          - script: npm ci
+            displayName: Install
+          - script: npm run check-types
+            displayName: Type check
+          - script: npm run lint
+            displayName: Lint
+          - script: npm run check:extension -- --gate slice
+            displayName: Extension best-practice checks
+          - script: npm run test:unit
+            displayName: Unit tests
+          - script: $(integrationCommand)
+            displayName: Integration tests (Extension Host, VS Code stable)
+
+  - stage: Package
+    dependsOn: Validate
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - job: package
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UseNode@1
+            inputs:
+              version: $(nodeVersion)
+          - task: Cache@2
+            displayName: Cache npm
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(npm_config_cache)
+          - script: npm ci
+            displayName: Install
+          - bash: |
+              version="$(node -p "require('./package.json').version")"
+              if [ "v${version}" != "$(Build.SourceBranchName)" ]; then
+                echo "##vso[task.logissue type=error]Tag $(Build.SourceBranchName) does not match package.json version ${version}"
+                exit 1
+              fi
+            displayName: Tag matches package.json version
+          - script: npm run check:extension -- --gate release
+            displayName: Release gate (mechanical checks)
+          - script: xvfb-run -a npm run test:integration:floor
+            displayName: Integration tests at the engines.vscode floor
+          - bash: |
+              mkdir -p "$(Build.ArtifactStagingDirectory)/vsix"
+              npx vsce package --no-dependencies --out "$(Build.ArtifactStagingDirectory)/vsix/"
+            displayName: Package VSIX
+          - publish: $(Build.ArtifactStagingDirectory)/vsix
+            artifact: vsix
+
+  - stage: Publish
+    dependsOn: Package
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - deployment: publish
+        displayName: Publish to Azure Artifacts
+        pool:
+          vmImage: ubuntu-latest
+        environment: 'part-lookup-release'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: vsix
+                - bash: echo "##vso[task.setvariable variable=extVersion]${BUILD_SOURCEBRANCHNAME#v}"
+                  displayName: Derive version from tag
+                - task: UniversalPackages@0
+                  displayName: Publish universal package
+                  inputs:
+                    command: publish
+                    publishDirectory: $(Pipeline.Workspace)/vsix
+                    vstsFeedPublish: $(feed)
+                    vstsFeedPackagePublish: $(universalPackage)
+                    versionOption: custom
+                    versionPublish: $(extVersion)
+                    packagePublishDescription: 'Part Lookup VS Code extension'

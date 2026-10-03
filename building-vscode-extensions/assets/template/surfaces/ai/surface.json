@@ -1,0 +1,30 @@
+{
+  "description": "Language Model Tool for agent mode (read-only reference tool), registered and contract-tested.",
+  "imports": ["import { aiFeature } from './ai';"],
+  "features": ["aiFeature,"],
+  "dependencies": [],
+  "devDependencies": [],
+  "merge": {
+    "package.json": {
+      "contributes": {
+        "languageModelTools": [
+          {
+            "name": "{{ID_SNAKE}}_get_workspace_summary",
+            "toolReferenceName": "workspaceSummary",
+            "displayName": "Workspace Summary",
+            "userDescription": "Summarize the folders open in this workspace.",
+            "modelDescription": "Returns the names and URIs of the folders open in the current VS Code workspace. Use it when you need to know which projects or roots are open before reading or searching files. Read-only; it does not read file contents.",
+            "canBeReferencedInPrompt": true,
+            "icon": "$(folder-library)",
+            "tags": ["{{ID}}"],
+            "inputSchema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ]
+      }
+    }
+  },
+  "agentsNotes": "- **AI** (`src/features/ai`): tool names are `{{ID_SNAKE}}_<verb>_<noun>`; each tool's `modelDescription` says what it does, when to use it, and its limits. Logic lives in `src/core` and returns plain text; the feature only adapts it to `LanguageModelToolResult`. Tools with side effects must return `confirmationMessages` from `prepareInvocation`. Errors thrown from `invoke` must tell the model what to do next."
+}

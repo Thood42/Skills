@@ -1,0 +1,86 @@
+{
+  "name": "part-lookup",
+  "displayName": "Part Lookup",
+  "description": "Look up internal part numbers.",
+  "version": "0.1.0",
+  "publisher": "acme-devtools",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://dev.azure.com/acme-auto/DevTools/_git/part-lookup"
+  },
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "partLookup.showLog",
+        "title": "Show Log",
+        "category": "Part Lookup"
+      },
+      {
+        "command": "partLookup.helloWorld",
+        "title": "Hello World",
+        "category": "Part Lookup"
+      }
+    ],
+    "configuration": {
+      "title": "Part Lookup",
+      "properties": {
+        "partLookup.greeting": {
+          "type": "string",
+          "default": "Hello",
+          "markdownDescription": "Greeting used by the **Hello World** command.",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.mjs",
+    "package": "npm run check-types && node esbuild.mjs --production",
+    "check-types": "tsc --noEmit -p .",
+    "watch:esbuild": "node esbuild.mjs --watch",
+    "watch:tsc": "tsc --noEmit --watch -p .",
+    "lint": "eslint .",
+    "check:extension": "node tools/vsx-check.mjs",
+    "compile-tests": "tsc -p .",
+    "test:unit": "npm run compile-tests && mocha",
+    "test:integration": "npm run compile && npm run compile-tests && vscode-test --label stable",
+    "test:integration:floor": "npm run compile && npm run compile-tests && vscode-test --label floor",
+    "test": "npm run test:unit && npm run test:integration",
+    "package:vsix": "node -e \"require('node:fs').mkdirSync('dist-vsix',{recursive:true})\" && vsce package --no-dependencies --out dist-vsix/",
+    "verify": "npm run check-types && npm run lint && npm run check:extension && npm test && npm run package:vsix"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.5",
+    "@types/vscode": "1.110.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "mocha": "^11.8.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0"
+  }
+}
