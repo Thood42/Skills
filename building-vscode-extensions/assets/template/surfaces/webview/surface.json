@@ -1,0 +1,24 @@
+{
+  "description": "Webview panel with strict CSP, nonce-gated script, typed message protocol, and @vscode-elements UI.",
+  "imports": ["import { panelFeature } from './panel';"],
+  "features": ["panelFeature,"],
+  "dependencies": ["@vscode-elements/elements"],
+  "devDependencies": [],
+  "merge": {
+    "package.json": {
+      "contributes": {
+        "commands": [
+          {
+            "command": "{{ID}}.openPanel",
+            "title": "Open Panel",
+            "category": "{{DISPLAY_NAME}}"
+          }
+        ]
+      },
+      "scripts": {
+        "check-types": "tsc --noEmit -p . && tsc --noEmit -p src/webview"
+      }
+    }
+  },
+  "agentsNotes": "- **Webview** (`src/features/panel`, `src/webview`, `src/shared/protocol.ts`): every message crossing the boundary is a member of the discriminated unions in `src/shared/protocol.ts` and is validated with its type guard on receipt. HTML is built only in `panelHtml.ts` (CSP `default-src 'none'`, nonce-gated script). Browser code type-checks against `src/webview/tsconfig.json`."
+}

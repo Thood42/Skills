@@ -1,0 +1,26 @@
+{
+  "skill_name": "building-vscode-extensions",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bootstrap-signal-lens",
+      "prompt": "We need a new VS Code extension for our controls engineering team: paste a CAN signal name and see its definition (pulled from a DBC-derived JSON file in the repo) in a side panel with a proper table. Nothing exists yet. We're on Azure DevOps - org 'acme-auto', project 'Controls Tooling' - and we publish internal stuff to the 'vscode-extensions' feed. Most of the team is on VS Code 1.112 or newer. Publisher id is acme-controls. Set the repo up in ./signal-lens and get us started.",
+      "expected_output": "Bootstrap mode with the webview surface: repo scaffolded in ./signal-lens with engines floor <= 1.112, layered src/, unit + integration tests, azure-pipelines.yml publishing a universal package to 'Controls Tooling/vscode-extensions', AGENTS.md, ADR 0001. Baseline gate run and reported honestly (INCOMPLETE if VS Code cannot be downloaded). Then Feature mode Gate 1 for the signal lookup: docs/plans/<slug>/00-status.md and 01-product.md written, user asked to approve Gate 1. No signal-lookup implementation code yet.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "review-legacy-notes",
+      "prompt": "Can you review our team's notes extension before we push it to the internal feed? It's in ./legacy-notes. Tell me what has to be fixed first.",
+      "expected_output": "Review mode at release level: mechanical checks run (vsx-check) and judgment review applied. Verdict BLOCKED with blockers first: '*' activation, @types/vscode above floor, version suffix, unregistered exportNotes command, vscode import in core, token in globalState, missing CSP + note text interpolated into webview HTML/script, test.only, no .vscodeignore, strict off, missing repository/LICENSE; judgment findings such as undisposed listeners/command, token prompt at activation, automatic git commit on save, token sent over plain HTTP, unhandled fetch promise, crash with no folder open. Prioritized fix order. Code not modified without approval.",
+      "files": ["evals/files/legacy-notes"]
+    },
+    {
+      "id": 3,
+      "name": "feature-agent-tool-gated",
+      "prompt": "In ./part-lookup (our extension) add a Copilot agent tool so people can ask agent mode to look up part numbers from the parts.json file at the root of whatever workspace they have open.",
+      "expected_output": "Feature mode via the software-factory gates with VS Code overlays: docs/plans/<slug>/00-status.md and 01-product.md created; 01-product.md has no implementation detail and includes where users meet the feature; a best-practice review section with a verdict is appended; the user is asked 'Approve Gate 1, or what should change?'. No changes to src/ or package.json yet.",
+      "files": ["evals/files/part-lookup"]
+    }
+  ]
+}

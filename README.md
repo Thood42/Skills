@@ -1,9 +1,10 @@
 # Claude Skills Workspace
 
-Development workspace for custom Claude Skills. Two skills live here today:
-**slide-forge**, which generates self-contained HTML presentations, and
+Development workspace for custom Claude Skills. Three skills live here today:
+**slide-forge**, which generates self-contained HTML presentations,
 **research-partner**, which bootstraps Obsidian-based research vaults with a
-queryable knowledge graph.
+queryable knowledge graph, and **building-vscode-extensions**, which scaffolds,
+plans, reviews and releases enterprise-grade VS Code extensions.
 
 ## Structure
 
@@ -26,6 +27,13 @@ Skills/
 │   ├── scripts/                    init_project.py · scripts/kg/ (compiler, retrieval, MCP server)
 │   ├── references/                 kg-schema · retrieval · interview-guide · hardening-ledger · …
 │   └── assets/                     note/base templates, Obsidian config, AGENTS.md template
+├── building-vscode-extensions/     VS Code extension builder: bootstrap · feature · review gates · release
+│   ├── SKILL.md                    router: modes, gate model, non-negotiables
+│   ├── workflows/                  bootstrap · adopt · feature · review-gates · release · maintain
+│   ├── references/                 architecture · manifest · testing · webviews · review-rubric · …
+│   ├── scripts/                    scaffold · gate · vsx-check (55 rules) · selftest (zero-dep Node)
+│   ├── assets/                     baseline repo template + surface overlays, versions.json
+│   └── evals/                      3 eval prompts + seeded fixtures
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```
 

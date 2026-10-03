@@ -43,3 +43,6 @@ ehthumbs.db
 tmp/
 temp/
 .cache/
+
+# Eval fixtures intentionally include a scaffolded .vscode/ folder
+!building-vscode-extensions/evals/files/*/.vscode/

@@ -1,0 +1,29 @@
+/* Theme-aware: only VS Code CSS variables, so light, dark and high-contrast themes all work. */
+body {
+  padding: 1rem;
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+#app {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+#output {
+  flex-basis: 100%;
+}
+
+#output.error {
+  color: var(--vscode-errorForeground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

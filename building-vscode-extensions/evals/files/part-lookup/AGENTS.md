@@ -1,0 +1,69 @@
+# Part Lookup — agent & contributor guide
+
+VS Code extension `acme-devtools.part-lookup`. Distributed internally through the Azure Artifacts
+feed `DevTools/vscode-extensions` as universal package `acme-devtools.part-lookup`.
+
+This file is the durable context for humans and coding agents. Keep it current: if a rule here
+changes, change it here in the same PR.
+
+## Commands
+
+| Task | Command |
+| --- | --- |
+| Everything a PR must pass | `npm run verify` |
+| Type check / lint | `npm run check-types` / `npm run lint` |
+| Extension best-practice checks | `npm run check:extension -- --gate slice` (`--gate release` before tagging) |
+| Unit tests (plain Node, fast) | `npm run test:unit` |
+| Integration tests (real Extension Host) | `npm run test:integration` (Linux CI: `xvfb-run -a npm run test:integration`) |
+| Integration tests at the engines floor | `npm run test:integration:floor` |
+| Build VSIX | `npm run package:vsix` → `dist-vsix/` |
+| Debug | F5 → "Run Extension" |
+
+## Layers (enforced by `eslint.config.mjs` and `tools/vsx-check.mjs`)
+
+```
+src/extension.ts        composition root — builds services, registers FEATURES, nothing else
+src/features/<name>/    one folder per feature; wires manifest contributions to core logic
+src/platform/           thin adapters over the VS Code API (commands, settings, logging, ...)
+src/core/               pure logic: no `vscode` import, no I/O — unit-tested in src/test/unit
+src/shared/             types shared with webviews (message protocols)
+src/webview/            browser code for webviews (own tsconfig, DOM lib)
+src/test/unit|integration
+```
+
+Dependency direction: `extension → features → platform → core`. Core imports nothing outward.
+
+## Conventions
+
+- Command IDs: `partLookup.<verbNoun>`; every contributed command has a `category` and is registered
+  through `registerCommand()` in `src/platform/commands.ts` (uniform error boundary).
+- Settings: `partLookup.<key>`; defaults live only in `package.json`; read via `readSetting()`.
+- Language model tool names: `part_lookup_<verb>_<noun>`.
+- Logging: `ctx.log` (LogOutputChannel). No `console.*` in `src/`.
+- Every disposable goes into `context.subscriptions` (directly or via a helper).
+- File I/O: `vscode.workspace.fs` (works in remote, virtual and web workspaces); no sync `fs`.
+- Secrets: `context.secrets` only — never `globalState`/`workspaceState` or settings.
+- `src/features/hello` is the reference feature; delete it when the first real feature lands.
+
+## How work flows
+
+- Multi-file features go through the gated plan in `docs/plans/<feature>/` (Product →
+  Architecture → Program Design → Vertical Slices). Read `00-status.md` first when resuming.
+- Every slice ends with the slice gate: `npm run verify` green + `check:extension --gate slice`
+  with zero unwaived blockers, and a review report in `docs/reviews/`.
+- Waivers live in `docs/reviews/waivers.json`, each with a reason, approver and expiry date.
+- Architectural decisions: `docs/adr/NNNN-<slug>.md` (supersede, never rewrite).
+
+## Definition of done (any change)
+
+1. `npm run verify` passes locally.
+2. New behavior has a test that fails without the change.
+3. User-visible changes have a line under `## [Unreleased]` in `CHANGELOG.md`.
+4. `package.json` contributions and code agree (the integration test checks commands).
+
+## Release
+
+Bump `version` (plain `MAJOR.MINOR.PATCH`), move `[Unreleased]` notes under the new version,
+run `npm run check:extension -- --gate release`, then push tag `v<version>`. The pipeline
+validates, packages, waits for approval on the `part-lookup-release` environment, and publishes
+to the feed. Users install/update with `scripts/install-extension.(sh|ps1)`.
