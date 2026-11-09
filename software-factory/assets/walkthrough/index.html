@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan walkthrough — {{plan_title}}</title>
+<style>
+{{css}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <div class="crumbs">Plan walkthrough · <code>{{slug}}</code></div>
+  <h1>{{plan_title}}</h1>
+  <div class="meta">
+    {{chips}}
+  </div>
+</header>
+
+<section>
+  <h2>Slices</h2>
+  <div class="tablewrap">{{slice_table}}</div>
+</section>
+
+{{attention_section}}
+
+<section>
+  <h2>Decisions taken by the user</h2>
+  <div class="card">{{decisions}}</div>
+</section>
+
+<section>
+  <h2>Amendments at approval</h2>
+  <div class="card">{{amendments}}</div>
+</section>
+
+<section>
+  <h2>The plan, gate by gate</h2>
+  {{gates}}
+</section>
+
+<footer>
+  <p>Rendered by software-factory <code>plan.py walkthrough</code>. This page is derived from the plan folder and git: regenerate it at any time.</p>
+</footer>
+</main>
+</body>
+</html>

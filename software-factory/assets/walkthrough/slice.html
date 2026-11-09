@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slice {{n}} — {{plan_title}}</title>
+<style>
+{{css}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <div class="crumbs"><a href="index.html">{{plan_title}}</a> · slice {{n}} of {{total}}</div>
+  <h1>Slice {{n}} — {{slice_title}}</h1>
+  <div class="meta">
+    {{chips}}
+  </div>
+</header>
+
+<section>
+  <h2>What this slice set out to do</h2>
+  <div class="card">{{what}}</div>
+</section>
+
+<section>
+  <h2>Code tour</h2>
+  <div class="card tour">{{tour}}</div>
+</section>
+
+<section>
+  <h2>Proof</h2>
+  <div class="card">{{proof}}</div>
+</section>
+
+{{notes_section}}
+
+<section>
+  <h2>Files changed in this slice</h2>
+  <div class="tablewrap">{{file_table}}</div>
+</section>
+
+<section>
+  <h2>The diff</h2>
+  <p class="meta">Only this slice's commit. Click a file to expand it.</p>
+  {{diffs}}
+</section>
+
+<footer>
+  {{nav}}
+  <p>Rendered by software-factory <code>plan.py walkthrough</code> from commit <code>{{sha}}</code>. This page is derived: regenerate it at any time.</p>
+</footer>
+</main>
+</body>
+</html>
