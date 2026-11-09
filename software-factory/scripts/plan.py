@@ -694,8 +694,8 @@ def next_action(st, sl):
         return {"kind": "gate", "gate": "4", "text": "No slices recorded yet"}
     harvest = st["kv"].get("Pointers", {}).get("Harvest", "")
     if not harvest or harvest.lower().startswith("pending"):
-        return {"kind": "closeout", "text": "All slices done: run `harvest`, make the edits it lists, "
-                                            "commit them, then `harvest --done`"}
+        return {"kind": "closeout", "text": "All slices done. Close-out runs now, without asking: `harvest`, make the edits it lists, "
+                                            "commit them as the last commit, `harvest --done`, `check --closeout`, then report once"}
     return {"kind": "complete", "text": "Plan complete and harvested"}
 
 
@@ -1340,7 +1340,7 @@ def human_status(st, sl):
         return out("waiting", "Slice %d needs you present" % nxt["slice"], "It will not start until you say so.")
     if k == "closeout":
         return out("building", "All %d slices are built" % total if total != 1 else "The slice is built",
-                   "Close-out is next: the lasting decisions get written into the project's own documents.")
+                   "Close-out is under way: the lasting decisions are being written into the project's own documents.")
     return out("complete", "Built and written up", "Every slice is done and the lasting decisions are recorded.")
 
 
@@ -2096,7 +2096,7 @@ def cmd_commit(args):
                                                                            " (%s)" % sha if sha else ""))
     nxt = next_action(st2, parse_slices(pdir))
     refresh_home(ctx, args.slug)
-    pause = not done or nxt["kind"] in ("needs-user", "paused", "closeout", "complete")
+    pause = not done or nxt["kind"] in ("needs-user", "paused", "complete")
     data = {"slice": n, "code_commit": sha, "plan_commit": store_sha, "subject": subject, "unverified": bool(unv),
             "done": done, "pause": pause, "next": nxt}
     lines = ["slice %d %s%s" % (n, "committed" if done else "recorded as UNVERIFIED", " as %s: %s" % (sha, subject) if sha else " (no commit: override)")]
@@ -2376,7 +2376,9 @@ def cmd_harvest(args):
         store_commit(ctx, args.slug, "plan(%s): close-out harvest recorded" % args.slug)
         refresh_home(ctx, args.slug)
         emit(args, {"harvest": value, "estimate_rows": wrote},
-             "harvest recorded: %s%s\nthen: `check %s --closeout`" % (value, " · %d estimate row(s) logged" % wrote if wrote else "", args.slug))
+             "harvest recorded: %s%s\nthen: `check %s --closeout`, and report to the user once: what was built, the plan home page, "
+             "what was written to the architecture doc and ADRs, anything unverified"
+             % (value, " · %d estimate row(s) logged" % wrote if wrote else "", args.slug))
         return
     h = harvest_items(ctx, args.slug)
     k = h["knowledge"]

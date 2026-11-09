@@ -332,8 +332,10 @@ def scenario_existing(root):
     # slice 3
     write(d / "src" / "cli.py", "import sys\nFLAG = '--export'\n")
     sh(["git", "add", "src/cli.py"], d)
-    plan(d, "commit", "pay-export", "--slice", "3", "--proof-kind", "measured", "--proof", "flag parsed: exit 0",
-         "--tour", "FLAG constant in src/cli.py")
+    rc, out, c = plan(d, "commit", "pay-export", "--slice", "3", "--proof-kind", "measured", "--proof", "flag parsed: exit 0",
+                      "--tour", "FLAG constant in src/cli.py", "--json")
+    check("commit: after the last slice the run continues into close-out without pausing",
+          c and c["pause"] is False and c["next"]["kind"] == "closeout" and "without asking" in c["next"]["text"], out)
     rc, out, s = plan(d, "status", "pay-export", "--json")
     check("status: after the last slice the next action is close-out", s and s["next"]["kind"] == "closeout", out)
 
@@ -351,7 +353,7 @@ def scenario_existing(root):
     check("walkthrough: index links slices and shows gate docs and user decisions",
           'href="slice-3.html"' in ix and "Gate 2 — Architecture" in ix and "keep CSV" in ix)
     check("home: every slice is commentable and the page reports that close-out is next",
-          ix.count('class="slice" data-target="slice-') == 3 and "Close-out is next" in ix and "Your feedback" in ix, ix[:300])
+          ix.count('class="slice" data-target="slice-') == 3 and "Close-out is under way" in ix and "Your feedback" in ix, ix[:300])
     check("home: approved gates are stamped with their date, and effort is charted per slice with a total",
           ix.count('class="stamp"') == 4 and "15 Jan 2026" in ix and ix.count('class="erow"') == 4
           and "4.5<small>points</small>" in ix and "36 hours" in ix, ix[:300])

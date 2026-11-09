@@ -90,7 +90,7 @@ For authors of overlays written against v1:
 | v1 | v2 |
 | --- | --- |
 | Plan folder is always `docs/plans/<slug>/` | Plan store by default; a folder already at `docs/plans/<slug>/` is still used in place |
-| Stop after every slice and ask whether to continue | Slices run without stopping; pauses only for needs-user-present, unverified proof, backtracking or a test that cannot honestly pass |
+| Stop after every slice and ask whether to continue | Slices run without stopping and close-out follows the last one; pauses only for needs-user-present, unverified proof, backtracking or a test that cannot honestly pass |
 | Progress notes accumulate in `00-status.md` | The slice commit message is the record; the status file stays a short state file |
 | Slice plan is one line per slice | Structured slice entries with proof, estimate and tasks |
 | No research artifact | `00-research.md` |

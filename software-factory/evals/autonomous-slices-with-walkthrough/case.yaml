@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: autonomous-slices-with-walkthrough
 expected_outcome: |
-  Builds both slices one after the other without stopping to ask between them. Each slice is proven by running the tests and the command, committed on the feature branch with a structured message carrying the proof, a code tour and a `Plan: list-filter slice N` trailer, ticked in the status file, and given an HTML review page. The plan walkthrough index is refreshed and its location reported. No planning file is tracked on the feature branch.
+  Builds both slices one after the other without stopping to ask between them. Each slice is proven by running the tests and the command, committed on the feature branch with a structured message carrying the proof, a code tour and a `Plan: list-filter slice N` trailer, ticked in the status file, and given an HTML review page. Close-out then runs without asking: the lasting knowledge is written into an architecture document and an ADR, committed as the last commit on the feature branch, and the harvest is recorded. One report at the end gives the plan home page link and says what close-out wrote. No planning file is tracked on the feature branch, and nothing is pushed.
 context:
   scaffold_script: place-files.sh

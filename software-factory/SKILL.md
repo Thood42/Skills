@@ -230,7 +230,8 @@ For each slice:
    `@file`.
 4. `plan.py walkthrough <slug> --slice N` renders the review page for that slice alone and
    refreshes the plan walkthrough.
-5. Read the script's last line. `CONTINUE` → next slice. `PAUSE` → stop and tell the user why.
+5. Read the script's last line. `CONTINUE` → carry on: the next slice, or close-out after the
+   last one. `PAUSE` → stop and tell the user why.
 
 **Pause only when:**
 
@@ -241,8 +242,11 @@ For each slice:
 - a slice shows an approved gate was wrong — backtrack through the approval protocol;
 - a test cannot be made to pass honestly.
 
-When the last slice is done, report once: slices completed, the plan home page link, anything
-unverified, and what close-out will do.
+When the last slice is done, go straight into close-out (below) without asking. Close-out makes
+no new decisions, so it needs no approval. Report once, after it: slices completed, the plan
+home page link, what was written to the architecture doc and the ADRs, and anything
+unverified. If any slice is unverified the run is already paused, and close-out waits until
+that is settled.
 
 **Comments on built slices.** The user can comment on any slice from the home page at any
 time. Treat each comment as feedback on finished work: a correction becomes a further slice
@@ -258,7 +262,8 @@ will read ten lines and no more.
 
 ## Close-out
 
-After the last slice and before any talk of a pull request:
+This follows the last slice directly, with no question in between, and comes before any talk
+of a pull request:
 
 1. `plan.py harvest <slug>` lists what the plan owes the default branch: architecture as built,
    one ADR per decision (including every decision the user took), guarded areas, baselines,
@@ -268,8 +273,8 @@ After the last slice and before any talk of a pull request:
    cannot fill. See `references/knowledge.md`.
 3. `plan.py harvest <slug> --done`, then `plan.py check <slug> --closeout`. The check fails if
    any planning file is tracked on the code branch.
-4. Tell the user the feature is ready, with the walkthrough path. Push, open a pull request or
-   merge only when asked.
+4. Tell the user the feature is ready, with the plan home page link and a short list of what
+   close-out wrote. Push, open a pull request or merge only when asked.
 
 Bugs found in real use after shipping are added to `04-slices.md` under Post-ship as further
 slices and go through the same build, prove, commit, walkthrough loop.

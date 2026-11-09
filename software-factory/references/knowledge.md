@@ -115,7 +115,9 @@ superseded instead.
 
 ## The close-out harvest
 
-After the last slice, before any pull request:
+This runs straight after the last slice, without asking the user first, and before any pull
+request. It needs no approval because it decides nothing: everything it writes down was agreed
+at a gate. If a slice is still unverified, the run is paused and close-out waits.
 
 1. `plan.py harvest <slug>` prints what the plan owes the default branch and where each piece
    goes. `--stubs` creates any missing file.
@@ -127,6 +129,8 @@ After the last slice, before any pull request:
    plan's index line. If the plan changed nothing durable, say so instead:
    `plan.py harvest <slug> --none "<why>"`.
 5. `plan.py check <slug> --closeout`.
+6. Report to the user once: what was built, the plan home page, which sections of the
+   architecture doc changed, which ADRs were written or superseded, and anything unverified.
 
 | Part of the plan | Needed later? | Goes to |
 | --- | --- | --- |

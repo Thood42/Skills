@@ -669,6 +669,9 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
    the walkthrough pages). One HTML page per plan shows the whole plan and its current status
    from a single link. The user can comment on any section or slice and choose a sign-off
    decision there, and those comments come back as feedback the agent must act on.
+10. **Close-out runs without asking** once the last slice is done (decided after the first eval
+    round, where the agent stopped to ask). It makes no new decisions, so it needs no approval;
+    the user gets one report after it. An unverified slice still pauses the run before close-out.
 
 ## 9. Sources
 
@@ -733,7 +736,7 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 
 **Verified.**
 
-- `scripts/selftest.py`: 85 checks across an existing project, a fresh project on the Lite tier,
+- `scripts/selftest.py`: 86 checks across an existing project, a fresh project on the Lite tier,
   a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
   an external store, a linked worktree and an overlay rule file. All pass on Windows with
   Git 2.44 and Python 3.11.
@@ -759,9 +762,9 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
   measures features v1 does not have. Nine cases have never been run, including the tier offer,
   work items, close-out and the review flow from the plan home page, which was added after that
   round. v1 as first committed on this branch is the baseline.
-- **Three behaviours seen in that round are not yet addressed**: HTML mockups produced for a
-  command-line tool, a stop to ask before close-out after the last slice, and an UNVERIFIED
-  reason written into the status file as a paragraph.
+- **Two behaviours seen in that round are not yet addressed**: HTML mockups produced for a
+  command-line tool, and an UNVERIFIED reason written into the status file as a paragraph. The
+  third, a stop to ask before close-out, is resolved by decision 10 but has not been re-run.
 - **Tracker imports.** The Azure DevOps and Jira CSV shapes follow the vendors' documented
   hierarchy columns (`Title 1..N`; `Issue ID` / `Parent`). Field names for points and estimates
   were not tried against a live board, and company-managed Jira projects may want an epic-link
