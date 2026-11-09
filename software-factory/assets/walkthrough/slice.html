@@ -4,19 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slice {{n}} — {{plan_title}}</title>
+<script>try{var t=localStorage.getItem("sf-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}</script>
 <style>
 {{css}}
 </style>
 </head>
 <body>
-<main>
-<header class="top">
-  <div class="crumbs"><a href="index.html">{{plan_title}}</a> · slice {{n}} of {{total}}</div>
-  <h1>Slice {{n}} — {{slice_title}}</h1>
+<header class="bar">
+  <a class="bar-title" href="index.html">{{plan_title}}</a>
+  <span class="bar-where">slice {{n}} of {{total}}</span>
+  <div class="bar-tools">
+    <button type="button" class="tool" id="theme"><svg viewBox="0 0 16 16" aria-hidden="true"><path id="theme-icon" fill="currentColor" d=""/></svg><span id="theme-label">Dark</span></button>
+    <button type="button" class="tool" id="print" aria-label="Print or save as PDF"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1h8v3H4zM2 5h12a1 1 0 0 1 1 1v6h-3v3H4v-3H1V6a1 1 0 0 1 1-1zm4 6v3h4v-3z"/></svg><span>Print</span></button>
+  </div>
+</header>
+
+<div class="wrap narrow">
+<div class="sheet">
+  <p class="sheet-kicker">Review of slice {{n}} of {{total}}</p>
+  <h1>{{slice_title}}</h1>
   <div class="meta">
     {{chips}}
   </div>
-</header>
+</div>
 
 <section>
   <h2>What this slice set out to do</h2>
@@ -37,19 +47,68 @@
 
 <section>
   <h2>Files changed in this slice</h2>
-  <div class="tablewrap">{{file_table}}</div>
+  <div class="card tablewrap">{{file_table}}</div>
 </section>
 
 <section>
   <h2>The diff</h2>
-  <p class="meta">Only this slice's commit. Click a file to expand it.</p>
+  <p class="lede">Only this slice's commit. Select a file to open it.</p>
+  <div class="doc-tools">
+    <button type="button" class="btn small quiet" id="open-all">Open all</button>
+    <button type="button" class="btn small quiet" id="close-all">Close all</button>
+  </div>
   {{diffs}}
 </section>
 
-<footer>
-  {{nav}}
-  <p>Rendered by software-factory <code>plan.py walkthrough</code> from commit <code>{{sha}}</code>. This page is derived: regenerate it at any time.</p>
+<div class="pager">{{nav}}</div>
+
+<footer class="end">
+  <p>Rendered from commit <code>{{sha}}</code> by software-factory. To comment on this slice, use its Comment button on the <a href="index.html#slices">plan home page</a>.</p>
 </footer>
-</main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  function byId(id) { return document.getElementById(id); }
+  var SUN = "M8 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM8 0l1 2.5H7zM8 16l-1-2.5h2zM0 8l2.5-1v2zM16 8l-2.5 1V7zM2.3 2.3l2.5 1-1.5 1.5zM13.7 13.7l-2.5-1 1.5-1.5zM2.3 13.7l1-2.5 1.5 1.5zM13.7 2.3l-1 2.5-1.5-1.5z";
+  var MOON = "M6 1a7 7 0 1 0 9 9A6 6 0 0 1 6 1z";
+  function isDark() {
+    var set = root.getAttribute("data-theme");
+    if (set) { return set === "dark"; }
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function paintTheme() {
+    var dark = isDark();
+    byId("theme-label").textContent = dark ? "Light" : "Dark";
+    byId("theme-icon").setAttribute("d", dark ? SUN : MOON);
+    byId("theme").setAttribute("aria-label", "Switch to the " + (dark ? "light" : "dark") + " theme");
+  }
+  byId("theme").addEventListener("click", function () {
+    var next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { window.localStorage.setItem("sf-theme", next); } catch (e) { /* storage unavailable */ }
+    paintTheme();
+  });
+  paintTheme();
+  if (window.matchMedia) {
+    var scheme = window.matchMedia("(prefers-color-scheme: dark)");
+    if (scheme.addEventListener) { scheme.addEventListener("change", paintTheme); }
+  }
+
+  var files = Array.prototype.slice.call(document.querySelectorAll("details.file"));
+  if (files.length === 1) { files[0].open = true; }
+  byId("open-all").addEventListener("click", function () { files.forEach(function (d) { d.open = true; }); });
+  byId("close-all").addEventListener("click", function () { files.forEach(function (d) { d.open = false; }); });
+  var reopened = [];
+  window.addEventListener("beforeprint", function () {
+    reopened = files.filter(function (d) { return !d.open; });
+    reopened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { reopened.forEach(function (d) { d.open = false; }); reopened = []; });
+  byId("print").addEventListener("click", function () { window.print(); });
+})();
+</script>
 </body>
 </html>

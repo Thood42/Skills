@@ -231,8 +231,13 @@ def scenario_existing(root):
     rc, out, g = plan(d, "gate", "pay-export", "1", "in-progress", "--json")
     page = read(home)
     check("home: a gate presented for approval shows as waiting on the user, open and commentable",
-          "Waiting on you" in page and '<details class="doc await" open>' in page
+          "Gate 1 is waiting on you" in page and '<details class="doc await" open' in page
           and 'data-target="01-product.md" data-section="Problem"' in page and "Sign off: Gate 1" in page, page[:300])
+    check("home: route shows one station per gate plus build and close-out, with the waiting one marked",
+          page.count('<li class="station ') == 6 and 'class="station is-current needs-you"' in page and "--stations: 6" in page)
+    check("home: theme switch, live updates and print controls are present, and both themes are defined",
+          'id="theme"' in page and 'id="live"' in page and 'id="print"' in page
+          and ':root[data-theme="dark"]' in page and "prefers-color-scheme: dark" in page and "@media print" in page)
     meta = json.loads(page.split("var PLAN = ", 1)[1].split(";\n", 1)[0])
     check("home: embedded plan data is valid and names the gate", meta["slug"] == "pay-export" and meta["gate"] == "gate1" and meta["awaiting"] is True, meta)
     check("home: page is self-contained (no network references)", "http://" not in page and "https://" not in page)
@@ -347,6 +352,11 @@ def scenario_existing(root):
           'href="slice-3.html"' in ix and "Gate 2 — Architecture" in ix and "keep CSV" in ix)
     check("home: every slice is commentable and the page reports that close-out is next",
           ix.count('class="slice" data-target="slice-') == 3 and "Close-out is next" in ix and "Your feedback" in ix, ix[:300])
+    check("home: approved gates are stamped with their date, and effort is charted per slice with a total",
+          ix.count('class="stamp"') == 4 and "15 Jan 2026" in ix and ix.count('class="erow"') == 4
+          and "4.5<small>points</small>" in ix and "36 hours" in ix, ix[:300])
+    check("slice page: carries the same theme switch and links back to the plan",
+          'id="theme"' in p1 and 'href="index.html"' in p1 and 'details class="file"' in p1)
     check("walkthrough: pages are not committed anywhere",
           sh(["git", "status", "--porcelain"], d / ".plans") == "" and "walkthrough" not in sh(["git", "ls-tree", "-r", "--name-only", "plans"], d))
 

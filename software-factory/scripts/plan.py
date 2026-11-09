@@ -1279,7 +1279,7 @@ def render_diff(sha, files):
         if f["more"]:
             rows.append("<div class=\"l note\">… %d more lines. Full diff: git show %s -- %s</div>"
                         % (f["more"], sha[:10], html.escape(f["path"])))
-        out.append("<details><summary><span class=\"path\">%s</span><span class=\"chip\">%s</span>"
+        out.append("<details class=\"file\"><summary><span class=\"path\">%s</span><span class=\"chip\">%s</span>"
                    "<span class=\"delta\"><span class=\"plus\">+%d</span> <span class=\"minus\">−%d</span></span>"
                    "</summary><div class=\"diff\">%s</div></details>"
                    % (html.escape(f["path"]), html.escape(f["status"]), adds, dels, "\n".join(rows)))
@@ -1309,27 +1309,47 @@ def plan_version(pdir):
 
 
 def human_status(st, sl):
-    """(kind, label, sentence, gate) describing where the plan stands, in the reader's terms."""
+    """Where the plan stands, in the reader's terms: kind, a headline, one sentence, the gate involved."""
     nxt = next_action(st, sl)
     k = nxt["kind"]
     total = len(st["slices"])
+
+    def out(kind, headline, sentence, gate=None):
+        return {"kind": kind, "headline": headline, "sentence": sentence, "gate": gate}
+
     if k == "gate":
         g = nxt.get("gate", "")
-        name = "the plan" if g == "plan" else "Gate %s — %s" % (g, GATE_NAMES.get(g, ""))
+        name = "The plan" if g == "plan" else "Gate %s" % g
+        topic = {"plan": "the whole plan", "1": "the product brief", "2": "the architecture", "3": "the program design",
+                 "4": "the slice plan"}.get(g, "the document")
         if nxt.get("state") == "in progress":
-            return "waiting", "Waiting on you", "Review %s below and sign off." % name, g
-        return "drafting", "In progress", "%s is being drafted." % (name[:1].upper() + name[1:]), g
+            return out("waiting", "%s is waiting on you" % name,
+                       "Read %s below, comment where something should change, and sign off." % topic, g)
+        return out("drafting", "%s is being drafted" % name, "Nothing for you to do yet. This page updates when it is ready.", g)
     if k == "slice":
         t = next((s["title"] for s in st["slices"] if s["n"] == nxt["slice"]), "")
-        return "building", "Building", "Slice %d of %d: %s." % (nxt["slice"], total, t), None
+        return out("building", "Building slice %d of %d" % (nxt["slice"], total), t[:1].upper() + t[1:] + ".")
     if k == "paused":
         why = next((s["unverified"] for s in st["slices"] if s["n"] == nxt["slice"]), "")
-        return "paused", "Paused — needs you", "Slice %d could not be proven: %s" % (nxt["slice"], why), None
+        first = re.split(r"(?<=[.!?])\s", why.strip(), 1)[0]
+        if len(first) > 160:
+            first = first[:157].rsplit(" ", 1)[0] + "…"
+        return out("paused", "Paused on slice %d" % nxt["slice"],
+                   "It is built but could not be proven. %s The full reason is under Needs your attention." % first)
     if k == "needs-user":
-        return "waiting", "Waiting on you", "Slice %d needs you present before it starts." % nxt["slice"], None
+        return out("waiting", "Slice %d needs you present" % nxt["slice"], "It will not start until you say so.")
     if k == "closeout":
-        return "building", "Nearly done", "All %d slices are built. Close-out is next." % total, None
-    return "complete", "Complete", "Every slice is built and the plan has been harvested.", None
+        return out("building", "All %d slices are built" % total if total != 1 else "The slice is built",
+                   "Close-out is next: the lasting decisions get written into the project's own documents.")
+    return out("complete", "Built and written up", "Every slice is done and the lasting decisions are recorded.")
+
+
+def _nice_date(text):
+    m = re.search(r"(\d{4})-(\d\d)-(\d\d)", text or "")
+    if not m:
+        return ""
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    return "%d %s %s" % (int(m.group(3)), months[int(m.group(2)) - 1], m.group(1))
 
 
 def render_home(ctx, slug):
@@ -1337,101 +1357,187 @@ def render_home(ctx, slug):
     pdir, sf, st, sl = load_plan(ctx, slug)
     out_dir = walk_dir(ctx, slug, pdir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    kind, label, sentence, gate = human_status(st, sl)
+    hs = human_status(st, sl)
+    kind, gate = hs["kind"], hs["gate"]
     awaiting = kind == "waiting" and gate is not None
     lite = (pdir / "plan.md").is_file() and not (pdir / "01-product.md").is_file()
     await_doc = ("plan.md" if gate == "plan" or lite else GATE_DOCS.get(gate or "", "")) if awaiting else ""
     by_n = {s["n"]: s for s in sl["slices"]}
+    stat = {s["n"]: s for s in st["slices"]}
+    slices_shown = any(g["key"] in ("4", "plan") and g["state"] != "pending" for g in st["gates"]) or bool(st["slices"])
+    nums = ([s["n"] for s in st["slices"]] or [s["n"] for s in sl["slices"]]) if slices_shown else []
     done = sum(1 for s in st["slices"] if s["done"])
-    pts = (sl["plan_points"] or 0) + sum(s["points"] or 0 for s in sl["slices"])
+    pts = ((sl["plan_points"] or 0) + sum(s["points"] or 0 for s in sl["slices"])) if slices_shown else 0
+    hours = ctx.cfg["workItems"]["pointHours"]
     vc, wi = st["kv"].get("Version control", {}), st["kv"].get("Work items", {})
-
-    chips = [chip(st["tier"] or "Full"), chip((st["project"] or "?") + " project")]
-    if vc.get("Code branch"):
-        chips.append(chip("branch " + vc["Code branch"]))
-    if pts:
-        chips.append(chip("%s points" % fmt_pts(pts)))
-    if wi.get("Tool", "none").lower() not in ("", "none"):
-        chips.append(chip("%s %s" % (wi["Tool"], wi.get("Feature") or "")))
-
-    steps = []
     gstate = {g["key"]: g["state"] for g in st["gates"]}
-    for g in st["gates"]:
-        name = "Plan" if g["key"] == "plan" else "Gate %s · %s" % (g["key"], GATE_NAMES.get(g["key"], ""))
-        cls = "done" if g["state"] == "approved" else "current" if g["key"] == gate else ""
-        word = {"approved": "approved", "in progress": "awaiting sign-off" if awaiting and g["key"] == gate else "in progress",
-                "pending": "not started"}[g["state"]]
-        steps.append("<li class=\"%s\"><strong>%s</strong><span>%s</span></li>" % (cls, html.escape(name), word))
     all_gates = bool(st["gates"]) and all(g["state"] == "approved" for g in st["gates"])
-    steps.append("<li class=\"%s\"><strong>Slices</strong><span>%s</span></li>"
-                 % ("done" if st["slices"] and done == len(st["slices"]) else "current" if all_gates else "",
-                    "%d of %d built" % (done, len(st["slices"])) if st["slices"] else "not planned yet"))
+    all_built = bool(st["slices"]) and done == len(st["slices"])
     harvest = st["kv"].get("Pointers", {}).get("Harvest", "pending")
     closed = bool(harvest) and not harvest.lower().startswith("pending")
-    steps.append("<li class=\"%s\"><strong>Close-out</strong><span>%s</span></li>" % ("done" if closed else "", "done" if closed else "not yet"))
+    esc = html.escape
 
-    def sec_html(target, heading, body_html, tag="section", cls="sec"):
+    # ---- the route: one station per gate, then build, then close-out
+    stations = []
+    first_open = next((g["key"] for g in st["gates"] if g["state"] != "approved"), None)
+    for g in st["gates"]:
+        name = "Plan" if g["key"] == "plan" else GATE_NAMES.get(g["key"], "Gate")
+        if g["state"] == "approved":
+            stations.append((name, "is-done", "", _nice_date(g["raw"])))
+        elif g["key"] == first_open:
+            wait = g["state"] == "in progress"
+            stations.append((name, "is-current" + (" needs-you" if wait else ""), "Awaiting your sign-off" if wait else "Being drafted", ""))
+        else:
+            stations.append((name, "is-todo", "Not started", ""))
+    build_note = "%d of %d built" % (done, len(st["slices"])) if st["slices"] else "Not planned yet"
+    paused = kind in ("paused",) or (kind == "waiting" and gate is None)
+    stations.append(("Build", "is-done" if all_built else ("is-current" + (" needs-you" if paused else "")) if all_gates else "is-todo", build_note, ""))
+    stations.append(("Close-out", "is-done" if closed else "is-current" if all_built else "is-todo",
+                     "Decisions recorded" if closed else "Next" if all_built else "Not yet", ""))
+    current = next((i for i, s_ in enumerate(stations) if "is-current" in s_[1]), len(stations) - 1)
+    reach = "%.4f" % (current / max(1, len(stations) - 1))
+    route = []
+    for i, (name, cls, note, stamp) in enumerate(stations, 1):
+        mark = "&#10003;" if "is-done" in cls else str(i)
+        extra = ("<span class=\"stamp\">Approved<small>%s</small></span>" % esc(stamp)) if stamp else \
+            ("<span class=\"station-note\">%s</span>" % esc(note)) if note else "<span class=\"station-note\">Done</span>"
+        route.append("<li class=\"station %s\"><span class=\"station-node\" aria-hidden=\"true\">%s</span>"
+                     "<span class=\"station-text\"><span class=\"station-name\">%s</span><br>%s</span></li>" % (cls, mark, esc(name), extra))
+
+    # ---- headline figures
+    approved = sum(1 for g in st["gates"] if g["state"] == "approved")
+    unver = sum(1 for s in st["slices"] if s["unverified"])
+    figures = []
+    if pts:
+        figures.append("<div class=\"figure\"><div class=\"figure-label\">Estimated effort</div><div class=\"figure-value\">%s<small>points</small></div>"
+                       "<div class=\"figure-note\">%s hours of hands-on work, at %d hours a point</div></div>" % (fmt_pts(pts), fmt_pts(pts * hours), hours))
+    else:
+        rough = ""
+        if (pdir / "01-product.md").is_file():
+            rough = " ".join(without_placeholders(section(read(pdir / "01-product.md"), "Rough size")).split())
+        elif (pdir / "plan.md").is_file():
+            mr = re.search(r"(?m)^- Rough size:\s*(.*)$", without_placeholders(read(pdir / "plan.md")))
+            rough = mr.group(1).strip() if mr else ""
+        mr = re.match(r"^(\d+(?:\.\d+)?(?:\s*[–-]\s*\d+(?:\.\d+)?)?)\s*points?", rough)
+        if mr:
+            figures.append("<div class=\"figure\"><div class=\"figure-label\">Rough size</div><div class=\"figure-value\">%s<small>points</small></div>"
+                           "<div class=\"figure-note\">A first guess from the product brief. Firm numbers come with the slice plan.</div></div>" % esc(mr.group(1)))
+        else:
+            figures.append("<div class=\"figure\"><div class=\"figure-label\">Estimated effort</div><div class=\"figure-value\">&ndash;</div>"
+                           "<div class=\"figure-note\">Estimated when the slice plan is written</div></div>")
+    if st["slices"]:
+        segs = "".join("<span class=\"%s\" title=\"Slice %d: %s\"></span>" % ("is-done" if s["done"] else "is-bad" if s["unverified"] else "", s["n"],
+                       "built" if s["done"] else "not proven" if s["unverified"] else "not built yet") for s in st["slices"])
+        figures.append("<div class=\"figure\"><div class=\"figure-label\">Slices built</div><div class=\"figure-value\">%d<small>of %d</small></div>"
+                       "<div class=\"meter\" role=\"img\" aria-label=\"%d of %d slices built%s\">%s</div><div class=\"figure-note\">%s</div></div>"
+                       % (done, len(st["slices"]), done, len(st["slices"]), ", %d not proven" % unver if unver else "", segs,
+                          "%d built but not proven" % unver if unver else "Each one proven and committed"))
+    else:
+        figures.append("<div class=\"figure\"><div class=\"figure-label\">Slices built</div><div class=\"figure-value\">&ndash;</div>"
+                       "<div class=\"figure-note\">The slice plan is not written yet</div></div>")
+    figures.append("<div class=\"figure\"><div class=\"figure-label\">Sign-offs given</div><div class=\"figure-value\">%d<small>of %d</small></div>"
+                   "<div class=\"figure-note\">%s</div></div>"
+                   % (approved, len(st["gates"]), "One sign-off covers the whole plan" if lite else "Product, architecture, program design, slice plan"))
+    facts = []
+    for label, value in (("Process", st["tier"] or "Full"), ("Project", (st["project"] or "").capitalize()), ("Branch", vc.get("Code branch", "")),
+                         ("Work item", ("%s %s" % (wi.get("Tool", ""), wi.get("Feature", ""))).strip() if wi.get("Tool", "none").lower() not in ("", "none") else "")):
+        if value:
+            facts.append("<div><dt>%s</dt><dd>%s</dd></div>" % (label, esc(value)))
+
+    # ---- documents, each section commentable
+    def sec_html(target, heading, body_html, tag="section", cls="sec", extra=""):
+        cid = "c-" + hashlib.sha1((target + heading).encode("utf-8")).hexdigest()[:8]
         return ("<%s class=\"%s\" data-target=\"%s\" data-section=\"%s\"><div class=\"sec-head\"><h3>%s</h3>"
-                "<button type=\"button\" class=\"cbtn\">Comment</button></div><div class=\"sec-body\">%s</div>"
-                "<div class=\"cbox\" hidden><label class=\"visually-hidden\" for=\"c-%s\">Comment on %s</label>"
-                "<textarea id=\"c-%s\" rows=\"3\" placeholder=\"Your comment on this part\"></textarea></div></%s>"
-                % (tag, cls, html.escape(target, quote=True), html.escape(heading, quote=True), inline_md(heading), body_html,
-                   hashlib.sha1((target + heading).encode("utf-8")).hexdigest()[:8], html.escape(heading, quote=True),
-                   hashlib.sha1((target + heading).encode("utf-8")).hexdigest()[:8], tag))
+                "<button type=\"button\" class=\"cbtn\">Comment</button></div>%s<div class=\"sec-body\">%s</div>"
+                "<div class=\"cbox\" hidden><label class=\"visually-hidden\" for=\"%s\">Comment on %s</label>"
+                "<textarea id=\"%s\" rows=\"3\" placeholder=\"Your comment on this part\"></textarea></div></%s>"
+                % (tag, cls, esc(target, quote=True), esc(heading, quote=True), inline_md(heading), extra, body_html,
+                   cid, esc(heading, quote=True), cid, tag))
 
-    docs = []
+    docs, rail = [], []
+    rail.append("<a href=\"#signoff\"%s>%s</a>" % (" class=\"is-await\"" if awaiting else "", "Sign-off" if awaiting else "Your feedback"))
     names = [("00-research.md", "Research", None), ("01-product.md", "Gate 1 — Product", "1"),
              ("02-architecture.md", "Gate 2 — Architecture", "2"), ("03-program-design.md", "Gate 3 — Program design", "3"),
              ("04-slices.md", "Gate 4 — Slice plan", "4"), ("plan.md", "The plan (Lite)", "plan")]
-    for name, title, key in names:
+    for i, (name, title, key) in enumerate(names):
         f = pdir / name
         if not f.is_file():
             continue
-        text = without_placeholders(read(f))
-        parts = [sec_html(name, h, md_to_html(body)) for h, body in split_sections(text, 2) if body.strip()]
+        if key and gstate.get(key, "pending") == "pending":
+            continue  # not presented yet: a half-written draft is not something to review
+        parts = [sec_html(name, h, md_to_html(body)) for h, body in split_sections(without_placeholders(read(f)), 2) if body.strip()]
         if not parts:
             continue
         state = gstate.get(key, "") if key else ""
         badge = (chip("awaiting your sign-off", "warn") if name == await_doc else chip("approved", "ok") if state == "approved"
                  else chip(state) if state else "")
-        docs.append("<details class=\"doc%s\"%s><summary>%s %s <span class=\"path\">%s</span></summary><div class=\"body\">%s</div></details>"
-                    % (" await" if name == await_doc else "", " open" if name == await_doc else "", html.escape(title), badge, name, "\n".join(parts)))
+        docs.append("<details class=\"doc%s\"%s id=\"doc-%d\"><summary><span class=\"doc-title\">%s</span> %s"
+                    "<span class=\"badge\" data-count-for=\"%s\" hidden>0</span><span class=\"doc-file\">%s</span></summary>"
+                    "<div class=\"body\">%s</div></details>"
+                    % (" await" if name == await_doc else "", " open" if name == await_doc else "", i, esc(title), badge, name, name, "\n".join(parts)))
+        rail.append("<a href=\"#doc-%d\"%s>%s<span class=\"badge\" data-count-for=\"%s\" hidden>0</span></a>"
+                    % (i, " class=\"is-await\"" if name == await_doc else "", esc(title.split(" — ")[-1] if " — " in title else title), name))
 
-    slices, attention = [], []
-    nums = [s["n"] for s in st["slices"]] or [s["n"] for s in sl["slices"]]
-    stat = {s["n"]: s for s in st["slices"]}
+    # ---- slices, and the effort chart built from the same rows
+    slices, attention, erows = [], [], []
+    emax = max([sl["plan_points"] or 0] + [s["points"] or 0 for s in sl["slices"]] + [0.5])
+    if sl["plan_points"] and slices_shown:
+        erows.append(("Plan and design", sl["plan_points"], all_gates, "done" if all_gates else "in progress"))
     for n in nums:
         d, s = by_n.get(n, {}), stat.get(n, {})
         title = d.get("title") or s.get("title") or "slice %d" % n
         commits = slice_commits(ctx, slug, n)
-        bits = [chip("done", "ok") if s.get("done") else chip("UNVERIFIED", "bad") if s.get("unverified") else chip("not built yet")]
+        bits = [chip("built", "ok") if s.get("done") else chip("not proven", "bad") if s.get("unverified") else chip("not built yet")]
         if d.get("points") is not None:
-            bits.append(chip("%s point(s)" % fmt_pts(d["points"])))
+            bits.append(chip("%s point%s" % (fmt_pts(d["points"]), "" if d["points"] == 1 else "s")))
+            erows.append(("Slice %d: %s" % (n, title), d["points"], bool(s.get("done")),
+                          "built" if s.get("done") else "built, not proven" if s.get("unverified") else "planned"))
         if d.get("needs_user"):
             bits.append(chip("needs you present", "warn"))
         if commits:
             bits.append(chip("commit " + commits[-1][:10]))
-        body = "<p class=\"meta\">%s</p>" % " ".join(bits)
+        body = ""
         if d.get("what"):
             body += "<p>%s</p>" % inline_md(d["what"])
         if d.get("proof"):
-            body += "<p class=\"meta\">Proof planned: %s</p>" % inline_md(d["proof"])
+            body += "<p class=\"muted small\">How it will be proven: %s</p>" % inline_md(d["proof"])
         if s.get("unverified"):
-            body += "<p><strong>Not proven:</strong> %s</p>" % html.escape(s["unverified"])
-            attention.append("<li>Slice %d is <strong>UNVERIFIED</strong>: %s</li>" % (n, html.escape(s["unverified"])))
+            body += "<p><strong>Not proven:</strong> %s</p>" % esc(s["unverified"])
+            attention.append("<li>Slice %d is built but <strong>not proven</strong>: %s</li>" % (n, esc(s["unverified"])))
         elif d.get("needs_user") and not s.get("done"):
             attention.append("<li>Slice %d needs you present before it starts.</li>" % n)
         if (out_dir / ("slice-%d.html" % n)).exists():
-            body += "<p><a href=\"slice-%d.html\">Open the review page for this slice</a> (code tour, proof and diff)</p>" % n
-        slices.append(sec_html("slice-%d" % n, "Slice %d — %s" % (n, title), body, tag="article", cls="slice"))
+            body += "<p><a class=\"btn small\" href=\"slice-%d.html\">Open the review page</a> <span class=\"muted small\">code tour, proof and diff</span></p>" % n
+        slices.append(sec_html("slice-%d" % n, "Slice %d — %s" % (n, title), body, tag="article", cls="slice",
+                               extra="<div class=\"slice-meta\">%s</div>" % " ".join(bits)))
+    rail.append("<a href=\"#slices\">Slices<span class=\"badge\" data-count-for=\"slices\" hidden>0</span></a>")
 
-    def bullets(items, empty):
-        return "<ul>%s</ul>" % "".join("<li>%s</li>" % inline_md(x) for x in items) if items else "<p class=\"meta\">%s</p>" % empty
+    effort = ""
+    if any(e[1] for e in erows):
+        rows = []
+        for label, p_, built, state in erows:
+            tip = "%s: %s point%s, about %s hours of hands-on work. %s." % (label, fmt_pts(p_), "" if p_ == 1 else "s", fmt_pts(p_ * hours), state.capitalize())
+            rows.append("<div class=\"erow\" tabindex=\"0\" data-tip=\"%s\" aria-label=\"%s\"><span class=\"erow-label\">%s</span>"
+                        "<span class=\"erow-plot\"><span class=\"ebar%s\" style=\"width: %.1f%%\"></span><span class=\"erow-value\">%s</span></span></div>"
+                        % (esc(tip, quote=True), esc(tip, quote=True), esc(label), "" if built else " planned", 78.0 * p_ / emax, fmt_pts(p_)))
+        effort = ("<section id=\"effort\"><h2>Effort by slice</h2><p class=\"lede\">Story points of hands-on work, one point being one %d-hour block. "
+                  "%s points in all, about %s hours.</p><div class=\"effort\"><div class=\"legend\"><span><i class=\"swatch\"></i>Done</span>"
+                  "<span><i class=\"swatch planned\"></i>Planned</span></div>%s</div></section>"
+                  % (hours, fmt_pts(pts), fmt_pts(pts * hours), "\n".join(rows)))
+        rail.append("<a href=\"#effort\">Effort</a>")
 
     work = ""
     if (pdir / "05-work-items.md").is_file():
-        work = ("<section><h2>Work items and estimate</h2><details class=\"doc\"><summary>%s points in total <span class=\"path\">05-work-items.md</span></summary>"
-                "<div class=\"body\">%s</div></details></section>" % (fmt_pts(pts), md_to_html(read(pdir / "05-work-items.md"))))
+        table = read(pdir / "05-work-items.md")
+        table = "\n".join(l for l in table.split("\n") if l.startswith("|"))
+        work = ("<section id=\"work-items\"><h2>Work items</h2><p class=\"lede\">The same work as it appears on the board: a feature, a story for each slice, "
+                "and the tasks beneath.</p><div class=\"card tablewrap\">%s</div></section>" % md_to_html(table))
+        rail.append("<a href=\"#work-items\">Work items</a>")
+    rail.append("<a href=\"#decisions\">Decisions</a>")
+
+    def bullets(items, empty):
+        return "<ul>%s</ul>" % "".join("<li>%s</li>" % inline_md(x) for x in items) if items else "<p class=\"muted\">%s</p>" % empty
+
     gate_label = ("the whole plan" if gate == "plan" else "Gate %s — %s" % (gate, GATE_NAMES.get(gate, ""))) if gate else \
         ("slices" if all_gates else "general feedback")
     plan_json = json.dumps({"slug": slug, "title": st["title"] or slug, "gate": ("gate" + gate if gate and gate != "plan" else gate or "feedback"),
@@ -1439,24 +1545,28 @@ def render_home(ctx, slug):
                            ensure_ascii=False).replace("</", "<\\/")
     if awaiting:
         so_title = "Sign off: %s" % (gate_label[:1].upper() + gate_label[1:])
-        so_help = ("Read the open document below, comment where something should change, choose a decision, then send your review "
-                   "with the button at the bottom of the page.")
+        so_help = "Read the open document below and comment where something should change. Then choose, and send your review from the bar at the bottom of the page."
+        actions = "<div class=\"hero-actions\"><a class=\"btn primary\" href=\"#signoff\">Go to sign-off</a><a class=\"btn\" href=\"#plan\">Read the plan</a></div>"
     else:
         so_title = "Your feedback"
-        so_help = ("Nothing is waiting for your sign-off right now. You can still comment on any part of the plan or any slice; "
-                   "send it with the button at the bottom of the page and it will be treated as feedback.")
+        so_help = ("Nothing is waiting for your sign-off right now. You can still comment on any part of the plan or any slice, "
+                   "and send it from the bar at the bottom of the page.")
+        actions = ""
+    now = dt.datetime.now().astimezone()
     page = fill(read(WALK / "index.html"), {
-        "css": read(WALK / "style.css"), "slug": html.escape(slug), "plan_title": html.escape(st["title"] or slug),
-        "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "chips": "\n    ".join(chips),
-        "now_class": kind, "now_label": html.escape(label), "now_text": html.escape(sentence),
-        "steps": "\n  ".join(steps), "signoff_title": html.escape(so_title), "signoff_help": so_help,
+        "css": read(WALK / "style.css"), "slug": esc(slug), "plan_title": esc(st["title"] or slug),
+        "generated": now.strftime("%Y-%m-%d %H:%M"), "generated_iso": now.isoformat(timespec="seconds"),
+        "now_class": kind, "headline": esc(hs["headline"]), "now_text": esc(hs["sentence"]), "hero_actions": actions,
+        "stations": len(stations), "reach": reach, "route": "\n    ".join(route),
+        "figures": "\n  ".join(figures), "facts": "\n  ".join(facts), "rail": "\n    ".join(rail),
+        "signoff_title": esc(so_title), "signoff_help": so_help, "signoff_class": "is-await" if awaiting else "",
         "decision_hidden": "" if awaiting else "hidden",
-        "attention_section": ("<section><h2>Needs your attention</h2><div class=\"card warnbox\"><ul>%s</ul></div></section>" % "".join(attention)) if attention else "",
-        "docs": "\n".join(docs) or "<p class=\"meta\">No plan documents yet.</p>",
-        "slices": "\n".join(slices) or "<p class=\"meta\">The slice plan has not been written yet.</p>",
-        "work_items_section": work,
-        "decisions": bullets(st["lists"].get("Decisions taken by the user", []), "None recorded."),
-        "amendments": bullets(st["lists"].get("Amendments at approval", []), "None recorded."),
+        "attention_section": ("<section id=\"attention\"><h2>Needs your attention</h2><div class=\"card warnbox\"><ul>%s</ul></div></section>" % "".join(attention)) if attention else "",
+        "docs": "\n".join(docs) or "<p class=\"muted\">No plan documents yet.</p>",
+        "slices": "\n".join(slices) or "<p class=\"muted\">The slice plan has not been written yet.</p>",
+        "effort_section": effort, "work_items_section": work,
+        "decisions": bullets(st["lists"].get("Decisions taken by the user", []), "None so far."),
+        "amendments": bullets(st["lists"].get("Amendments at approval", []), "None so far."),
         "plan_json": plan_json})
     write(out_dir / "index.html", page)
     return str(out_dir / "index.html")
@@ -1510,9 +1620,9 @@ def render_walkthrough(ctx, slug, only=None):
             chips = [chip("done", "ok") if s.get("done") else chip("UNVERIFIED", "bad") if unv else chip("not checked off", "warn"),
                      chip("commit " + last[:10]), chip(when)]
             if d.get("points") is not None:
-                chips.append(chip("%s point(s)" % fmt_pts(d["points"])))
+                chips.append(chip("%s point%s" % (fmt_pts(d["points"]), "" if d["points"] == 1 else "s")))
             if d.get("needs_user"):
-                chips.append(chip("needs user present", "warn"))
+                chips.append(chip("needs you present", "warn"))
             if d.get("work_item"):
                 chips.append(chip("work item " + d["work_item"]))
             proof = ""
@@ -1530,17 +1640,17 @@ def render_walkthrough(ctx, slug, only=None):
             idx = nums.index(n)
             nav = []
             if idx > 0:
-                nav.append("<a href=\"slice-%d.html\">← slice %d</a>" % (nums[idx - 1], nums[idx - 1]))
-            nav.append("<a href=\"index.html\">plan walkthrough</a>")
+                nav.append("<a class=\"btn\" href=\"slice-%d.html\">Previous: slice %d</a>" % (nums[idx - 1], nums[idx - 1]))
+            nav.append("<a class=\"btn quiet\" href=\"index.html\">Back to the plan</a>")
             if idx + 1 < len(nums):
-                nav.append("<a href=\"slice-%d.html\">slice %d →</a>" % (nums[idx + 1], nums[idx + 1]))
+                nav.append("<a class=\"btn\" href=\"slice-%d.html\">Next: slice %d</a>" % (nums[idx + 1], nums[idx + 1]))
             page = fill(read(WALK / "slice.html"), {
                 "css": css, "n": n, "total": total, "plan_title": html.escape(st["title"] or slug),
-                "slice_title": html.escape(title), "chips": "\n    ".join(chips),
+                "slice_title": html.escape(title[:1].upper() + title[1:]), "chips": "\n    ".join(chips),
                 "what": md_to_html(body["what"] or d.get("what") or subject),
                 "tour": md_to_html(body["tour"] or "No code tour was recorded in this slice's commit message."),
                 "proof": proof, "notes_section": notes, "file_table": "".join(table),
-                "diffs": "\n".join(diffs), "nav": "<p>%s</p>" % " · ".join(nav), "sha": last[:10]})
+                "diffs": "\n".join(diffs), "nav": "".join(nav), "sha": last[:10]})
             write(out_dir / ("slice-%d.html" % n), page)
             written.append(str(out_dir / ("slice-%d.html" % n)))
     written.append(render_home(ctx, slug))

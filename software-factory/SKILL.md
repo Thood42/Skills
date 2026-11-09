@@ -103,7 +103,9 @@ review pages, the work items and the decisions taken. The script regenerates it 
 plan's state changes and prints its path as `plan home page: …`. Give the user that one link
 whenever you report on a plan. On it they can comment on any section or slice, choose a
 decision when a gate is waiting, and send it all back with one button — see the approval
-protocol. It is a static file: tell them to reload it to see the latest state.
+protocol. It is a static file: they reload it to see the latest state, or switch on "Live
+updates" to have it refresh itself during a meeting. It has light and dark themes and prints
+cleanly, so it is the thing to put on screen when a wider group reviews the plan.
 
 **Resume rule.** At the start of any session where a plan exists for the feature being
 discussed, run `status` and `digest` before anything else, then continue from the first

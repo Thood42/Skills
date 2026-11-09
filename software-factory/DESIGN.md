@@ -721,10 +721,19 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
   chat, or downloaded as a file that `plan.py review` imports and records under `reviews/`. A
   review file counts as the user's answer only once the user says in the conversation that they
   sent it, so approval still happens in the conversation.
+- **The review pages were redesigned for a wider audience** (Trevor, after seeing the first
+  version: more attractive, light and dark modes, engaging enough to put in front of a
+  management team). The look borrows from a factory route sheet: the page opens on the plan's
+  status in large DIN-style lettering above a route of stations (the gates, build, close-out),
+  each stamped with its approval date. Below that: headline figures, a side rail that shows
+  where the reader's comments are, effort charted per slice, and the work-item table. Both
+  themes are designed rather than inverted, with a switch that overrides the system setting and
+  carries across pages. There is a live-updates switch, a print layout, and a phone layout.
+  Everything stays in one self-contained file with system fonts and no network use.
 
 **Verified.**
 
-- `scripts/selftest.py`: 81 checks across an existing project, a fresh project on the Lite tier,
+- `scripts/selftest.py`: 85 checks across an existing project, a fresh project on the Lite tier,
   a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
   an external store, a linked worktree and an overlay rule file. All pass on Windows with
   Git 2.44 and Python 3.11.
@@ -733,6 +742,10 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 - The plan home page exercised in a real browser: commenting, the decision choice, the review
   text, comments surviving a reload, the "plan changed" notice, and the feedback-only state when
   no gate is waiting. Copying to the clipboard could only be tested through its fallback path.
+  After the redesign: both themes, the theme switch carrying from the home page to a slice page,
+  the effort chart's hover text, the paused and waiting states, and a phone-width layout with no
+  horizontal overflow. The bar colour passes the chart palette check in both themes. Printing
+  and the live-updates reload were not exercised.
 - Every eval fixture builds through `evals/files/build_fixture.py`, and each resulting plan
   passes `plan.py check`.
 - `quick_validate` from skill-creator accepts the skill.
