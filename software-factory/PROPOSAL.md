@@ -104,7 +104,8 @@ v1 encodes the four layers from Dex's 2025 talks. Three later pieces add rules w
 ## 4. Proposed upgrades
 
 Each one says why, so the skill can explain the reasoning to the model rather than issue a bare
-rule. Upgrades 3, 5, 8 and 9 were reshaped by Trevor's decisions (§8).
+rule. Upgrades 3, 5, 8 and 9 were reshaped by Trevor's decisions (§8); upgrade 11 was added by
+them.
 
 ### Upgrade 1 — A **Lite** tier, chosen by the user, never by the agent
 
@@ -168,11 +169,13 @@ and each slice produces an HTML review walkthrough of its own changes.
 - The **slice commit message** carries the note the old progress log carried: slice number and
   title, what landed, proof summary, surprises and test traps, Gate 3 tests turned green. A
   resuming session reads `git log` for the plan's branch; humans read the walkthrough. There is
-  no `05-log.md`.
+  no `05-log.md`. When the plan is linked to a tracker (upgrade 11), the subject also carries the
+  story's ID (`AB#1234` / `PROJ-123`) so the commit shows up on the work item.
 - `00-status.md` stays the **state file** and gets a hard shape: gate lines, slice checkboxes,
   **Decisions taken by the user**, **Amendments at approval**, **Version control** (branch,
-  override), **Pointers** (predecessor, research doc, walkthrough index, ADRs), and a short
-  "Notes for a fresh session". Target: under 80 lines for the life of the feature.
+  override), **Work items** (tool, Feature/Epic ID, story IDs per slice, points total),
+  **Pointers** (predecessor, research doc, walkthrough index, ADRs), and a short "Notes for a
+  fresh session". Target: under 80 lines for the life of the feature.
 
 Backward compatible: a v1 folder with everything in `00-status.md` still resumes; the agent
 simply starts committing per slice from the next slice.
@@ -218,15 +221,18 @@ in HTML of that slice's changes alone, maintained alongside a walkthrough of the
 
 ### Upgrade 6 — Gate template refinements (small, each backed by §2)
 
-- **Gate 1** gains **Scope — in / out / deferred** (the composer run improvised it) and a
-  **Riskiest assumption** line (what would make this the wrong thing to build).
+- **Gate 1** gains **Scope — in / out / deferred** (the composer run improvised it), a
+  **Riskiest assumption** line (what would make this the wrong thing to build) and a **Rough
+  size** (a story-point range, upgrade 11) so the build-or-not decision has a cost next to it.
 - **Gate 2** gains **Load-bearing bets** (assumptions a spike should prove — ties to upgrade 2)
   and **Where a human must stay in the loop** (auth, billing, public API, data deletion — Dex's
   back-pressure list), which Gate 4 turns into *needs user present* flags on slices.
 - **Gate 3** keeps all five sections; **Test plan** entries get stable numbers so slices can
   reference them (the composer run did exactly this with "Tests 1–3, 10").
 - **Gate 4** slices become a fixed mini-template per slice: *what · tests it turns green · proof ·
-  needs user present (y/n)*. "One line per slice" is dropped; it was never what got written.
+  needs user present (y/n) · story points (basis, confidence) · work item ID once linked*. "One
+  line per slice" is dropped; it was never what got written. The Gate 4 summary ends with the
+  work-item breakdown and its points total (upgrade 11).
 - **After the last slice**: a **Post-ship** section in `04-slices.md` where bug-hunt rounds from
   real use are added as further slices (same commit + walkthrough rhythm), and a prompt to write
   the ADR(s) the gates promised.
@@ -279,7 +285,8 @@ practically every machine the skill will meet; this repo already uses it):
 | `digest <slug>` | a compact digest of every gate doc: headings, decisions, slice list, user decisions, amendments | re-reading four docs in full on resume |
 | `check <slug>` | lints the folder: Gate 1 free of banned tech words, every slice has Proof and needs-user-present, status lines well-formed, pointers resolve | a self-review pass done by reading |
 | `walkthrough <slug> --slice N` | renders `walkthrough/slice-N.html` from the slice commit's diff + the slice entry + a code-tour paragraph passed in; regenerates `index.html` | hand-writing HTML and pasting diffs |
-| `commit <slug> --slice N` | builds the structured slice commit message from the slice entry and proof, commits on the plan branch (respecting overrides and repo rules) | composing the message by hand each slice |
+| `commit <slug> --slice N` | builds the structured slice commit message from the slice entry, proof and linked story ID, commits on the plan branch (respecting overrides and repo rules) | composing the message by hand each slice |
+| `work-items <slug> [--export ado\|jira] [--sync]` | builds `05-work-items.md` + `work-items.json` from the gate docs (Feature ← Gate 1, Stories ← slices, Tasks ← Gate 3), leaves points for the agent to fill; `--sync` mirrors slice checkboxes to item states; `--export` writes the tool's bulk-import CSV | writing the breakdown by hand and re-deriving it after every gate change |
 
 `check` also accepts extra rule files so an overlay (§6) can add lint rules. Each subcommand has
 a `--json` flag so the agent can read the result without parsing prose.
@@ -292,9 +299,76 @@ in docs/plans/…", and on the agent's own judgement that a task will touch seve
 explicit negatives (renames, copy, one-line config). The skill-creator's description optimizer is
 the tool for this, run last.
 
+### Upgrade 11 — **Work items**: an Agile hierarchy with story-point estimates, tied to Azure DevOps or Jira
+
+**Why (Trevor).** The plan folder, the slices and the commits describe the work in the agent's
+terms. Teams track work in Azure DevOps or Jira, and want this effort to show up there as real
+work items with a size on them, in the hierarchy their process already uses. The gates already
+contain everything a work-item breakdown needs — Gate 1 has the user-facing value, Gate 3 has
+the files and tests, Gate 4 has the increments — so the breakdown should fall out of the plan
+rather than be written separately, and it should carry an estimate a planning meeting can use.
+
+**What.**
+
+*Hierarchy.* `docs/plans/<slug>/05-work-items.md` (human-readable) plus `work-items.json`
+(export-ready) describe the plan in the **Azure DevOps Agile process hierarchy by default**,
+with a Jira mapping alongside:
+
+| Plan artefact | Azure DevOps (Agile) | Jira (default scheme) | Content |
+| --- | --- | --- | --- |
+| A programme the plan belongs to (optional; usually an existing item the user names) | Epic | Epic (parent) | linked, never created by the agent |
+| The plan (`docs/plans/<slug>`) | **Feature** | **Epic** | Gate 1 announcement + success metric as the description; scope in/out; rough size |
+| One slice | **User Story** | **Story** | slice goal as the story; acceptance criteria = the slice's Proof and the Gate 3 tests it turns green; *needs user present* → tag |
+| The plan and gate work itself | User Story "Plan & design" under the Feature | Story | research, Gates 1–4, approvals — human review time is real effort |
+| A unit of work inside a slice | **Task** | Sub-task | derived from Gate 3: files created/changed grouped sensibly, tests, the walkthrough/review |
+| Post-ship fix | Bug (linked to the Feature) | Bug | from the Post-ship section of `04-slices.md` |
+
+Slices map to stories, not tasks, because the slice rule ("ends in a working, testable state the
+user can see") is the definition of a story. The mapping is a table in `references/work-items.md`
+and a `mapping` block in `work-items.json`, so a team on Scrum/CMMI/Basic or a custom Jira scheme
+changes names once, not the breakdown.
+
+*Estimates.* Every Task and Story carries **story points where 1 point = one 8-hour block of
+human effort to implement by hand**. Scale: 0.5, 1, 2, 3, 5, 8; anything larger is a sign the
+slice should split. The estimate is **human** effort, deliberately not agent wall-clock, because
+that is the number a team's velocity and planning are built on; the agent's actual time can be
+recorded beside it as `agent_hours` so the two can be compared over time. Rules:
+
+- A **rough size** goes on the Feature at Gate 1 (a points range, e.g. "8–13"), because that is
+  when the user decides whether to build at all.
+- **Firm points per Story and Task at Gate 4**, when slices and Gate 3 files are known. The
+  breakdown and its total are part of the Gate 4 summary, so approving the slice plan approves
+  the estimate.
+- Each estimate records its **basis** (files, tests, unknowns) and a **confidence** (high /
+  medium / low). Low confidence on a story is a flag that research or a spike is missing.
+- Reopening a gate re-estimates the stories it touches; the old number is kept in the file.
+- Lite tier produces the same structure one level flatter: the plan is a Story, slices are Tasks.
+
+*Tying it to the tool.* Two directions, both optional:
+
+- **Linking.** The user names an existing Feature/Epic (or any item) and `00-status.md` →
+  **Work items** records the IDs. Every slice commit message references its story
+  (`AB#1234` for Azure Boards, `PROJ-123` for Jira), which both tools turn into a link
+  automatically. Story and task state are mirrored from the slice checkboxes (`New` → `Active`
+  → `Closed`; `To Do` → `In Progress` → `Done`) in `work-items.json` on every slice.
+- **Export / create.** `plan.py work-items --export ado|jira` writes a CSV in the shape each
+  tool's bulk import accepts (Azure Boards' `Title 1…Title 4` hierarchy columns; Jira's
+  `Parent` / `Issue ID` columns), with points in the right field. Where an Azure DevOps or Jira
+  connector or CLI is present, the agent may create or update items directly, but only after the
+  user says so for that plan — writing to a team's board is an outward-facing action and never
+  happens on the agent's own judgement. The export file is the default; the connector is the
+  shortcut.
+
+*Generation.* `plan.py work-items <slug>` builds the skeleton from the gate docs (Feature from
+Gate 1, Stories from slices, Tasks from Gate 3 files and tests) with points left blank; the agent
+fills in points, basis and confidence. `check` fails a Gate 4 approval request if any story is
+unestimated.
+
 ### Explicitly not proposed
 
 - No change to the four gates, their order, or the approval question.
+- No writes to Azure DevOps, Jira or any tracker without the user's explicit go-ahead for that
+  plan; the CSV export is always available instead.
 - No automatic gate approval, no "agent approves its own gate" path, no skipping Gate 3. Slices
   are autonomous; gates are not.
 - No framework- or language-specific content; overlays (§6) are where that lives.
@@ -312,14 +386,16 @@ software-factory/
 │   ├── proof.md             proof kinds, UNVERIFIED rule, code-tour paragraph format
 │   ├── research.md          what deep-enough research looks like; spikes; subagent use; the
 │   │                        "user-supplied exclusive context" exception
+│   ├── work-items.md        hierarchy mappings (ADO Agile default, Scrum/CMMI/Basic, Jira),
+│   │                        estimation rules (1 pt = one 8-hour block), export/link/sync rules
 │   └── overlay-contract.md  how other skills extend the gates (see §6)
 ├── assets/
 │   ├── templates/           copied by plan.py init, hand-copyable without it
 │   │   ├── 00-status.md  00-research.md  01-product.md  02-architecture.md
-│   │   ├── 03-program-design.md  04-slices.md  plan.md (Lite)  adr.md
+│   │   ├── 03-program-design.md  04-slices.md  05-work-items.md  plan.md (Lite)  adr.md
 │   └── walkthrough/         HTML shell + CSS the walkthrough renderer fills (no network, no JS deps)
 ├── scripts/
-│   ├── plan.py              init | status | digest | check | walkthrough | commit — stdlib only
+│   ├── plan.py              init | status | digest | check | walkthrough | commit | work-items — stdlib only
 │   └── selftest.py          exercises every subcommand on a temp repo
 ├── evals/                   test cases (§7), skill-creator case-folder format
 └── DESIGN.md                this proposal, renamed once implementation starts; then the decision record
@@ -349,8 +425,9 @@ v2 makes that contract explicit in `references/overlay-contract.md`:
 - an overlay may add a **per-slice gate** that runs before the slice commit (the VS Code skill's
   slice review gate is exactly this) and may flag slices *needs user present*;
 - new in v2 and available to overlays: the research artifact, the proof standard, the Lite tier
-  (an overlay may require Full), extra `plan.py check` rules, and extra sections in the slice
-  walkthrough.
+  (an overlay may require Full), extra `plan.py check` rules, extra sections in the slice
+  walkthrough, and extra work-item fields or tags (an overlay may, for example, add an "Area
+  Path" or a component to every item it generates).
 
 The VS Code skill's "condensed protocol (only if software-factory is unavailable)" needs no
 change for v2, since every v1 rule it restates survives.
@@ -363,7 +440,9 @@ Done with the skill-creator loop, on this branch:
    eval run.
 2. **Write v2** per §4–§5: `SKILL.md`, references, templates, the walkthrough shell, `plan.py`
    with `selftest.py` (init → check passes; a Gate 1 doc containing "endpoint" → check fails;
-   walkthrough renders from a synthetic commit; commit respects an override).
+   walkthrough renders from a synthetic commit; commit respects an override; work-items builds
+   the hierarchy from fixture gate docs, `check` rejects an unestimated story, the ADO and Jira
+   CSVs have the columns each importer expects).
 3. **Test cases** (`evals/`, one folder each, prompts first, assertions while runs are in flight):
    - `feature-on-small-repo` — a feature request against a tiny fixture repo. Expected: research
      summary, plan folder and branch created, `01-product.md` without tech talk, no code, tier
@@ -380,6 +459,12 @@ Done with the skill-creator loop, on this branch:
      branch, `walkthrough/slice-1.html`, `slice-2.html` and `index.html` present, boxes ticked.
    - `slice-proof-unverifiable` — a slice whose proof tool is unavailable in the fixture.
      Expected: UNVERIFIED reported, slice not checked off, run paused with the reason.
+   - `work-items-hierarchy-and-points` — fixture with Gates 1–3 approved; the user says the work
+     is tracked in Azure DevOps under Feature 4321 and asks for the slice plan. Expected:
+     `04-slices.md` with points per slice, `05-work-items.md` + `work-items.json` with the Feature
+     linked (not created), one Story per slice and Tasks beneath, every item estimated with basis
+     and confidence, the Gate 4 summary quoting the total, an ADO-shaped CSV on request, and no
+     call to any tracker API.
 4. **Run with-skill (v2) and old-skill (v1) in parallel**, grade with assertions on the files and
    git state produced (all objectively checkable), aggregate, open the viewer for Trevor's review,
    iterate.
@@ -407,6 +492,11 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 5. **Version control default:** commits on a **new branch based on the repo's default branch**;
    the user can override this for their own setup, and the override is recorded in the status
    file (upgrade 8).
+6. **Work items: in.** The plan is broken down into a task-list structure that can be tied to a
+   work item in Azure DevOps or Jira, expressed in the **Agile process hierarchy by default**
+   (Epic → Feature → User Story → Task, with a Jira mapping), and given a **rough estimate of
+   human effort in story points where 1 point = one 8-hour block** (upgrade 11). Linking and CSV
+   export are the default; direct writes to a tracker need the user's go-ahead per plan.
 
 ## 9. Sources
 
