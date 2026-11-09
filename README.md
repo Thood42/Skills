@@ -41,7 +41,7 @@ Skills/
 │   ├── references/                 gates · research · proof · work-items · plan-store · knowledge · overlay-contract
 │   ├── scripts/                    plan.py (plan store, checks, slice commits, walkthroughs, work items) · selftest.py
 │   ├── assets/                     gate/plan/ADR templates, walkthrough page shell
-│   ├── evals/                      11 eval cases + a shared fixture builder
+│   ├── evals/                      12 eval cases + a shared fixture builder
 │   └── DESIGN.md                   v2 proposal, decisions taken, and what was and was not verified
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```

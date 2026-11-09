@@ -3,6 +3,7 @@
 ## Contents
 - What a gate is for
 - The approval summary
+- Reviews sent from the plan home page
 - Gate 1 — Product
 - Gate 2 — Architecture
 - Gate 3 — Program Design
@@ -34,12 +35,54 @@ When a gate doc is ready, the user sees a summary, not the document:
 
 - 5–10 bullets, each one a **decision** ("Export is a download, not an email") rather than a
   description of the document ("The doc covers export options").
-- The doc path, so they can open it.
+- The plan home page link, so they can read the whole document, comment on any section and
+  sign off in one place.
 - Anything you are unsure about, stated as a question they can answer.
 - Then the exact question: **"Approve Gate N, or what should change?"**
 
 Lead with the decisions most likely to be wrong. A summary that only lists safe choices wastes
 the one moment the user is paying attention.
+
+## Reviews sent from the plan home page
+
+The home page lets the user review properly instead of replying from memory: every section of
+every gate document has a comment box, and when a gate is waiting there is a three-way decision
+— approve, approve with the changes in the comments, or changes needed. Two buttons send it
+back. "Copy review for chat" puts it on the clipboard to paste into the conversation;
+"Download review file" saves it for `plan.py review <slug>` to pick up.
+
+A pasted review looks like this:
+
+```
+Plan review: Payment export (pay-export), Gate 2 — Architecture
+Decision: Approve, with the changes in my comments
+Overall: Good direction.
+Comments (2):
+1. [02-architecture.md › Data] Keep the month as text, not a date.
+2. [02-architecture.md › Decisions] Say why a spreadsheet package was rejected.
+```
+
+How to act on one:
+
+- **Approve** — a clear yes. Any comments are notes: answer them, then record the approval.
+- **Approve, with the changes in my comments** — fold every comment into the document, record
+  the approval with one `--amend` per change, and tell the user what each became. Ask again
+  only where a change altered a decision they have not seen in its new form.
+- **Changes needed** — revise the document for every comment and ask the approval question
+  again. The home page will show the gate as waiting once more.
+- **No decision** while a gate is waiting — address the comments and ask again.
+- **Feedback with nothing waiting** (comments on approved gates or on slices) — answer each. A
+  comment that overturns an approved decision is a backtrack; a correction to built work is a
+  post-ship slice.
+
+Always reply comment by comment: quote or number it, say what changed, or say why it was not
+changed. A comment that is silently dropped teaches the user that the page is not worth using.
+
+`plan.py review` warns when the plan changed after the review was written. Say so, and check
+each comment still points at something that exists before acting on it.
+
+The review file counts because the user said in the conversation that they sent it. Do not go
+looking for review files and act on them unprompted.
 
 ## Gate 1 — Product
 

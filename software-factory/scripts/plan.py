@@ -1297,6 +1297,179 @@ def chip(text, cls=""):
     return "<span class=\"chip %s\">%s</span>" % (cls, html.escape(text))
 
 
+def plan_version(pdir):
+    """Short hash of the plan's content, so a review can tell whether the plan changed under it."""
+    h = hashlib.sha1()
+    for name in ("00-status.md", "00-research.md", "01-product.md", "02-architecture.md",
+                 "03-program-design.md", "04-slices.md", "plan.md"):
+        f = pdir / name
+        if f.is_file():
+            h.update(read(f).encode("utf-8"))
+    return h.hexdigest()[:10]
+
+
+def human_status(st, sl):
+    """(kind, label, sentence, gate) describing where the plan stands, in the reader's terms."""
+    nxt = next_action(st, sl)
+    k = nxt["kind"]
+    total = len(st["slices"])
+    if k == "gate":
+        g = nxt.get("gate", "")
+        name = "the plan" if g == "plan" else "Gate %s — %s" % (g, GATE_NAMES.get(g, ""))
+        if nxt.get("state") == "in progress":
+            return "waiting", "Waiting on you", "Review %s below and sign off." % name, g
+        return "drafting", "In progress", "%s is being drafted." % (name[:1].upper() + name[1:]), g
+    if k == "slice":
+        t = next((s["title"] for s in st["slices"] if s["n"] == nxt["slice"]), "")
+        return "building", "Building", "Slice %d of %d: %s." % (nxt["slice"], total, t), None
+    if k == "paused":
+        why = next((s["unverified"] for s in st["slices"] if s["n"] == nxt["slice"]), "")
+        return "paused", "Paused — needs you", "Slice %d could not be proven: %s" % (nxt["slice"], why), None
+    if k == "needs-user":
+        return "waiting", "Waiting on you", "Slice %d needs you present before it starts." % nxt["slice"], None
+    if k == "closeout":
+        return "building", "Nearly done", "All %d slices are built. Close-out is next." % total, None
+    return "complete", "Complete", "Every slice is built and the plan has been harvested.", None
+
+
+def render_home(ctx, slug):
+    """The plan's home page: status, every gate doc, slices, and a review form. Returns its path."""
+    pdir, sf, st, sl = load_plan(ctx, slug)
+    out_dir = walk_dir(ctx, slug, pdir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    kind, label, sentence, gate = human_status(st, sl)
+    awaiting = kind == "waiting" and gate is not None
+    lite = (pdir / "plan.md").is_file() and not (pdir / "01-product.md").is_file()
+    await_doc = ("plan.md" if gate == "plan" or lite else GATE_DOCS.get(gate or "", "")) if awaiting else ""
+    by_n = {s["n"]: s for s in sl["slices"]}
+    done = sum(1 for s in st["slices"] if s["done"])
+    pts = (sl["plan_points"] or 0) + sum(s["points"] or 0 for s in sl["slices"])
+    vc, wi = st["kv"].get("Version control", {}), st["kv"].get("Work items", {})
+
+    chips = [chip(st["tier"] or "Full"), chip((st["project"] or "?") + " project")]
+    if vc.get("Code branch"):
+        chips.append(chip("branch " + vc["Code branch"]))
+    if pts:
+        chips.append(chip("%s points" % fmt_pts(pts)))
+    if wi.get("Tool", "none").lower() not in ("", "none"):
+        chips.append(chip("%s %s" % (wi["Tool"], wi.get("Feature") or "")))
+
+    steps = []
+    gstate = {g["key"]: g["state"] for g in st["gates"]}
+    for g in st["gates"]:
+        name = "Plan" if g["key"] == "plan" else "Gate %s · %s" % (g["key"], GATE_NAMES.get(g["key"], ""))
+        cls = "done" if g["state"] == "approved" else "current" if g["key"] == gate else ""
+        word = {"approved": "approved", "in progress": "awaiting sign-off" if awaiting and g["key"] == gate else "in progress",
+                "pending": "not started"}[g["state"]]
+        steps.append("<li class=\"%s\"><strong>%s</strong><span>%s</span></li>" % (cls, html.escape(name), word))
+    all_gates = bool(st["gates"]) and all(g["state"] == "approved" for g in st["gates"])
+    steps.append("<li class=\"%s\"><strong>Slices</strong><span>%s</span></li>"
+                 % ("done" if st["slices"] and done == len(st["slices"]) else "current" if all_gates else "",
+                    "%d of %d built" % (done, len(st["slices"])) if st["slices"] else "not planned yet"))
+    harvest = st["kv"].get("Pointers", {}).get("Harvest", "pending")
+    closed = bool(harvest) and not harvest.lower().startswith("pending")
+    steps.append("<li class=\"%s\"><strong>Close-out</strong><span>%s</span></li>" % ("done" if closed else "", "done" if closed else "not yet"))
+
+    def sec_html(target, heading, body_html, tag="section", cls="sec"):
+        return ("<%s class=\"%s\" data-target=\"%s\" data-section=\"%s\"><div class=\"sec-head\"><h3>%s</h3>"
+                "<button type=\"button\" class=\"cbtn\">Comment</button></div><div class=\"sec-body\">%s</div>"
+                "<div class=\"cbox\" hidden><label class=\"visually-hidden\" for=\"c-%s\">Comment on %s</label>"
+                "<textarea id=\"c-%s\" rows=\"3\" placeholder=\"Your comment on this part\"></textarea></div></%s>"
+                % (tag, cls, html.escape(target, quote=True), html.escape(heading, quote=True), inline_md(heading), body_html,
+                   hashlib.sha1((target + heading).encode("utf-8")).hexdigest()[:8], html.escape(heading, quote=True),
+                   hashlib.sha1((target + heading).encode("utf-8")).hexdigest()[:8], tag))
+
+    docs = []
+    names = [("00-research.md", "Research", None), ("01-product.md", "Gate 1 — Product", "1"),
+             ("02-architecture.md", "Gate 2 — Architecture", "2"), ("03-program-design.md", "Gate 3 — Program design", "3"),
+             ("04-slices.md", "Gate 4 — Slice plan", "4"), ("plan.md", "The plan (Lite)", "plan")]
+    for name, title, key in names:
+        f = pdir / name
+        if not f.is_file():
+            continue
+        text = without_placeholders(read(f))
+        parts = [sec_html(name, h, md_to_html(body)) for h, body in split_sections(text, 2) if body.strip()]
+        if not parts:
+            continue
+        state = gstate.get(key, "") if key else ""
+        badge = (chip("awaiting your sign-off", "warn") if name == await_doc else chip("approved", "ok") if state == "approved"
+                 else chip(state) if state else "")
+        docs.append("<details class=\"doc%s\"%s><summary>%s %s <span class=\"path\">%s</span></summary><div class=\"body\">%s</div></details>"
+                    % (" await" if name == await_doc else "", " open" if name == await_doc else "", html.escape(title), badge, name, "\n".join(parts)))
+
+    slices, attention = [], []
+    nums = [s["n"] for s in st["slices"]] or [s["n"] for s in sl["slices"]]
+    stat = {s["n"]: s for s in st["slices"]}
+    for n in nums:
+        d, s = by_n.get(n, {}), stat.get(n, {})
+        title = d.get("title") or s.get("title") or "slice %d" % n
+        commits = slice_commits(ctx, slug, n)
+        bits = [chip("done", "ok") if s.get("done") else chip("UNVERIFIED", "bad") if s.get("unverified") else chip("not built yet")]
+        if d.get("points") is not None:
+            bits.append(chip("%s point(s)" % fmt_pts(d["points"])))
+        if d.get("needs_user"):
+            bits.append(chip("needs you present", "warn"))
+        if commits:
+            bits.append(chip("commit " + commits[-1][:10]))
+        body = "<p class=\"meta\">%s</p>" % " ".join(bits)
+        if d.get("what"):
+            body += "<p>%s</p>" % inline_md(d["what"])
+        if d.get("proof"):
+            body += "<p class=\"meta\">Proof planned: %s</p>" % inline_md(d["proof"])
+        if s.get("unverified"):
+            body += "<p><strong>Not proven:</strong> %s</p>" % html.escape(s["unverified"])
+            attention.append("<li>Slice %d is <strong>UNVERIFIED</strong>: %s</li>" % (n, html.escape(s["unverified"])))
+        elif d.get("needs_user") and not s.get("done"):
+            attention.append("<li>Slice %d needs you present before it starts.</li>" % n)
+        if (out_dir / ("slice-%d.html" % n)).exists():
+            body += "<p><a href=\"slice-%d.html\">Open the review page for this slice</a> (code tour, proof and diff)</p>" % n
+        slices.append(sec_html("slice-%d" % n, "Slice %d — %s" % (n, title), body, tag="article", cls="slice"))
+
+    def bullets(items, empty):
+        return "<ul>%s</ul>" % "".join("<li>%s</li>" % inline_md(x) for x in items) if items else "<p class=\"meta\">%s</p>" % empty
+
+    work = ""
+    if (pdir / "05-work-items.md").is_file():
+        work = ("<section><h2>Work items and estimate</h2><details class=\"doc\"><summary>%s points in total <span class=\"path\">05-work-items.md</span></summary>"
+                "<div class=\"body\">%s</div></details></section>" % (fmt_pts(pts), md_to_html(read(pdir / "05-work-items.md"))))
+    gate_label = ("the whole plan" if gate == "plan" else "Gate %s — %s" % (gate, GATE_NAMES.get(gate, ""))) if gate else \
+        ("slices" if all_gates else "general feedback")
+    plan_json = json.dumps({"slug": slug, "title": st["title"] or slug, "gate": ("gate" + gate if gate and gate != "plan" else gate or "feedback"),
+                            "gateLabel": gate_label, "awaiting": awaiting, "version": plan_version(pdir)},
+                           ensure_ascii=False).replace("</", "<\\/")
+    if awaiting:
+        so_title = "Sign off: %s" % (gate_label[:1].upper() + gate_label[1:])
+        so_help = ("Read the open document below, comment where something should change, choose a decision, then send your review "
+                   "with the button at the bottom of the page.")
+    else:
+        so_title = "Your feedback"
+        so_help = ("Nothing is waiting for your sign-off right now. You can still comment on any part of the plan or any slice; "
+                   "send it with the button at the bottom of the page and it will be treated as feedback.")
+    page = fill(read(WALK / "index.html"), {
+        "css": read(WALK / "style.css"), "slug": html.escape(slug), "plan_title": html.escape(st["title"] or slug),
+        "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "chips": "\n    ".join(chips),
+        "now_class": kind, "now_label": html.escape(label), "now_text": html.escape(sentence),
+        "steps": "\n  ".join(steps), "signoff_title": html.escape(so_title), "signoff_help": so_help,
+        "decision_hidden": "" if awaiting else "hidden",
+        "attention_section": ("<section><h2>Needs your attention</h2><div class=\"card warnbox\"><ul>%s</ul></div></section>" % "".join(attention)) if attention else "",
+        "docs": "\n".join(docs) or "<p class=\"meta\">No plan documents yet.</p>",
+        "slices": "\n".join(slices) or "<p class=\"meta\">The slice plan has not been written yet.</p>",
+        "work_items_section": work,
+        "decisions": bullets(st["lists"].get("Decisions taken by the user", []), "None recorded."),
+        "amendments": bullets(st["lists"].get("Amendments at approval", []), "None recorded."),
+        "plan_json": plan_json})
+    write(out_dir / "index.html", page)
+    return str(out_dir / "index.html")
+
+
+def refresh_home(ctx, slug):
+    """Regenerate the home page after a state change. Never fails the command that called it."""
+    try:
+        return render_home(ctx, slug)
+    except Exception:
+        return None
+
+
 def render_walkthrough(ctx, slug, only=None):
     pdir, sf, st, sl = load_plan(ctx, slug)
     out_dir = walk_dir(ctx, slug, pdir)
@@ -1304,7 +1477,7 @@ def render_walkthrough(ctx, slug, only=None):
     css = read(WALK / "style.css")
     by_n = {s["n"]: s for s in sl["slices"]}
     total = max(len(st["slices"]), len(sl["slices"]))
-    written, rows, attention = [], [], []
+    written = []
     nums = [s["n"] for s in st["slices"]] or [s["n"] for s in sl["slices"]]
     stat = {s["n"]: s for s in st["slices"]}
     for n in nums:
@@ -1370,44 +1543,7 @@ def render_walkthrough(ctx, slug, only=None):
                 "diffs": "\n".join(diffs), "nav": "<p>%s</p>" % " · ".join(nav), "sha": last[:10]})
             write(out_dir / ("slice-%d.html" % n), page)
             written.append(str(out_dir / ("slice-%d.html" % n)))
-        state = (chip("done", "ok") if s.get("done") else chip("UNVERIFIED", "bad") if s.get("unverified")
-                 else chip("pending"))
-        link = "<a href=\"slice-%d.html\">review</a>" % n if (out_dir / ("slice-%d.html" % n)).exists() else "—"
-        rows.append("<tr><td class=\"num\">%d</td><td>%s</td><td class=\"num\">%s</td><td>%s</td><td><code>%s</code></td><td>%s</td></tr>"
-                    % (n, html.escape(title), fmt_pts(d.get("points")), state,
-                       (commits[-1][:10] if commits else "—"), link))
-        if s.get("unverified"):
-            attention.append("<li>Slice %d is <strong>UNVERIFIED</strong>: %s</li>" % (n, html.escape(s["unverified"])))
-        elif d.get("needs_user") and not s.get("done"):
-            attention.append("<li>Slice %d needs the user present before it starts.</li>" % n)
-    chips = [chip(st["tier"] or "Full"), chip(st["project"] or "project")]
-    for g in st["gates"]:
-        chips.append(chip("%s: %s" % ("Gate " + g["key"] if g["key"] != "plan" else "Plan", g["state"]),
-                          "ok" if g["state"] == "approved" else "warn"))
-    pts = (sl["plan_points"] or 0) + sum(s["points"] or 0 for s in sl["slices"])
-    if pts:
-        chips.append(chip("%s points" % fmt_pts(pts)))
-    gates = []
-    names = [("00-research.md", "Research"), ("01-product.md", "Gate 1 — Product"),
-             ("02-architecture.md", "Gate 2 — Architecture"), ("03-program-design.md", "Gate 3 — Program design"),
-             ("04-slices.md", "Gate 4 — Slices"), ("plan.md", "Plan (Lite)"), ("05-work-items.md", "Work items")]
-    for name, label in names:
-        if (pdir / name).is_file():
-            gates.append("<details><summary>%s <span class=\"path\">%s</span></summary><div class=\"body\">%s</div></details>"
-                         % (html.escape(label), name, md_to_html(without_placeholders(read(pdir / name)))))
-
-    def bullet_list(items, empty):
-        return "<ul>%s</ul>" % "".join("<li>%s</li>" % inline_md(x) for x in items) if items else "<p class=\"meta\">%s</p>" % empty
-    page = fill(read(WALK / "index.html"), {
-        "css": css, "slug": html.escape(slug), "plan_title": html.escape(st["title"] or slug),
-        "chips": "\n    ".join(chips),
-        "slice_table": "<table><thead><tr><th class=\"num\">#</th><th>Slice</th><th class=\"num\">Points</th><th>State</th><th>Commit</th><th>Walkthrough</th></tr></thead><tbody>%s</tbody></table>" % "".join(rows) if rows else "<p class=\"meta\">No slices yet.</p>",
-        "attention_section": "<section><h2>Needs attention</h2><div class=\"card\"><ul>%s</ul></div></section>" % "".join(attention) if attention else "",
-        "decisions": bullet_list(st["lists"].get("Decisions taken by the user", []), "None recorded."),
-        "amendments": bullet_list(st["lists"].get("Amendments at approval", []), "None recorded."),
-        "gates": "\n".join(gates)})
-    write(out_dir / "index.html", page)
-    written.append(str(out_dir / "index.html"))
+    written.append(render_home(ctx, slug))
     return out_dir, written
 
 
@@ -1535,7 +1671,8 @@ def cmd_init(args):
     index_update(ctx, slug, state="planning", tier=m["tier"], branch=code_branch, started=today())
     store_commit(ctx, slug, "plan(%s): start" % slug)
     k = ctx.knowledge()
-    data = {"slug": slug, "path": str(pdir), "tier": m["tier"], "project": kind, "evidence": why,
+    home = refresh_home(ctx, slug)
+    data = {"slug": slug, "path": str(pdir), "home": home, "tier": m["tier"], "project": kind, "evidence": why,
             "code_branch": code_branch, "base": base, "store": ctx.store_label(), "files": files,
             "knowledge": k, "notes": notes,
             "next": ("Fresh project: skip codebase research; record the user's context and constraints in 00-research.md, then Gate 1."
@@ -1543,7 +1680,7 @@ def cmd_init(args):
                      "Existing project: run `context`, research the area, fill 00-research.md, then Gate 1.")}
     text = "\n".join(["plan folder: %s" % pdir, "tier: %s · project: %s (%s)" % (m["tier"], kind, why),
                       "code branch: %s (base %s)" % (code_branch or "-", base or "-"),
-                      "files: " + ", ".join(files)] + ["note: " + n for n in notes] + ["next: " + data["next"]])
+                      "files: " + ", ".join(files), "plan home page: %s" % home] + ["note: " + n for n in notes] + ["next: " + data["next"]])
     emit(args, data, text)
 
 
@@ -1577,6 +1714,8 @@ def cmd_status(args):
     if data["user_decisions"]:
         lines.append("decisions taken by the user (do not undo):")
         lines += ["  - " + d for d in data["user_decisions"]]
+    data["home"] = refresh_home(ctx, args.slug)
+    lines.append("plan home page: %s" % data["home"])
     lines.append("NEXT: " + nxt["text"])
     emit(args, data, "\n".join(lines))
 
@@ -1726,8 +1865,11 @@ def cmd_gate(args):
     sha = store_commit(ctx, args.slug, "plan(%s): %s %s" % (args.slug, label, state.replace("-", " ")))
     st2 = parse_status(read(sf))
     nxt = next_action(st2, parse_slices(pdir))
-    emit(args, {"gate": key, "state": state, "store_commit": sha, "hints": hints, "next": nxt},
-         "\n".join(["%s recorded as %s" % (label, state)] + ["hint: " + h for h in hints] + ["NEXT: " + nxt["text"]]))
+    home = refresh_home(ctx, args.slug)
+    if state == "in-progress":
+        hints.append("give the user the plan home page link: they can read the doc, comment and sign off there")
+    emit(args, {"gate": key, "state": state, "store_commit": sha, "hints": hints, "home": home, "next": nxt},
+         "\n".join(["%s recorded as %s" % (label, state), "plan home page: %s" % home] + ["hint: " + h for h in hints] + ["NEXT: " + nxt["text"]]))
 
 
 def cmd_save(args):
@@ -1746,6 +1888,7 @@ def cmd_save(args):
         emit(args, {"committed": True, "where": "code branch"}, "committed plan folder on the code branch (in-tree mode)")
         return
     sha = store_commit(ctx, args.slug, msg)
+    refresh_home(ctx, args.slug)
     emit(args, {"committed": bool(sha), "sha": sha, "where": "plan store"},
          "plan store commit %s" % sha if sha else "plan store unchanged")
 
@@ -1842,6 +1985,7 @@ def cmd_commit(args):
     store_sha = store_commit(ctx, args.slug, "plan(%s): slice %d %s%s" % (args.slug, n, "done" if done else "UNVERIFIED",
                                                                            " (%s)" % sha if sha else ""))
     nxt = next_action(st2, parse_slices(pdir))
+    refresh_home(ctx, args.slug)
     pause = not done or nxt["kind"] in ("needs-user", "paused", "closeout", "complete")
     data = {"slice": n, "code_commit": sha, "plan_commit": store_sha, "subject": subject, "unverified": bool(unv),
             "done": done, "pause": pause, "next": nxt}
@@ -1853,13 +1997,90 @@ def cmd_commit(args):
     emit(args, data, "\n".join(lines))
 
 
+def cmd_home(args):
+    ctx = Ctx(args.cwd)
+    path = render_home(ctx, args.slug)
+    emit(args, {"home": path}, "plan home page: %s" % path)
+
+
+def find_review_file(ctx, slug, pdir):
+    cands = []
+    for folder in (pdir, ctx.root, Path.home() / "Downloads"):
+        if not folder.is_dir():
+            continue
+        for f in folder.glob("plan-review-%s-*.json" % slug):
+            try:  # another plan's slug may merely start with this one
+                if f.is_file() and json.loads(read(f).lstrip("﻿")).get("slug") == slug:
+                    cands.append(f)
+            except (ValueError, OSError):
+                continue
+    return max(cands, key=lambda f: f.stat().st_mtime) if cands else None
+
+
+def cmd_review(args):
+    """Read a review exported from the plan home page, record it in the plan folder, print it."""
+    ctx = Ctx(args.cwd)
+    pdir, sf, st, sl = load_plan(ctx, args.slug)
+    src = Path(args.file) if args.file else find_review_file(ctx, args.slug, pdir)
+    if src is None or not src.is_file():
+        raise PlanError("no review file found for '%s'. Looked for plan-review-%s-*.json in the plan folder, %s and %s. "
+                        "If the user pasted their review into the chat, act on that text directly."
+                        % (args.slug, args.slug, ctx.root, Path.home() / "Downloads"))
+    try:
+        data = json.loads(read(src).lstrip("﻿"))
+    except ValueError as e:
+        raise PlanError("%s is not valid JSON: %s" % (src, e))
+    if data.get("kind") != "software-factory-review":
+        raise PlanError("%s is not a review exported from a plan home page" % src)
+    if data.get("slug") != args.slug:
+        raise PlanError("that review is for plan '%s', not '%s'" % (data.get("slug"), args.slug))
+    comments = [c for c in data.get("comments", []) if (c.get("text") or "").strip()]
+    decision = data.get("decision") or "none"
+    stale = data.get("version") and data["version"] != plan_version(pdir)
+    digest = hashlib.sha1(json.dumps([decision, data.get("overall"), comments], sort_keys=True).encode("utf-8")).hexdigest()[:10]
+    rdir = pdir / "reviews"
+    known = {f.stem.rsplit("-", 1)[-1] for f in rdir.glob("*.json")} if rdir.is_dir() else set()
+    recorded = None
+    if digest not in known:
+        stamp = re.sub(r"[^0-9]", "", str(data.get("exported", "")))[:12] or dt.datetime.now().strftime("%Y%m%d%H%M")
+        recorded = rdir / ("%s-%s-%s.json" % (data.get("gate") or "feedback", stamp, digest))
+        write(recorded, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        store_commit(ctx, args.slug, "plan(%s): review received (%s, %s)" % (args.slug, data.get("gateLabel") or data.get("gate"), decision))
+    gate = str(data.get("gate") or "").replace("gate", "")
+    how = {
+        "approve": "A clear yes. If there are comments, they are notes, not conditions: answer them, then `gate %s %s approved`." % (args.slug, gate),
+        "approve-with-changes": "Approved on condition. Fold every comment into the doc, then `gate %s %s approved --amend \"<what changed>\"` "
+                                "(one --amend per change). Ask again only if a change alters a decision the user has not seen." % (args.slug, gate),
+        "changes": "Not approved. Revise the doc to address every comment, then ask the approval question again.",
+        "feedback": "No sign-off was pending. Treat each comment as feedback: answer it, and say what you changed or why not.",
+        "none": "No decision was chosen. Address the comments, then ask the approval question again.",
+    }.get(decision, "Unknown decision: ask the user what they meant.")
+    lines = ["review of %s — %s — from %s" % (args.slug, data.get("gateLabel") or gate or "feedback", src),
+             "decision: %s" % decision]
+    if (data.get("overall") or "").strip():
+        lines.append("overall: %s" % data["overall"].strip())
+    lines.append("comments (%d):" % len(comments))
+    for i, c in enumerate(comments, 1):
+        where = c.get("section") if str(c.get("target", "")).startswith("slice-") else "%s › %s" % (c.get("target"), c.get("section"))
+        lines.append("  %d. [%s] %s" % (i, where, " ".join(c["text"].split())))
+    if stale:
+        lines.append("WARNING: the plan changed after this review was written. Check each comment still applies and tell the user.")
+    lines.append("recorded: %s" % recorded if recorded else "already recorded earlier (same decision and comments)")
+    lines.append("what to do: %s" % how)
+    lines.append("In your reply, list each comment and how it was handled. A review file is the user's answer only "
+                 "because they told you in the conversation that they submitted it.")
+    emit(args, {"source": str(src), "decision": decision, "gate": gate, "overall": data.get("overall", ""), "comments": comments,
+                "stale": bool(stale), "recorded": str(recorded) if recorded else None, "next": how}, "\n".join(lines))
+
+
 def cmd_walkthrough(args):
     ctx = Ctx(args.cwd)
     if not ctx.is_git:
         raise PlanError("walkthroughs render git diffs; this is not a git repository")
     out_dir, written = render_walkthrough(ctx, args.slug, only=set(args.slice) if args.slice else None)
-    emit(args, {"dir": str(out_dir), "written": written, "index": str(out_dir / "index.html")},
-         "\n".join(["wrote %d page(s) to %s" % (len(written), out_dir)] + ["  " + w for w in written]))
+    emit(args, {"dir": str(out_dir), "written": written, "index": str(out_dir / "index.html"), "home": str(out_dir / "index.html")},
+         "\n".join(["wrote %d page(s) to %s" % (len(written), out_dir)] + ["  " + w for w in written]
+                   + ["plan home page: %s" % (out_dir / "index.html")]))
 
 
 def cmd_work_items(args):
@@ -1890,6 +2111,7 @@ def cmd_work_items(args):
         out["csv"] = str(f)
         lines.append("export: %s (import it yourself; nothing was sent to the tracker)" % f)
     store_commit(ctx, args.slug, "plan(%s): work items" % args.slug)
+    refresh_home(ctx, args.slug)
     emit(args, out, "\n".join(lines))
 
 
@@ -2042,6 +2264,7 @@ def cmd_harvest(args):
         if (pdir / "work-items.json").is_file():
             write_work_items(ctx, args.slug)
         store_commit(ctx, args.slug, "plan(%s): close-out harvest recorded" % args.slug)
+        refresh_home(ctx, args.slug)
         emit(args, {"harvest": value, "estimate_rows": wrote},
              "harvest recorded: %s%s\nthen: `check %s --closeout`" % (value, " · %d estimate row(s) logged" % wrote if wrote else "", args.slug))
         return
@@ -2244,6 +2467,11 @@ def main(argv=None):
     p = add("walkthrough", cmd_walkthrough, "render the HTML review pages (per slice + plan index)")
     p.add_argument("slug")
     p.add_argument("--slice", type=int, action="append", help="only re-render this slice (index is always refreshed)")
+    p = add("home", cmd_home, "regenerate the plan home page (status, every gate doc, slices, review form) and print its path")
+    p.add_argument("slug")
+    p = add("review", cmd_review, "read a review exported from the plan home page and record it")
+    p.add_argument("slug")
+    p.add_argument("--file", help="the exported JSON (default: newest plan-review-<slug>-*.json in the plan folder, the repo or Downloads)")
     p = add("work-items", cmd_work_items, "build the work-item hierarchy and estimates from the slice plan")
     p.add_argument("slug")
     p.add_argument("--tool", choices=["ado", "jira"])

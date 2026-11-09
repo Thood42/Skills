@@ -288,7 +288,7 @@ a section on what the build verified and what it did not. Read it before changin
   branches) and a close-out harvest into a present-state architecture doc and ADRs in force.
 - **`scripts/plan.py`** (Python, stdlib only) does the bookkeeping. `scripts/selftest.py` drives
   every subcommand through throwaway repos — run it after any change to the script:
-  `python software-factory/scripts/selftest.py` (71 checks; it never touches this repo).
+  `python software-factory/scripts/selftest.py` (81 checks; it never touches this repo).
 - **Careful with git here:** this repo is itself a candidate for `plan.py`, which creates a
   `plans` branch and a `.plans/` worktree in whatever repository it is run from. Run it only from
   a fixture or a real project, never from this repo's root, unless the intent is to plan work on

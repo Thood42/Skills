@@ -591,7 +591,7 @@ if __name__ == "__main__":
                    "`digest` subcommand to it. Without --dry-run the command refuses on purpose: sending is slice 2.")
 
 
-def case_work_items_hierarchy_and_points(d):
+def recurring_plan(d, with_design=True):
     r = mk_repo(d)
     plan(r, "init", "recurring-tasks", "--title", "Recurring tasks")
     p = Path(plan(r, "path", "recurring-tasks"))
@@ -612,6 +612,8 @@ def case_work_items_hierarchy_and_points(d):
         "- Create the next occurrence when the current one is completed — instead of generating occurrences on a schedule — because nothing runs in the background today\n- Month arithmetic clamps to the last day of the month — instead of rolling into the next month — because that is what people expect of a monthly chore",
         "- Completing a task and adding the next one can be written in a single save: proven by spike (two writes in one save call, file intact after an interrupt)",
         "nowhere"))
+    if not with_design:
+        return r, p
     write(p / "03-program-design.md", design(
         "Recurring tasks",
         "- tasktrack/recur.py: new — `next_due`\n- tasktrack/store.py: `add` accepts `repeat` and `due`; `complete` adds the next occurrence\n- tasktrack/cli.py: `--repeat` and `--due` on `add`; `list` shows the due date and a repeat marker\n- tests/test_recur.py, tests/test_store_repeat.py: new",
@@ -619,7 +621,36 @@ def case_work_items_hierarchy_and_points(d):
         "cli.main → store.complete → recur.next_due → store.add",
         "1. test_next_due_daily — one day later\n2. test_next_due_weekly — seven days later\n3. test_next_due_monthly_clamps — 31 January gives 28 or 29 February\n4. test_complete_repeating_adds_next — one new open task with the next date\n5. test_complete_plain_adds_nothing — non-repeating tasks behave as today\n6. test_old_file_loads — a file with no repeat or due fields still loads\n7. test_add_rejects_unknown_repeat — a clear error, nothing saved",
         "1. `complete` doing two things (mark done, add next) rather than the command handler doing the second"))
+    return r, p
+
+
+def case_work_items_hierarchy_and_points(d):
+    r, p = recurring_plan(d)
     approve(r, "recurring-tasks", "1", "2", "3")
+
+
+def case_review_comments_folded_in(d):
+    """Gate 2 is waiting; the user reviewed it on the plan home page and downloaded the review."""
+    import json
+    r, p = recurring_plan(d, with_design=False)
+    approve(r, "recurring-tasks", "1")
+    plan(r, "gate", "recurring-tasks", "2", "in-progress")
+    home = Path(plan(r, "home", "recurring-tasks").split("plan home page: ", 1)[1].strip())
+    meta = json.loads(home.read_text(encoding="utf-8").split("var PLAN = ", 1)[1].split(";\n", 1)[0])
+    review = {
+        "kind": "software-factory-review", "schema": 1, "slug": "recurring-tasks", "title": "Recurring tasks",
+        "gate": "gate2", "gateLabel": "Gate 2 — Architecture", "awaiting": True, "version": meta["version"],
+        "exported": "2026-10-20T09:30:00.000Z", "decision": "approve-with-changes",
+        "overall": "Happy with the shape. Three changes, then carry on.",
+        "comments": [
+            {"target": "02-architecture.md", "section": "Data",
+             "text": "Call the field `repeats`, not `repeat`. That is the word the team already uses."},
+            {"target": "02-architecture.md", "section": "Decisions",
+             "text": "Add a decision: the next due date is worked out from the task's due date, not from the day it was completed. Otherwise a late Monday chore drifts to Tuesday."},
+            {"target": "02-architecture.md", "section": "Where a human must stay in the loop",
+             "text": "Not nowhere. Anything that changes what is written to the saved file needs me present."},
+        ]}
+    write(r / "plan-review-recurring-tasks-gate2-20261020-0930.json", json.dumps(review, indent=2, ensure_ascii=False) + "\n")
 
 
 def case_fresh_project_seeds_architecture(d):

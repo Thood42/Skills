@@ -110,9 +110,10 @@ Example:
 
 - `slice-N.html` — that slice only: what it set out to do, the tour, the proof, the files
   changed and the diff of that slice's commit.
-- `index.html` — the plan walkthrough: gate states, every slice with its state and a link,
-  decisions the user took, anything unverified, and each gate doc folded away underneath.
+- `index.html` — the plan home page: where the plan stands, every gate document, every slice
+  with its state and a link to its review page, decisions the user took, anything unverified,
+  and a comment box on each part so the user can send feedback from the page.
 
 Both are generated entirely from the slice commit and the plan folder, which is why the tour
 and proof go in the commit message. They are never committed to a code branch and can be
-re-rendered at any time. Give the user the path to `index.html` in the final report.
+re-rendered at any time. Give the user the home page link in the final report.

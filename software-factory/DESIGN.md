@@ -1,6 +1,6 @@
 # software-factory v2 — design and decision record
 
-Status: **v2 built 2026-11-09 (`metadata.version` 2.0.0); eval runs not yet done** — branch
+Status: **v2 built 2026-11-09 (`metadata.version` 2.0.0); first eval round run on 3 of 12 cases** — branch
 `claude/software-factory-v2`. The first commit on this branch imports the installed v1 `SKILL.md`
 verbatim, so v2 is reviewable as a diff against what ran before.
 
@@ -665,6 +665,10 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
    fixed home (a present-state architecture doc and ADRs in force), and harvests into them only
    the parts of a plan that future decisions or workflows need; everything else stays in the
    plan store (upgrade 13). This also moves the plan index off the default branch.
+9. **A plan home page with review and sign-off** (added after the first eval round, on seeing
+   the walkthrough pages). One HTML page per plan shows the whole plan and its current status
+   from a single link. The user can comment on any section or slice and choose a sign-off
+   decision there, and those comments come back as feedback the agent must act on.
 
 ## 9. Sources
 
@@ -711,23 +715,40 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
   and a plan actually created at that path is used in place. Moving that skill to
   `plan.py path` is a separate change.
 
+- **The plan walkthrough index became the plan home page** (decision 9). It exists from
+  `init` onward and is regenerated on every state change. Because a static page cannot write to
+  the conversation, a review returns in one of two ways: copied to the clipboard and pasted into
+  chat, or downloaded as a file that `plan.py review` imports and records under `reviews/`. A
+  review file counts as the user's answer only once the user says in the conversation that they
+  sent it, so approval still happens in the conversation.
+
 **Verified.**
 
-- `scripts/selftest.py`: 71 checks across an existing project, a fresh project on the Lite tier,
+- `scripts/selftest.py`: 81 checks across an existing project, a fresh project on the Lite tier,
   a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
   an external store, a linked worktree and an overlay rule file. All pass on Windows with
   Git 2.44 and Python 3.11.
 - Walkthrough pages rendered in a real browser at desktop and phone widths: no console errors,
   no horizontal overflow, slice links resolve.
+- The plan home page exercised in a real browser: commenting, the decision choice, the review
+  text, comments surviving a reload, the "plan changed" notice, and the feedback-only state when
+  no gate is waiting. Copying to the clipboard could only be tested through its fallback path.
 - Every eval fixture builds through `evals/files/build_fixture.py`, and each resulting plan
   passes `plan.py check`.
 - `quick_validate` from skill-creator accepts the skill.
 
 **Not verified.**
 
-- **No eval has been run.** How a model behaves with this SKILL.md — whether it offers the tier,
-  runs slices without stopping, records an unprovable slice honestly — is untested. The eleven
-  cases in `evals/` exist for that; v1 as first committed on this branch is the baseline.
+- **Most model behaviour.** One eval round has been run: three cases (a new feature on an
+  existing repo, building approved slices, a slice that cannot be proven), each once with v2 and
+  once with v1, graded by the skill's author. v2 met 22 of 22 assertions and v1 11 of 22; v1
+  passed all nine assertions that both versions were designed to meet, so the gap mostly
+  measures features v1 does not have. Nine cases have never been run, including the tier offer,
+  work items, close-out and the review flow from the plan home page, which was added after that
+  round. v1 as first committed on this branch is the baseline.
+- **Three behaviours seen in that round are not yet addressed**: HTML mockups produced for a
+  command-line tool, a stop to ask before close-out after the last slice, and an UNVERIFIED
+  reason written into the status file as a paragraph.
 - **Tracker imports.** The Azure DevOps and Jira CSV shapes follow the vendors' documented
   hierarchy columns (`Title 1..N`; `Issue ID` / `Parent`). Field names for points and estimates
   were not tried against a live board, and company-managed Jira projects may want an epic-link

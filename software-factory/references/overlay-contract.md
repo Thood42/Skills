@@ -59,6 +59,8 @@ An overlay can depend on these not changing within a major version:
 - **Work-item fields.** Through `workItems.mapping` in the settings, or by post-processing
   `work-items.json`.
 - **Rows in the close-out harvest**, for durable files the overlay maintains.
+- **Its verdict on the plan home page.** Anything the overlay appends to a gate document under
+  its own `##` heading appears on the home page as a commentable section.
 
 ## What an overlay must not do
 

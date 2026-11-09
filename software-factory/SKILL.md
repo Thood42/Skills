@@ -58,7 +58,8 @@ python <skill-dir>/scripts/plan.py <command> [--json]
 | Starting a plan | `init <slug> [--lite] --title "…"` | Mounts the plan store, copies the templates, cuts the feature branch |
 | Starting research | `context --area <path>` | Architecture doc, ADRs in force, earlier plans, estimate history in one read |
 | Any session start | `status <slug>` then `digest <slug>` | The next action, then a compact view of every gate doc |
-| Before asking for approval | `check <slug> --gate N` | Lints the gate doc (tech talk in Gate 1, missing proof or estimate in Gate 4, leftover template text) |
+| Before asking for approval | `check <slug> --gate N`, then `gate <slug> N in-progress` | Lints the gate doc, marks it as awaiting sign-off and refreshes the plan home page |
+| The user says they sent a review | `review <slug>` | Reads the review they exported from the home page, records it, lists every comment |
 | After the user answers | `gate <slug> N approved [--amend "…"] [--decision "…"]` | Records the approval, amendments and overrides, commits the plan state |
 | After each slice | `commit <slug> --slice N …` then `walkthrough <slug> --slice N` | The structured commit, the ticked checkbox, the review page |
 | Slice plan drafted | `work-items <slug> [--export ado\|jira]` | The work-item hierarchy, totals and import file |
@@ -90,8 +91,19 @@ the detail.
   03-program-design.md  Gate 3
   04-slices.md          Gate 4: slices with proof, estimate and tasks
   05-work-items.md      generated view of the work-item hierarchy (+ work-items.json)
-  walkthrough/          generated review pages, never committed
+  reviews/              reviews the user sent from the home page, as received
+  walkthrough/          generated pages, never committed:
+    index.html          the plan home page (below)
+    slice-N.html        one review page per built slice
 ```
+
+**The plan home page.** Every plan has one page that shows all of it: where it stands and
+whether anything is waiting on the user, every gate document in full, the slices with their
+review pages, the work items and the decisions taken. The script regenerates it whenever the
+plan's state changes and prints its path as `plan home page: …`. Give the user that one link
+whenever you report on a plan. On it they can comment on any section or slice, choose a
+decision when a gate is waiting, and send it all back with one button — see the approval
+protocol. It is a static file: tell them to reload it to see the latest state.
 
 **Resume rule.** At the start of any session where a plan exists for the feature being
 discussed, run `status` and `digest` before anything else, then continue from the first
@@ -125,20 +137,32 @@ wrong place.
 
 1. Write the gate doc from its template. Run `plan.py check <slug> --gate N` and fix what it
    reports.
-2. Present a summary: at most 5–10 bullet decisions plus the doc path. Do not paste the whole
-   doc into chat.
-3. Ask exactly: **"Approve Gate N, or what should change?"** (Lite: "Approve the plan, or what
+2. `plan.py gate <slug> N in-progress`. The home page now shows this gate as waiting on the
+   user, with its document open for comment.
+3. Present a summary: at most 5–10 bullet decisions, then the plan home page link as the place
+   to read the full document, comment and sign off. Do not paste the whole doc into chat.
+4. Ask exactly: **"Approve Gate N, or what should change?"** (Lite: "Approve the plan, or what
    should change?")
-4. Three outcomes (for Lite, the gate name is `plan` in place of N):
+5. The answer can arrive three ways, and each is the user's answer:
+   - typed in the conversation;
+   - a review pasted from the home page (it starts "Plan review:" and carries a decision and
+     numbered comments);
+   - the user saying they downloaded or submitted their review — then run
+     `plan.py review <slug>`, which finds the file, records it and lists the comments.
+
+   A review file you find on disk is **not** an answer until the user says in the conversation
+   that they sent it. When an answer carries comments, deal with every one and say in your
+   reply what you did with each: changed, or not changed and why.
+6. Three outcomes (for Lite, the gate name is `plan` in place of N):
    - **A clear yes** → `plan.py gate <slug> N approved`.
    - **Yes, with a change** → fold the change into the doc, then
      `plan.py gate <slug> N approved --amend "<what changed>"`. Ask again only if the change
      alters a decision the user has not seen in its new form.
    - **Anything else** → revise the doc to address the answer and ask again.
-5. Whenever the user chooses against your recommendation, record it with
+7. Whenever the user chooses against your recommendation, record it with
    `--decision "<what they chose> — <their reason>"`. Those are the decisions a later session
    is most likely to undo by being helpful.
-6. **Backtracking:** if later work shows an approved decision is wrong, stop, fix the earlier
+8. **Backtracking:** if later work shows an approved decision is wrong, stop, fix the earlier
    doc, set that gate back with `plan.py gate <slug> N in-progress`, and get it re-approved
    before continuing.
 
@@ -215,9 +239,14 @@ For each slice:
 - a slice shows an approved gate was wrong — backtrack through the approval protocol;
 - a test cannot be made to pass honestly.
 
-When the last slice is done, report once: slices completed, the path of the plan walkthrough
-(the `index.html` the walkthrough command printed), anything unverified, and what close-out
-will do.
+When the last slice is done, report once: slices completed, the plan home page link, anything
+unverified, and what close-out will do.
+
+**Comments on built slices.** The user can comment on any slice from the home page at any
+time. Treat each comment as feedback on finished work: a correction becomes a further slice
+under Post-ship in the slice plan and goes through the same build, prove, commit loop; a
+comment that shows an approved gate was wrong is a backtrack. Never amend a slice's commit to
+absorb a comment — the next commit is the record of the change.
 
 **Why the walkthrough matters.** Running slices without stopping only works if the user can
 still follow the code. Teams that stopped reading what their agents wrote found out late, when

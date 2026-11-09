@@ -224,6 +224,42 @@ def scenario_existing(root):
     check("gate: refuses to record approval while checks fail", "cannot record approval" in out, out)
     write(pdir / "01-product.md", PRODUCT_OK)
     plan(d, "check", "pay-export", "--gate", "1")
+
+    # plan home page and review round trip
+    home = Path(init["home"]) if init and init.get("home") else pdir / "walkthrough" / "index.html"
+    check("home: the plan has a home page from the moment it is created", home.is_file() and home.name == "index.html", str(home))
+    rc, out, g = plan(d, "gate", "pay-export", "1", "in-progress", "--json")
+    page = read(home)
+    check("home: a gate presented for approval shows as waiting on the user, open and commentable",
+          "Waiting on you" in page and '<details class="doc await" open>' in page
+          and 'data-target="01-product.md" data-section="Problem"' in page and "Sign off: Gate 1" in page, page[:300])
+    meta = json.loads(page.split("var PLAN = ", 1)[1].split(";\n", 1)[0])
+    check("home: embedded plan data is valid and names the gate", meta["slug"] == "pay-export" and meta["gate"] == "gate1" and meta["awaiting"] is True, meta)
+    check("home: page is self-contained (no network references)", "http://" not in page and "https://" not in page)
+    review = {"kind": "software-factory-review", "schema": 1, "slug": "pay-export", "gate": "gate1", "gateLabel": "Gate 1 — Product",
+              "awaiting": True, "version": meta["version"], "exported": "2026-01-15T10:30:00.000Z", "decision": "approve-with-changes",
+              "overall": "Good direction.",
+              "comments": [{"target": "01-product.md", "section": "Scope", "text": "Refunds must be in scope."},
+                           {"target": "01-product.md", "section": "Success metric", "text": "Name who\nowns the number."}]}
+    write(d / "plan-review-pay-export-gate1-20260115-1030.json", json.dumps(review))
+    write(d / "plan-review-pay-export-v2-gate1-20260115-1031.json", json.dumps(dict(review, slug="pay-export-v2")))
+    rc, out, r = plan(d, "review", "pay-export", "--json")
+    check("review: finds the user's exported review, ignoring another plan with a longer slug",
+          r and r["decision"] == "approve-with-changes" and len(r["comments"]) == 2 and r["gate"] == "1" and not r["stale"], out)
+    check("review: recorded in the plan folder and committed to the store",
+          r and r["recorded"] and Path(r["recorded"]).is_file() and "review received" in sh(["git", "log", "-1", "--format=%s", "plans"], d), out)
+    rc, out, _ = plan(d, "review", "pay-export")
+    check("review: readable digest says what to do, and a second import is not recorded twice",
+          "[01-product.md › Scope] Refunds must be in scope." in out and "Name who owns the number." in out
+          and "already recorded earlier" in out and "--amend" in out, out)
+    os.remove(d / "plan-review-pay-export-gate1-20260115-1030.json")
+    os.remove(d / "plan-review-pay-export-v2-gate1-20260115-1031.json")
+    write(d / "old-review.json", json.dumps(dict(review, version="0000000000", overall="changed")))
+    rc, out, r = plan(d, "review", "pay-export", "--file", "old-review.json", "--json")
+    check("review: warns when the plan changed after the review was written", r and r["stale"], out)
+    os.remove(d / "old-review.json")
+    check("review: nothing from the review flow touched the code branch", sh(["git", "status", "--porcelain"], d) == "")
+
     rc, out, g = plan(d, "gate", "pay-export", "1", "approved", "--amend", "also cover refunds",
                       "--decision", "keep CSV — because accountants asked for it", "--json")
     st = read(pdir / "00-status.md")
@@ -309,6 +345,8 @@ def scenario_existing(root):
     ix = read(wdir / "index.html") if (wdir / "index.html").is_file() else ""
     check("walkthrough: index links slices and shows gate docs and user decisions",
           'href="slice-3.html"' in ix and "Gate 2 — Architecture" in ix and "keep CSV" in ix)
+    check("home: every slice is commentable and the page reports that close-out is next",
+          ix.count('class="slice" data-target="slice-') == 3 and "Close-out is next" in ix and "Your feedback" in ix, ix[:300])
     check("walkthrough: pages are not committed anywhere",
           sh(["git", "status", "--porcelain"], d / ".plans") == "" and "walkthrough" not in sh(["git", "ls-tree", "-r", "--name-only", "plans"], d))
 
