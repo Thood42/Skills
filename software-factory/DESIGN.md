@@ -1,11 +1,12 @@
-# software-factory v2 — upgrade proposal
+# software-factory v2 — design and decision record
 
-Status: **decisions taken 2026-11-09, ready to implement** — branch `claude/software-factory-v2`.
-The first commit on this branch imports the installed v1 `SKILL.md` verbatim, so the eventual v2
-lands as a reviewable diff against what runs today.
+Status: **v2 built 2026-11-09 (`metadata.version` 2.0.0); eval runs not yet done** — branch
+`claude/software-factory-v2`. The first commit on this branch imports the installed v1 `SKILL.md`
+verbatim, so v2 is reviewable as a diff against what ran before.
 
-This document is the proposal and its decision record. Nothing in the skill has changed yet.
-§8 records Trevor's decisions; §7 is the implementation plan that follows from them.
+This document began as the upgrade proposal and is kept as the decision record. §1–§7 are the
+proposal as agreed, §8 records Trevor's decisions, and §10 says where the build departs from the
+proposal and what has and has not been verified.
 
 ## Contents
 
@@ -18,6 +19,7 @@ This document is the proposal and its decision record. Nothing in the skill has 
 7. Implementation and evaluation plan
 8. Decisions taken (2026-11-09)
 9. Sources
+10. As built: departures from the proposal, and verification
 
 ---
 
@@ -678,3 +680,58 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
   https://openclawdatabase.com/news/videos/2026-08-07-program-design-system-agentic-engineering/
 - This repo: `docs/plans/slide-forge-composer/` and `docs/plans/slide-forge-motion/` (complete
   v1 runs), `building-vscode-extensions/workflows/feature.md` and `DESIGN.md` (the overlay).
+
+## 10. As built: departures from the proposal, and verification
+
+**Departures.** Each was a simplification found while building; none changes a decision in §8.
+
+- **Estimates and tasks have one home.** Points, basis, confidence and tasks are written in
+  `04-slices.md`; `plan.py work-items` generates `05-work-items.md` and `work-items.json` from
+  it. The proposal had the script emit a skeleton with blank points to fill in afterwards, which
+  would have left two places to keep in step.
+- **More subcommands than the table in upgrade 9.** `config` (what was detected; `--set` writes
+  settings), `gate` (records an approval, amendment or user decision and commits plan state, and
+  refuses to record an approval while `check` reports errors), `save`, `supersede` (archives a
+  superseded ADR) and `retire` (in-tree mode: tag the folder and stage its removal).
+- **The store is mounted beside the main checkout.** A branch can be checked out once, so a
+  session running in a linked worktree uses the store already mounted next to the main checkout
+  instead of trying to mount a second copy.
+- **Walkthrough location in in-tree mode.** Pages go to an ignored `.plan-walkthroughs/<slug>/`
+  beside the checkout, since the plan folder itself is tracked in that mode.
+- **Close-out is stricter.** `check --closeout` also fails on an architecture doc or ADR stub
+  with unfilled sections, so template text cannot reach the default branch.
+- **Unverified slices have two exits.** `--proof-only` records proof for a slice whose code is
+  already committed; `--accepted-by-user "<their words>"` records the user accepting it unproven.
+- **`estimates.csv` logs elapsed hours** between slice commits automatically and leaves actual
+  points blank for a team to fill in; the script cannot know human effort after the fact.
+- **A repository with no commits** gets an empty initial commit from `init` so that a feature
+  branch can be cut from the default branch.
+- **`building-vscode-extensions` is unchanged.** Its feature workflow still names
+  `docs/plans/<feature-slug>/`. v2's SKILL.md tells the model to read that as "the plan folder",
+  and a plan actually created at that path is used in place. Moving that skill to
+  `plan.py path` is a separate change.
+
+**Verified.**
+
+- `scripts/selftest.py`: 71 checks across an existing project, a fresh project on the Lite tier,
+  a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
+  an external store, a linked worktree and an overlay rule file. All pass on Windows with
+  Git 2.44 and Python 3.11.
+- Walkthrough pages rendered in a real browser at desktop and phone widths: no console errors,
+  no horizontal overflow, slice links resolve.
+- Every eval fixture builds through `evals/files/build_fixture.py`, and each resulting plan
+  passes `plan.py check`.
+- `quick_validate` from skill-creator accepts the skill.
+
+**Not verified.**
+
+- **No eval has been run.** How a model behaves with this SKILL.md — whether it offers the tier,
+  runs slices without stopping, records an unprovable slice honestly — is untested. The eleven
+  cases in `evals/` exist for that; v1 as first committed on this branch is the baseline.
+- **Tracker imports.** The Azure DevOps and Jira CSV shapes follow the vendors' documented
+  hierarchy columns (`Title 1..N`; `Issue ID` / `Parent`). Field names for points and estimates
+  were not tried against a live board, and company-managed Jira projects may want an epic-link
+  column instead of `Parent`. `references/work-items.md` tells the user to trial a few rows first.
+- Linux and macOS, and Git older than 2.44.
+- Description triggering has not been optimized.
+

@@ -106,8 +106,9 @@ wrong place.
 ## Starting a plan
 
 1. `plan.py init <slug> --title "<feature name>"` (add `--lite` for Lite). Read its output: it
-   says whether this is a **fresh** or an **existing** project and what conventions it found.
-   State that reading to the user in one line so they can correct it.
+   says whether this is a **fresh** or an **existing** project, what conventions it found, and
+   which branch it created. Tell the user all three in one or two lines so they can correct
+   any of them.
 2. **Existing project → research first.** Run `plan.py context --area <path>` and read the
    code the feature touches. Fill `00-research.md`: how it works today with file:line
    references, measured baselines, defects marked reproduced or inferred, constraints carried
@@ -245,10 +246,12 @@ slices and go through the same build, prove, commit, walkthrough loop.
 ## Standing rules
 
 - **Version control.** By default the work happens on a new branch cut from the repository's
-  default branch, one commit per slice. The user can override any of it (current branch,
-  another name, no commits); record the override under "Version control" in the status file and
-  honour it in every later session. The repository's own commit rules always apply. Never push,
-  open a pull request or merge unless asked.
+  default branch, one commit per slice. The user can override any of it: `init --no-branch`
+  stays on the current branch, `--branch <name>` and `--base <branch>` choose others, and
+  "Override: no commits" in the status file makes `plan.py commit` tick the slice without
+  committing. Record the override under "Version control" in the status file and honour it in
+  every later session. The repository's own commit rules always apply. Never push, open a pull
+  request or merge unless asked.
 - **Compact at every boundary.** Each gate and each slice ends with everything decided written
   down — nothing important may exist only in chat. A fresh session must be able to continue
   from the plan store and git alone. Aim to keep context use around the middle of the window
