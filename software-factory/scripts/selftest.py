@@ -233,6 +233,8 @@ def scenario_existing(root):
     check("home: a gate presented for approval shows as waiting on the user, open and commentable",
           "Gate 1 is waiting on you" in page and '<details class="doc await" open' in page
           and 'data-target="01-product.md" data-section="Problem"' in page and "Sign off: Gate 1" in page, page[:300])
+    check("home: the feature branch and the planning branch are both named",
+          "<dt>Feature branch</dt><dd>feature/pay-export</dd>" in page and "<dt>Planning branch</dt><dd>plans</dd>" in page, page[:200])
     check("home: route shows one station per gate plus build and close-out, with the waiting one marked",
           page.count('<li class="station ') == 6 and 'class="station is-current needs-you"' in page and "--stations: 6" in page)
     check("home: theme switch, live updates and print controls are present, and both themes are defined",
@@ -358,7 +360,8 @@ def scenario_existing(root):
           ix.count('class="stamp"') == 4 and "15 Jan 2026" in ix and ix.count('class="erow"') == 4
           and "4.5<small>points</small>" in ix and "36 hours" in ix, ix[:300])
     check("slice page: carries the same theme switch and links back to the plan",
-          'id="theme"' in p1 and 'href="index.html"' in p1 and 'details class="file"' in p1)
+          'id="theme"' in p1 and 'href="index.html"' in p1 and 'details class="file"' in p1
+          and "feature branch feature/pay-export" in p1 and "planning branch plans" in p1)
     check("walkthrough: pages are not committed anywhere",
           sh(["git", "status", "--porcelain"], d / ".plans") == "" and "walkthrough" not in sh(["git", "ls-tree", "-r", "--name-only", "plans"], d))
 

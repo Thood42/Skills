@@ -1306,6 +1306,21 @@ def chip(text, cls=""):
     return "<span class=\"chip %s\">%s</span>" % (cls, html.escape(text))
 
 
+def branch_names(ctx, slug, st):
+    """(feature branch, where the plan is kept) as the reader should see them."""
+    vc = st["kv"].get("Version control", {})
+    feature = vc.get("Code branch", "")
+    if not feature or feature.startswith("none"):
+        feature = git_try("branch", "--show-current", cwd=ctx.root)[1] if ctx.is_git else ""
+    if ctx.plan_is_intree(slug):
+        planning = "kept with the code, in docs/plans" if ctx.is_git else "docs/plans (no git)"
+    elif ctx.mode == "external":
+        planning = "separate repository"
+    else:
+        planning = ctx.store_branch
+    return feature, planning
+
+
 def plan_version(pdir):
     """Short hash of the plan's content, so a review can tell whether the plan changed under it."""
     h = hashlib.sha1()
@@ -1447,7 +1462,9 @@ def render_home(ctx, slug):
                    "<div class=\"figure-note\">%s</div></div>"
                    % (approved, len(st["gates"]), "One sign-off covers the whole plan" if lite else "Product, architecture, program design, slice plan"))
     facts = []
-    for label, value in (("Process", st["tier"] or "Full"), ("Project", (st["project"] or "").capitalize()), ("Branch", vc.get("Code branch", "")),
+    feature_branch, planning_branch = branch_names(ctx, slug, st)
+    for label, value in (("Feature branch", feature_branch), ("Planning branch", planning_branch),
+                         ("Process", st["tier"] or "Full"), ("Project", (st["project"] or "").capitalize()),
                          ("Work item", ("%s %s" % (wi.get("Tool", ""), wi.get("Feature", ""))).strip() if wi.get("Tool", "none").lower() not in ("", "none") else "")):
         if value:
             facts.append("<div><dt>%s</dt><dd>%s</dd></div>" % (label, esc(value)))
@@ -1631,6 +1648,10 @@ def render_walkthrough(ctx, slug, only=None):
                      chip("commit " + last[:10]), chip(when)]
             if d.get("points") is not None:
                 chips.append(chip("%s point%s" % (fmt_pts(d["points"]), "" if d["points"] == 1 else "s")))
+            fb, pb = branch_names(ctx, slug, st)
+            if fb:
+                chips.append(chip("feature branch " + fb))
+            chips.append(chip("planning branch " + pb))
             if d.get("needs_user"):
                 chips.append(chip("needs you present", "warn"))
             if d.get("work_item"):

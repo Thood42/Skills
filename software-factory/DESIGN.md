@@ -736,7 +736,7 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 
 **Verified.**
 
-- `scripts/selftest.py`: 87 checks across an existing project, a fresh project on the Lite tier,
+- `scripts/selftest.py`: 88 checks across an existing project, a fresh project on the Lite tier,
   a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
   an external store, a linked worktree and an overlay rule file. All pass on Windows with
   Git 2.44 and Python 3.11.
