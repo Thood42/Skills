@@ -283,7 +283,7 @@ def scenario_existing(root):
     rc, out, s = plan(d, "status", "pay-export", "--json")
     check("status: reports the pause", s and s["next"]["kind"] == "paused", out)
     rc, out, c = plan(d, "commit", "pay-export", "--slice", "2", "--proof-only", "--proof-kind", "command-output",
-                      "--proof", "python -m pytest: 5 passed", "--tour", "rows are built in export()", "--json")
+                      "--proof", "python -m pytest: 5 passed", "--json")
     check("commit --proof-only: proves an already-committed slice and pauses for the needs-user slice",
           c and c["done"] and c["pause"] and c["next"]["kind"] == "needs-user"
           and c["subject"] == "test: prove real rows (slice 2)", out)
@@ -304,7 +304,8 @@ def scenario_existing(root):
     check("walkthrough: slice page shows this slice's diff, tour and proof",
           'class="l add"' in p1 and "src/export.py" in p1 and "read export()" in p1 and "4 passed" in p1 and "src/cli.py" not in p1)
     p2 = read(wdir / "slice-2.html") if (wdir / "slice-2.html").is_file() else ""
-    check("walkthrough: a slice with two commits shows both", p2.count("<h3>Commit") == 2, p2[:400])
+    check("walkthrough: a slice with two commits shows both, keeping the tour from the first and the proof from the second",
+          p2.count("<h3>Commit") == 2 and "rows are built in export()" in p2 and "5 passed" in p2, p2[:400])
     ix = read(wdir / "index.html") if (wdir / "index.html").is_file() else ""
     check("walkthrough: index links slices and shows gate docs and user decisions",
           'href="slice-3.html"' in ix and "Gate 2 — Architecture" in ix and "keep CSV" in ix)
@@ -444,6 +445,17 @@ def scenario_fresh_lite(root):
           wi["items"][0]["type"] == "story" and [c["type"] for c in wi["items"][0]["children"]] == ["task", "task"] and wi["total_points"] == 1.0, wi)
     rc, out, s = plan(d, "status", "greeting", "--json")
     check("lite: next action is slice 1", s and s["next"]["kind"] == "slice", out)
+    write(d / "greet.py", "def greet(name):\n    return 'hello'\n")
+    rc, out, c = plan(d, "commit", "greeting", "--slice", "1", "--all", "--unverified", "no test runner yet",
+                      "--tour", "greet() in greet.py", "--json")
+    check("lite: an unverified slice is recorded but not done", c and not c["done"] and c["pause"], out)
+    rc, out, c = plan(d, "commit", "greeting", "--slice", "1", "--proof-only", "--unverified", "no test runner yet",
+                      "--accepted-by-user", "fine, I will run it myself", "--json")
+    msg = sh(["git", "log", "-1", "--format=%B"], d)
+    check("accepted-by-user: ticks the slice and records the user's words",
+          c and c["done"] and "Accepted by the user: fine, I will run it myself" in msg
+          and "- [x] Slice 1" in read(pdir / "00-status.md"), msg)
+    check("fresh: the plan store never lands on the code branch", sh(["git", "ls-files"], d) == "greet.py", sh(["git", "ls-files"], d))
 
 
 V1_STATUS = """# Status: Old feature

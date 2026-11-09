@@ -1315,6 +1315,10 @@ def render_walkthrough(ctx, slug, only=None):
         if commits and (only is None or n in only):
             last = commits[-1]
             body = parse_commit_body(git("show", "-s", "--format=%b", last, cwd=ctx.root))
+            for older in reversed(commits[:-1]):  # a proof-only commit may carry no tour or notes
+                ob = parse_commit_body(git("show", "-s", "--format=%b", older, cwd=ctx.root))
+                for key in ("what", "tour", "notes", "tests"):
+                    body[key] = body[key] or ob[key]
             subject = git("show", "-s", "--format=%s", last, cwd=ctx.root)
             when = git("show", "-s", "--format=%ad", "--date=short", last, cwd=ctx.root)
             diffs, table = [], ["<table><thead><tr><th>File</th><th>Change</th><th class=\"num\">+</th><th class=\"num\">−</th></tr></thead><tbody>"]
@@ -1755,6 +1759,10 @@ def cmd_commit(args):
     d = next((s for s in sl["slices"] if s["n"] == n), None)
     if d is None:
         raise PlanError("slice %d is not in %s" % (n, sl["doc"]))
+    for name in ("proof", "tour", "notes", "unverified"):  # "@file" reads the text from a file
+        v = getattr(args, name)
+        if v and v.startswith("@") and Path(v[1:]).is_file():
+            setattr(args, name, read(v[1:]).strip())
     unv = (args.unverified or "").strip()
     accepted = (args.accepted_by_user or "").strip()
     if accepted and not unv:
@@ -1765,7 +1773,7 @@ def cmd_commit(args):
                             "run or measured, pass --unverified \"reason\" instead" % ", ".join(PROOF_KINDS))
         if not (args.proof or "").strip():
             raise PlanError("--proof is required: what was run or measured, and the result")
-    if not (args.tour or "").strip():
+    if not (args.tour or "").strip() and not args.proof_only:
         raise PlanError("--tour is required: where the new logic lives, the one function to read, what was surprising")
     override = st["kv"].get("Version control", {}).get("Override", "none").lower()
     no_commit = "no commit" in override
@@ -1800,7 +1808,8 @@ def cmd_commit(args):
         body.append("Tests: %s" % d["tests"])
     if args.notes:
         body.append("Notes: %s" % args.notes.strip())
-    msg = "%s\n\n%s\n\nCode tour:\n%s\n\nPlan: %s slice %d\n" % (subject, "\n".join(body), args.tour.strip(), args.slug, n)
+    tour = "\n\nCode tour:\n%s" % args.tour.strip() if (args.tour or "").strip() else ""
+    msg = "%s\n\n%s%s\n\nPlan: %s slice %d\n" % (subject, "\n".join(body), tour, args.slug, n)
     for t in args.trailer or []:
         msg += t.strip() + "\n"
     sha = None

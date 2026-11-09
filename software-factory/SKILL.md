@@ -1,168 +1,277 @@
 ---
 name: software-factory
-description: Dex Horthy's 4-gate feature workflow — Product, Architecture, Program Design, Vertical Slices — with explicit user approval at every gate before implementation code exists. Use when starting a new feature, a new project, or any task expected to change several files or produce a large diff. Not for trivial tweaks like renames, copy changes, or one-line config edits.
+description: "Dex Horthy's four-gate feature workflow — Product, Architecture, Program Design, Vertical Slices — with the user's explicit approval at every gate before any implementation code exists, then slices built autonomously, each proven, committed and given an HTML review walkthrough. Plans live in a separate plan store so code branches stay clean, the work is broken into an Agile work-item hierarchy with story-point estimates for Azure DevOps or Jira, and lasting decisions are harvested into an architecture doc and ADRs. Use whenever the user starts a new feature or a new project, asks to plan, spec, scope, estimate or design something before building it, wants a PRD, design doc, slice plan or work-item breakdown, says to resume or continue an existing plan, or gives any task that will change several files or produce a large diff, even if they never say the word plan. Not for trivial tweaks like renames, copy changes or one-line config edits."
+compatibility: Python 3.8+ and git for the helper script (scripts/plan.py). Without them the workflow still runs by copying the templates by hand.
+metadata:
+  version: "2.0.0"
 ---
 
 # The Software Factory Playbook
 
-Dex Horthy's (HumanLayer) workflow: make every important decision **before** implementation code exists, where changing it costs a sentence instead of a rewrite. Work through four gates in order. Stop at each gate for explicit user approval. Never merge gates. Never write implementation code before the Gate 4 slice plan is approved.
+Dex Horthy's (HumanLayer) workflow: make every important decision **before** implementation
+code exists, where changing it costs a sentence instead of a rewrite. Four gates, in order,
+each one a cheap document a human can review in minutes. Models pay no penalty for bad design
+on their own; the gates are the penalty. A bad line in a plan becomes hundreds of bad lines of
+code, so the user's attention is spent on research and plans, and the code follows.
 
-## When to run the gates
+**Full tier:** stop at each gate for explicit approval. Never merge gates. Never write
+implementation code before the Gate 4 slice plan is approved. After that, slices run on their
+own, and each one leaves proof, a commit and a review page behind.
 
-Run the full workflow when the task is a real feature: it will create or change multiple files, add an endpoint, table, or screen, or produce a diff the user would hate to review all at once (roughly 100+ lines).
+## When to run it
 
-Skip the gates entirely (just do the task) when any of these hold:
+Run the workflow when the task is a real feature: it will create or change several files, add
+an endpoint, table or screen, or produce a diff the user would hate to review in one go
+(roughly 100+ lines).
+
+Skip it entirely and just do the task when any of these hold:
 
 - Trivial tweak: rename, typo, copy change, style tweak, small config edit.
-- The user explicitly says to skip the process ("just vibe it," "quick and dirty," "no process").
+- The user says to skip the process ("just vibe it", "quick and dirty", "no process").
 - The user says the code is throwaway or pure prototyping.
 
-If unsure whether the task qualifies, ask once: "This looks big enough for the 4-gate workflow — run it, or do you want the fast version?" Respect the answer.
+When the task qualifies, **offer a tier** in one line and let the user choose; never pick
+silently. Propose Full for anything that adds a screen, endpoint, table or external dependency,
+Lite otherwise:
 
-## Files and state
+- **Full** — four gate documents, four approvals. As described below.
+- **Lite** — one `plan.md` holding the same four sections, one approval, no mockups. Every
+  section is still required because each one forces a decision; each may be a few lines. If a
+  Lite plan turns up a decision the user should see on its own, move to Full from that gate.
+  Never move from Full to Lite on your own.
 
-All workflow files live in `docs/plans/<feature-slug>/`:
+If unsure whether the task qualifies at all, ask once: "This looks big enough for the gated
+workflow — Full, Lite, or just do it?" Respect the answer.
+
+## The helper script
+
+`scripts/plan.py` does the bookkeeping in single calls so your context goes to the thinking.
+Run it from the user's repository with this skill's directory as the prefix:
 
 ```
-docs/plans/<feature-slug>/
-  00-status.md          state file: gate approvals + slice checklist
-  01-product.md
-  mockups/              Gate 1 screen mockups — plain HTML, one file per screen
-  02-architecture.md
-  03-program-design.md
-  04-slices.md
+python <skill-dir>/scripts/plan.py <command> [--json]
 ```
 
-Create `00-status.md` first, before Gate 1. Update it at every gate approval and every slice completion. Template:
+| When | Command | What it saves you |
+| --- | --- | --- |
+| First contact with a repo | `config` | Detects fresh vs existing project, default branch, commit style, where the architecture doc and ADRs live |
+| Starting a plan | `init <slug> [--lite] --title "…"` | Mounts the plan store, copies the templates, cuts the feature branch |
+| Starting research | `context --area <path>` | Architecture doc, ADRs in force, earlier plans, estimate history in one read |
+| Any session start | `status <slug>` then `digest <slug>` | The next action, then a compact view of every gate doc |
+| Before asking for approval | `check <slug> --gate N` | Lints the gate doc (tech talk in Gate 1, missing proof or estimate in Gate 4, leftover template text) |
+| After the user answers | `gate <slug> N approved [--amend "…"] [--decision "…"]` | Records the approval, amendments and overrides, commits the plan state |
+| After each slice | `commit <slug> --slice N …` then `walkthrough <slug> --slice N` | The structured commit, the ticked checkbox, the review page |
+| Slice plan drafted | `work-items <slug> [--export ado\|jira]` | The work-item hierarchy, totals and import file |
+| After the last slice | `harvest <slug>` … `harvest <slug> --done`, `check <slug> --closeout` | What the default branch should keep, and proof nothing else leaked onto it |
 
-```markdown
-# Status: <feature name>
+`<command> --help` lists every option. If Python or git is missing, copy the files in
+`assets/templates/` into `docs/plans/<slug>/` by hand and keep the same file names and rules.
 
-- Gate 1 — Product: pending | in progress | APPROVED <date>
-- Gate 2 — Architecture: pending | in progress | APPROVED <date>
-- Gate 3 — Program Design: pending | in progress | APPROVED <date>
-- Gate 4 — Slice plan: pending | in progress | APPROVED <date>
+## Where things live
 
-## Slices
-- [ ] Slice 1 — tracer bullet: <one line>
-- [ ] Slice 2 — <one line>
+Two places, with different jobs. `references/plan-store.md` and `references/knowledge.md` have
+the detail.
 
-## Notes for a fresh session
-<anything decided in chat that a new session must know>
+- **The plan store holds the working papers.** By default an orphan `plans` branch of the same
+  repository, mounted as a folder at `.plans/` and ignored by the code branches. Each plan is a
+  folder there. `plan.py path <slug>` prints it; always use that rather than assuming a path.
+  A plan that already lives at `docs/plans/<slug>/` (the v1 layout) is used where it is.
+- **The default branch states the present.** Code, an architecture doc that describes the
+  system as it is now, the decisions currently in force (ADRs), and a short section in the
+  agent file. No plan documents, no mockups, no walkthrough pages, no change history.
+
+```
+<plan folder>/
+  00-status.md          state file: tier, gate approvals, slice checklist, user decisions,
+                        amendments, version control, work items, pointers
+  00-research.md        what is true today, constraints, spikes
+  01-product.md         Gate 1      mockups/   one plain HTML file per screen
+  02-architecture.md    Gate 2
+  03-program-design.md  Gate 3
+  04-slices.md          Gate 4: slices with proof, estimate and tasks
+  05-work-items.md      generated view of the work-item hierarchy (+ work-items.json)
+  walkthrough/          generated review pages, never committed
 ```
 
-**Resume rule:** at the start of any session, if `docs/plans/<feature-slug>/00-status.md` exists for the feature being discussed, read every doc in that folder first, then continue from the first unapproved gate or first unchecked slice. Never redo an approved gate unless the user asks for it or a later gate invalidated it.
+**Resume rule.** At the start of any session where a plan exists for the feature being
+discussed, run `status` and `digest` before anything else, then continue from the first
+unapproved gate or the first unchecked slice. Never redo an approved gate unless the user asks
+or a later gate invalidated it. Entries under "Decisions taken by the user" are settled: do not
+reopen or quietly undo them.
 
-## The approval protocol (run at every gate)
+**Keep `00-status.md` short.** It is a state file, read at every resume. History goes in
+commits, reasoning goes in the gate docs. If it passes about 80 lines, something is in the
+wrong place.
 
-1. Write the gate doc to disk.
-2. Present a summary to the user: at most 5–10 bullet decisions, plus the doc path. Do not paste the whole doc into chat.
-3. Ask exactly: **"Approve Gate N, or what should change?"**
-4. Approval means the user clearly says yes / approve / continue. Anything else means: revise the doc to address their answer, then re-ask.
-5. On approval, mark the gate APPROVED in `00-status.md` and move on.
-6. **Backtracking:** if work at a later gate reveals an earlier approved decision is wrong, stop, update the earlier doc, set that gate back to "in progress" in `00-status.md`, and get re-approval before continuing.
+## Starting a plan
 
-## Gate 1 — Product (no tech talk)
+1. `plan.py init <slug> --title "<feature name>"` (add `--lite` for Lite). Read its output: it
+   says whether this is a **fresh** or an **existing** project and what conventions it found.
+   State that reading to the user in one line so they can correct it.
+2. **Existing project → research first.** Run `plan.py context --area <path>` and read the
+   code the feature touches. Fill `00-research.md`: how it works today with file:line
+   references, measured baselines, defects marked reproduced or inferred, constraints carried
+   in, open questions. Research is not a gate, but show the user a short summary of it. See
+   `references/research.md` for how deep is deep enough and for spikes.
+3. **User-supplied context that is meant to be exclusive** (a spec, a ticket, "use only this")
+   → skip codebase research. Point `00-research.md` at that context, list the constraints it
+   states, and design against it without going looking for more.
+4. **Fresh project → nothing to research.** Record the user's context and constraints. The
+   first plan's Gate 2 becomes the architecture doc, and slice 1 also stands up the project
+   skeleton and the test runner so that later slices have something to prove against.
 
-Work with the user to fill this template, saved as `01-product.md`:
+## The approval protocol (every gate)
 
-```markdown
-# Product: <feature name>
+1. Write the gate doc from its template. Run `plan.py check <slug> --gate N` and fix what it
+   reports.
+2. Present a summary: at most 5–10 bullet decisions plus the doc path. Do not paste the whole
+   doc into chat.
+3. Ask exactly: **"Approve Gate N, or what should change?"** (Lite: "Approve the plan, or what
+   should change?")
+4. Three outcomes (for Lite, the gate name is `plan` in place of N):
+   - **A clear yes** → `plan.py gate <slug> N approved`.
+   - **Yes, with a change** → fold the change into the doc, then
+     `plan.py gate <slug> N approved --amend "<what changed>"`. Ask again only if the change
+     alters a decision the user has not seen in its new form.
+   - **Anything else** → revise the doc to address the answer and ask again.
+5. Whenever the user chooses against your recommendation, record it with
+   `--decision "<what they chose> — <their reason>"`. Those are the decisions a later session
+   is most likely to undo by being helpful.
+6. **Backtracking:** if later work shows an approved decision is wrong, stop, fix the earlier
+   doc, set that gate back with `plan.py gate <slug> N in-progress`, and get it re-approved
+   before continuing.
 
-## Problem
-<the user problem, in the end-user's words — not the developer's>
+The script records approvals; it never grants them. Only the user's answer in the conversation
+approves a gate.
 
-## Success metric
-<one real number tied to the business (conversion, latency, tickets, revenue) and how it's measured>
+## The gates
 
-## Announcement — the blog post before the feature
-<3–6 sentences announcing this feature to users. If you can't write it, you're building the wrong thing.>
+Templates are in `assets/templates/`; `references/gates.md` has the reasoning, examples and the
+Lite equivalents. The rules that matter most:
 
-## Screens
-<one line per mockup file in ./mockups/ — or "no UI">
-```
+**Gate 1 — Product (no tech talk).** The problem in the end-user's words, one real success
+metric and how it is measured, the announcement written before the feature, scope (in / out /
+deferred), the riskiest assumption, and a rough size in story points. Databases, schemas,
+endpoints, architecture and file names are banned here; if tech appears, it belongs in Gate 2.
+For anything with a UI, make one plain HTML file per screen in `mockups/` — no framework,
+throwaway by design — and iterate until the user says "yes, that."
 
-Rules for this gate:
+**Gate 2 — Architecture.** Read the real code before writing; never design against an imagined
+codebase. Fit, endpoints, data, flow, external dependencies (env var names, never values). Also:
+the decisions made with the alternative each one beat, the load-bearing bets and the spike that
+proved each, and where a human must stay in the loop (auth, billing, public API, deletion,
+anything irreversible).
 
-- **Banned in this stage:** databases, schemas, endpoints, architecture, file names. If tech appears, move it to Gate 2.
-- For anything with a UI: produce one plain HTML file per screen in `mockups/` — no framework, no build step, throwaway by design. Iterate on the mockups with the user until they say "yes, that."
+**Gate 3 — Program Design (the step everyone skips).** Every file created or changed, types
+and signatures with no bodies, the call stack, a numbered test plan written before any test
+exists, and the least confident decisions. These are the choices that would otherwise be made
+silently mid-implementation.
 
-Run the approval protocol.
+**Gate 4 — Vertical Slices.** One entry per slice in build order, each with what it delivers,
+the Gate 3 tests it turns green, the proof named in advance, whether the user must be present,
+an estimate, and its tasks.
 
-## Gate 2 — Architecture
+- **Slice 1 is the tracer bullet:** mocked or hardcoded, but wired end to end and running where
+  the user can see it.
+- **Slice 2** replaces the mocks with real logic for the single happy path.
+- **Slice 3+** one capability each — a rule, error handling, an edge case — each ending in a
+  working, testable state.
+- **Banned:** horizontal building (all the data layer, then all services, then all UI, with
+  nothing testable until the end).
+- **Estimates** are story points of *human* effort: 1 point = one 8-hour block to do the work
+  by hand. Scale 0.5, 1, 2, 3, 5, 8; a slice over 8 gets split. Give each a basis and a
+  confidence. Low confidence usually means research or a spike is missing.
+- The Gate 4 summary includes the work-item breakdown and the total, so approving the slice
+  plan approves the estimate. See `references/work-items.md`.
 
-Read the relevant existing code before writing this doc — never design against an imagined codebase. Template, saved as `02-architecture.md`:
+## Building slices
 
-```markdown
-# Architecture: <feature name>
+Once the slice plan is approved, build the slices one after another **without stopping to ask**.
+For each slice:
 
-## Fit
-<which existing services/modules this touches, and how>
+1. Build it. Tests first where the test plan names them.
+2. **Prove it** the way the slice said it would be proven: run it, test it, measure it. Read
+   `references/proof.md` once before the first slice. Reasoning is not proof.
+3. Stage the slice's changes and record it:
+   ```
+   python <skill-dir>/scripts/plan.py commit <slug> --slice N \
+     --proof-kind test-output --proof "<what ran, and the result>" \
+     --tour "<where the new logic lives, the one function to read, what was surprising>" \
+     [--notes "<test traps, tool quirks>"] [--trailer "<attribution line your environment requires>"]
+   ```
+   The commit message is the historical record of the slice. Longer text can be passed as
+   `@file`.
+4. `plan.py walkthrough <slug> --slice N` renders the review page for that slice alone and
+   refreshes the plan walkthrough.
+5. Read the script's last line. `CONTINUE` → next slice. `PAUSE` → stop and tell the user why.
 
-## Endpoints
-<route + verb + purpose, one line each — or "none">
+**Pause only when:**
 
-## Data
-<new or changed tables/collections, with outlines of the queries that will hit them>
+- the next slice is marked "Needs user present: yes";
+- a slice could not be proven — record it with `--unverified "<reason>"`, never as done. Report
+  it plainly. It is ticked only once it is proven (`--proof-only`) or the user accepts it in
+  words (`--accepted-by-user`);
+- a slice shows an approved gate was wrong — backtrack through the approval protocol;
+- a test cannot be made to pass honestly.
 
-## Flow
-<the end-to-end call order for the main path: what calls what>
+When the last slice is done, report once: slices completed, the path of the plan walkthrough
+(the `index.html` the walkthrough command printed), anything unverified, and what close-out
+will do.
 
-## External
-<third-party APIs, env var NAMES (never values), webhooks — or "none">
-```
+**Why the walkthrough matters.** Running slices without stopping only works if the user can
+still follow the code. Teams that stopped reading what their agents wrote found out late, when
+the agent hit a bug it could not solve and nobody else understood the system either. The code
+tour and the per-slice page are how the user stays oriented. Write the tour for someone who
+will read ten lines and no more.
 
-Run the approval protocol.
+## Close-out
 
-## Gate 3 — Program Design (the step everyone skips)
+After the last slice and before any talk of a pull request:
 
-The decisions the agent would otherwise make silently mid-implementation. Template, saved as `03-program-design.md`:
+1. `plan.py harvest <slug>` lists what the plan owes the default branch: architecture as built,
+   one ADR per decision (including every decision the user took), guarded areas, baselines,
+   test traps for the agent file. `--stubs` creates the missing files.
+2. Make those edits and commit them as the **last commit on the feature branch**. The
+   architecture doc is rewritten in place to describe the present. Delete any section you
+   cannot fill. See `references/knowledge.md`.
+3. `plan.py harvest <slug> --done`, then `plan.py check <slug> --closeout`. The check fails if
+   any planning file is tracked on the code branch.
+4. Tell the user the feature is ready, with the walkthrough path. Push, open a pull request or
+   merge only when asked.
 
-```markdown
-# Program Design: <feature name>
+Bugs found in real use after shipping are added to `04-slices.md` under Post-ship as further
+slices and go through the same build, prove, commit, walkthrough loop.
 
-## Files
-<every file created or changed, one line each on why it lives there>
+## Standing rules
 
-## Types & signatures
-<code blocks defining the types and method signatures — NO implementation bodies.
-A human should be able to read these in seconds and say "right" or "wrong.">
+- **Version control.** By default the work happens on a new branch cut from the repository's
+  default branch, one commit per slice. The user can override any of it (current branch,
+  another name, no commits); record the override under "Version control" in the status file and
+  honour it in every later session. The repository's own commit rules always apply. Never push,
+  open a pull request or merge unless asked.
+- **Compact at every boundary.** Each gate and each slice ends with everything decided written
+  down — nothing important may exist only in chat. A fresh session must be able to continue
+  from the plan store and git alone. Aim to keep context use around the middle of the window
+  (roughly 40–60%); at a boundary above that, tell the user this is a safe point to start a
+  fresh session, or stop cleanly at the boundary if no user is present and the harness cannot
+  compact.
+- **Real tests only.** Never write a test that passes against the pre-change code — a test
+  that cannot fail tests nothing. Never comment out, skip or weaken a test to get to green.
+- **Trackers.** Linking to existing work items and producing an import file are always fine.
+  Creating or changing items in Azure DevOps, Jira or any tracker needs the user's go-ahead for
+  that plan, every time.
+- **Other skills' plans.** When another skill layers its own content onto these gates (see
+  `references/overlay-contract.md`) and names `docs/plans/<slug>/` as the plan folder, read
+  that as "the plan folder" — whatever `plan.py path` prints.
 
-## Call stack
-<for each main flow: what calls what, top to bottom>
+## Reference files
 
-## Test plan
-<test case names and what each one asserts — before any of them exist>
-
-## Least confident decisions
-<numbered list of the calls most worth challenging now, while changing them is free>
-```
-
-Run the approval protocol.
-
-## Gate 4 — Vertical Slices (tracer bullets)
-
-First write the slice plan as `04-slices.md` — one line per slice, in build order — and run the approval protocol on it. Then build one slice at a time.
-
-Slice rules:
-
-- **Slice 1 is the tracer bullet:** a mocked/hardcoded endpoint and a stubbed UI (or curl-able response), wired end to end. It does almost nothing — but it runs, and the user can see it.
-- **Slice 2:** replace mocks with the real logic for the single happy path.
-- **Slice 3+:** one capability per slice — a business rule, error handling, an edge case, polish — each ending in a working, testable state.
-- **Banned:** horizontal building (all of the database, then all services, then all API, then all frontend, with nothing testable until the end).
-
-After **every** slice:
-
-1. Prove it works — run it, curl it, or browser-test it, and show the user the result.
-2. Check the slice off in `00-status.md`.
-3. Ask: "Continue to slice N+1, or re-steer?" If the trajectory is wrong, fix direction before adding more code.
-
-## Standing rules (always on during the workflow)
-
-- **Compact at every boundary.** At the end of every gate and every slice, make sure the docs contain everything decided — nothing important may exist only in chat. Tell the user this is a safe point to start a fresh session; a new session must be able to continue from the docs alone (see the resume rule). If the harness warns that context is running low, compact immediately, wherever you are.
-- **Keep diffs reviewable.** Small slices. If the user hasn't looked at code in a long stretch, nudge them at a slice boundary — losing touch with the codebase costs weeks, exactly when the agent hits a bug it can't solve.
-- **Real tests only.** Never write a test that passes against the pre-change code — a test that can't fail tests nothing. Never comment out, skip, or weaken a test to get to green.
-
-## Optional: durable context in the codebase
-
-When a gate produces a decision that outlives this feature, offer to record it as an ADR in `docs/adr/NNNN-<slug>.md` — context, decision, consequences; never rewrite old ADRs, supersede them. Record anything that lives outside the repo but that an agent needs to know exists (env var names, payment setup, test accounts, third-party dashboards) in `docs/external/`. Files on disk are free context — every future session starts smarter.
+| File | Read it when |
+| --- | --- |
+| `references/gates.md` | Writing any gate doc; the Lite equivalents; what a good approval summary looks like |
+| `references/research.md` | Before research on an existing project; spikes; exclusive context; using a subagent |
+| `references/proof.md` | Before the first slice; any time a proof is in doubt; writing the code tour |
+| `references/work-items.md` | Drafting Gate 4 estimates; linking to Azure DevOps or Jira; exporting |
+| `references/plan-store.md` | Anything about where plans live: modes, mounting, pushing, migrating a v1 folder |
+| `references/knowledge.md` | Close-out; fresh versus existing projects; architecture doc and ADR rules |
+| `references/overlay-contract.md` | Another skill extends these gates, or you are writing one that does |
