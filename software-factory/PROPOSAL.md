@@ -1,11 +1,11 @@
 # software-factory v2 — upgrade proposal
 
-Status: **draft for Trevor's review** — 2026-11-09, branch `claude/software-factory-v2`.
-The commit before this one imports the installed v1 `SKILL.md` verbatim, so the eventual v2 lands
-as a reviewable diff against what runs today.
+Status: **decisions taken 2026-11-09, ready to implement** — branch `claude/software-factory-v2`.
+The first commit on this branch imports the installed v1 `SKILL.md` verbatim, so the eventual v2
+lands as a reviewable diff against what runs today.
 
-This document is the proposal only. Nothing in the skill has changed yet. The decisions it asks
-for are listed at the end; once they are settled, the implementation plan in §7 applies.
+This document is the proposal and its decision record. Nothing in the skill has changed yet.
+§8 records Trevor's decisions; §7 is the implementation plan that follows from them.
 
 ## Contents
 
@@ -16,7 +16,7 @@ for are listed at the end; once they are settled, the implementation plan in §7
 5. Proposed layout of v2
 6. Compatibility: existing plan folders and the VS Code skill overlay
 7. Implementation and evaluation plan
-8. Open decisions for Trevor
+8. Decisions taken (2026-11-09)
 9. Sources
 
 ---
@@ -30,8 +30,8 @@ folder with a `00-status.md` state file and one doc per gate, a resume rule, thr
 
 Things v1 gets right and that v2 must keep unchanged:
 
-- **The four gates in that order, never merged, no implementation code before Gate 4 approval.**
-  This is the whole point and the other skill in this repo depends on it (§6).
+- **The four gates in that order, never merged in Full mode, no implementation code before
+  Gate 4 approval.** This is the whole point and the other skill in this repo depends on it (§6).
 - **The exact approval question** — "Approve Gate N, or what should change?" — and the rule that
   anything other than a clear yes means revise and re-ask.
 - **Gate 1 bans tech talk**, and the "blog post before the feature" test.
@@ -44,7 +44,8 @@ Things v1 gets right and that v2 must keep unchanged:
 - The skip list (trivial tweaks, "just vibe it", throwaway code) and the single clarifying
   question when unsure.
 
-v2 is additive on top of these. The change is in what the protocol is silent about.
+v2 is additive on top of these. The change is in what the protocol is silent about, and in how
+slices run once the plan is approved (§4, upgrades 3 and 5).
 
 ## 2. Evidence: two real runs of v1 in this repo
 
@@ -92,8 +93,8 @@ v1 encodes the four layers from Dex's 2025 talks. Three later pieces add rules w
   code ended in a painful manual debugging effort. The failure is "quiet and late". The fix is
   **back pressure**: autonomy must not exceed what can be cheaply and reliably verified, and a
   human stays in the loop where a wrong call is expensive (auth, billing, public API). Reviewing
-  a 200-line plan beats reviewing 2000 lines of code. v1's "keep diffs reviewable" nudge is the
-  seed of this; v2 should make comprehension an explicit per-slice deliverable.
+  a 200-line plan beats reviewing 2000 lines of code. v2 takes this seriously precisely because
+  it makes slices autonomous (§4, upgrade 3): the per-slice walkthrough is the back pressure.
 - **Four-layer program design, restated** (Dex with David Ondrej, Aug 2026): each layer is a
   cheap artifact reviewable in minutes; make structural decisions early, "when the model is
   sharpest"; "there is no penalty for bad design" in model training, so the gates supply the
@@ -102,90 +103,118 @@ v1 encodes the four layers from Dex's 2025 talks. Three later pieces add rules w
 
 ## 4. Proposed upgrades
 
-Ordered by how much the evidence in §2 and §3 supports them. Each one says why, so the skill can
-explain the reasoning to the model rather than issue a bare rule.
+Each one says why, so the skill can explain the reasoning to the model rather than issue a bare
+rule. Upgrades 3, 5, 8 and 9 were reshaped by Trevor's decisions (§8).
 
 ### Upgrade 1 — A **Lite** tier, chosen by the user, never by the agent
 
 **Why.** v1 is binary: full four-gate ceremony or nothing. Dex himself scopes the full flow to
 larger teams. Medium tasks (a 100–300 line change with a design decision in it) currently get
-either too much process or none. The runs in this repo were genuinely large; a lot of day-to-day
-work is not.
+either too much process or none.
 
 **What.** Keep **Full** exactly as v1. Add **Lite**: one `plan.md` holding the four gate sections
 in order (Product · Architecture · Program Design · Slices), **one** approval on the whole plan,
-no mockups, then slices as usual with the same proof rule. The gates still exist and are still
-in order; what Lite merges is the number of stop-and-ask moments, not the thinking.
+no mockups, then slices as usual with the same proof rule. Lite follows the basics of every gate
+in a less stringent manner — each section may be a few lines, but none may be skipped, because
+the point of the sections is to force the decision, not to produce prose.
 
 The tier is **offered, not decided**: when a task qualifies for the workflow the agent proposes a
 tier with a one-line reason and the user picks. Default proposal is Full for anything that adds a
-screen, endpoint, table or external dependency, Lite otherwise. "Never merge gates" stays true
-for Full; Lite is a separate mode the user has opted into. If Lite reveals a decision the user
-should see before the rest, the agent upgrades to Full from that gate onward — never the reverse.
+screen, endpoint, table or external dependency, Lite otherwise. If Lite reveals a decision the
+user should see before the rest, the agent upgrades to Full from that gate onward, never the
+reverse.
 
 ### Upgrade 2 — **Research** becomes a real phase with a real artifact (`00-research.md`)
 
-**Why.** Both runs did it anyway (the "measured baseline", "two confirmed defects",
-"constraints carried in") and parked it in the status file. HumanLayer's named failure mode is
-a plan built on shallow research. v1 only says "read the relevant existing code" at Gate 2.
+**Why.** Both runs did it anyway and parked it in the status file. HumanLayer's named failure
+mode is a plan built on shallow research. v1 only says "read the relevant existing code" at Gate 2.
 
 **What.** Before Gate 1 for a brownfield change, write `00-research.md`: how the relevant code
 works today (with file:line references), the measured baseline where there is one, confirmed
 defects marked **reproduced** vs **inferred**, constraints carried in (budgets, baselines, tool
 quirks), the predecessor plan if any, and open questions for the user. Research is **not a gate**
-(no approval needed) but it is shown to the user as a summary, because Dex's rule is to spend
-human attention on research and plans. Where the harness has subagents, the research can run in
-one so the main context stays lean — the artifact is what comes back.
+(no approval needed) but its summary is shown to the user, because Dex's rule is to spend human
+attention on research and plans. Where the harness has subagents, the research can run in one so
+the main context stays lean; the artifact is what comes back.
+
+**Exception (Trevor):** when the user supplies the context the implementation must consider
+*exclusively* — a spec, a ticket, a design doc, "use only this" — the research phase is skipped
+and `00-research.md` holds a pointer to that context plus the constraints carried in. The agent
+does not go looking for more; it designs against what it was given.
 
 The Gate 2 "load-bearing bet" pattern gets a name: **spike** — a measurement or throwaway
 experiment that proves an assumption the architecture rests on, recorded in `00-research.md`
 with its result, before the gate doc is written.
 
-### Upgrade 3 — Split the state file from the journal
+### Upgrade 3 — **Autonomous slices**: the commit is the record, the walkthrough is the review
 
-**Why.** `00-status.md` grew to 600 lines in the motion run. A resuming session has to read it
-all to find the first unchecked slice. The state file's job is to be scannable in ten seconds.
+**Why.** v1 stops after every slice with "Continue to slice N+1, or re-steer?". Once the slice
+plan is approved that stop mostly costs the user a round trip, and the two runs show the
+real history was already in git (one commit per slice). At the same time the 600-line
+progress log proves the per-slice notes have value; they just belong somewhere that is not the
+state file. Trevor's direction: slices run autonomously, the slice commit is the historical note,
+and each slice produces an HTML review walkthrough of its own changes.
 
 **What.**
+- After Gate 4 approval, slices run **without stopping** between them. Each slice ends with:
+  prove it (upgrade 4) → commit with a structured message (upgrade 8) → generate the slice
+  walkthrough (upgrade 5) → tick the box in `00-status.md` → next slice.
+- The run **pauses** only for: a slice flagged *needs user present* in `04-slices.md` (Gate 2's
+  back-pressure list: auth, billing, public API, data deletion, anything irreversible); a slice
+  whose proof came out **UNVERIFIED**; a backtrack (a later slice invalidates an approved gate);
+  or a failing test the agent cannot make pass honestly. Everything else continues.
+- At the end of the last slice the agent reports once: slices done, walkthrough index, anything
+  UNVERIFIED, ADRs due.
+- The **slice commit message** carries the note the old progress log carried: slice number and
+  title, what landed, proof summary, surprises and test traps, Gate 3 tests turned green. A
+  resuming session reads `git log` for the plan's branch; humans read the walkthrough. There is
+  no `05-log.md`.
 - `00-status.md` stays the **state file** and gets a hard shape: gate lines, slice checkboxes,
-  **Decisions taken by the user** (new, fixed section), **Amendments at approval** (new),
-  **Pointers** (predecessor plan, research doc, ADRs written), and a *short* "Notes for a fresh
-  session". Target: under 80 lines for the life of the feature.
-- `05-log.md` is the **append-only journal**: one entry per slice (what landed, proof, surprises,
-  test traps), plus post-ship entries. A resuming session reads the status file first and the
-  log only for the slice it is about to continue.
-- The resume rule is updated accordingly: status → gate docs → the latest log entry.
+  **Decisions taken by the user**, **Amendments at approval**, **Version control** (branch,
+  override), **Pointers** (predecessor, research doc, walkthrough index, ADRs), and a short
+  "Notes for a fresh session". Target: under 80 lines for the life of the feature.
 
 Backward compatible: a v1 folder with everything in `00-status.md` still resumes; the agent
-simply starts the log at the next slice.
+simply starts committing per slice from the next slice.
 
 ### Upgrade 4 — A **proof standard** and an honesty rule for slices
 
-**Why.** "Prove it works — run it, curl it, or browser-test it" is right but under-specified.
-Both runs had to decide for themselves what to do when the browser pane would not composite,
-and both landed on "measured values, not an image, and say so". The VS Code skill in this repo
-solved the same problem with an **INCOMPLETE** verdict that is never reported as a pass.
+**Why.** "Prove it works" is right but under-specified. Both runs had to decide for themselves
+what to do when the browser pane would not composite, and both landed on "measured values, not an
+image, and say so". The VS Code skill in this repo solved the same problem with an **INCOMPLETE**
+verdict that is never reported as a pass. Autonomous slices make this more important, not less:
+the user is not watching, so the proof has to be trustworthy on its own.
 
 **What.** A short `references/proof.md`: the acceptable kinds of proof in order of strength
 (test output → executed command output → measured values → screenshot → reasoning alone, which
 is **not** proof), the rule that each slice names its proof *before* it is built (in
-`04-slices.md`, as the composer run did), and the honesty rule: a slice whose proof could not
-be produced is reported **UNVERIFIED** with the reason, checked off only when the user accepts
-that, and listed in the log. "Test trap" notes (environment quirks that produce false readings)
-go in the log so the next slice does not rediscover them.
+`04-slices.md`), and the honesty rule: a slice whose proof could not be produced is reported
+**UNVERIFIED** with the reason, is not checked off, pauses the run, and is listed in the
+walkthrough. "Test trap" notes go in the slice commit body so the next slice does not rediscover
+them.
 
-### Upgrade 5 — **Comprehension checkpoints** against comprehension debt
+### Upgrade 5 — **HTML review walkthroughs**: per slice, and one for the whole plan
 
-**Why.** Dex's post-mortem on his own factory: the humans stopped reading code and lost the
-ability to help when the agent got stuck. v1's nudge ("if the user hasn't looked at code in a
-long stretch…") is vague about what to show.
+**Why.** Dex's post-mortem: the humans stopped reading code and could not help when the agent
+got stuck. If slices run autonomously (upgrade 3) the user will read even less code unless the
+skill produces something worth reading. Trevor's direction: each slice gets a review walkthrough
+in HTML of that slice's changes alone, maintained alongside a walkthrough of the plan as a whole.
 
-**What.** After every slice, alongside the proof, a **code tour**: at most ten lines naming the
-files touched, where the new logic lives, the one function to read if you read only one, and
-anything surprising. Every third slice, or whenever the user has not opened code in a while, the
-agent asks the user to actually open one named file before continuing. The reasoning given to
-the model: the user's ability to rescue the project later depends on staying oriented now, and
-ten lines per slice is the cheapest insurance there is.
+**What.**
+- `docs/plans/<slug>/walkthrough/slice-N.html` — one self-contained HTML file per slice, no
+  framework, no network: the slice's goal (from `04-slices.md`), the files touched with the
+  diff of **that slice's commit only** rendered readably, a short code tour (where the new logic
+  lives, the one function to read if you read only one, what was surprising), the proof with
+  its kind and verdict, and the Gate 3 tests it turned green.
+- `docs/plans/<slug>/walkthrough/index.html` — the **plan walkthrough**, regenerated after every
+  slice: the four gate summaries (decisions, not full docs), the slice list with status and a
+  link to each slice page, decisions taken by the user, anything UNVERIFIED. This is the page a
+  reviewer opens to understand the feature end to end without reading the gate docs.
+- Both are **generated by a script** from git and the plan folder (upgrade 9), so producing them
+  costs the agent one tool call and almost no tokens. The agent writes only the code-tour
+  paragraph; the diff, file list and plan summaries come from the data.
+- The walkthroughs are committed with the slice (they are part of the record) unless the user's
+  version-control override says otherwise.
 
 ### Upgrade 6 — Gate template refinements (small, each backed by §2)
 
@@ -193,13 +222,14 @@ ten lines per slice is the cheapest insurance there is.
   **Riskiest assumption** line (what would make this the wrong thing to build).
 - **Gate 2** gains **Load-bearing bets** (assumptions a spike should prove — ties to upgrade 2)
   and **Where a human must stay in the loop** (auth, billing, public API, data deletion — Dex's
-  back-pressure list), which later tells Gate 4 which slices need the user present.
+  back-pressure list), which Gate 4 turns into *needs user present* flags on slices.
 - **Gate 3** keeps all five sections; **Test plan** entries get stable numbers so slices can
   reference them (the composer run did exactly this with "Tests 1–3, 10").
 - **Gate 4** slices become a fixed mini-template per slice: *what · tests it turns green · proof ·
   needs user present (y/n)*. "One line per slice" is dropped; it was never what got written.
-- **After the last slice**: a named **Post-ship** section in the log for bug-hunt rounds from real
-  use, so they are not orphaned, and a prompt to write the ADR(s) the gates promised.
+- **After the last slice**: a **Post-ship** section in `04-slices.md` where bug-hunt rounds from
+  real use are added as further slices (same commit + walkthrough rhythm), and a prompt to write
+  the ADR(s) the gates promised.
 
 ### Upgrade 7 — Approval protocol: the third outcome
 
@@ -212,66 +242,87 @@ the amendment changes a decision the user has not seen in its new form. Also rec
 the user chose against the recommendation under **Decisions taken by the user**, with the
 reason, because those are the decisions a later session is most likely to "helpfully" undo.
 
-### Upgrade 8 — Context budget and version-control rhythm (standing rules)
+### Upgrade 8 — Version control by default, and a context budget (standing rules)
 
-- **Compaction gets a number.** Keep utilization roughly in the 40–60% band (HumanLayer's
-  heuristic); at a gate or slice boundary when above it, write the artifact and recommend a
-  fresh session rather than pushing on. Gates and slices *are* the compaction points; the
-  artifacts are what survive.
-- **Commit rhythm, if the user allows commits:** one docs commit when Gate 4 is approved (the
-  plan), one commit per slice with the slice number in the subject, plan-doc updates in the
-  same commit as the slice they describe. Observed in both runs; making it explicit keeps the
-  history reviewable slice by slice. This never overrides a user's or repo's own commit rules.
+**Version control (Trevor's default).** When the plan folder is created, the agent creates a
+**new branch off the repo's default branch** (detected from `origin/HEAD`, falling back to
+`main`/`master`), named `<prefix>/<slug>` where the prefix follows the host's convention if one
+is visible (this repo uses `claude/`), else `feature/`. From then on: one docs commit when Gate 4
+is approved (the plan), one commit per slice with the slice number in the subject and the
+structured note in the body, walkthrough and status updates in the same commit as the slice.
+The user can override any of this — commit to the current branch, a different prefix or name, no
+commits at all — and the override is recorded in `00-status.md` → **Version control** so a fresh
+session honours it. Repo-level commit rules (conventional commits, attribution lines, sign-off)
+always apply on top. The agent never pushes or opens a PR unless asked.
 
-### Upgrade 9 — Progressive disclosure and a small helper script
+**Compaction gets a number.** Keep utilization roughly in the 40–60% band (HumanLayer's
+heuristic); at a gate or slice boundary when above it, write the artifact and recommend a fresh
+session rather than pushing on. Gates and slices *are* the compaction points; the artifacts and
+commits are what survive. Autonomous slices make this a self-check the agent runs at every slice
+boundary, not something the user has to notice.
+
+### Upgrade 9 — Progressive disclosure and scripts that save tool calls and tokens
 
 **Why.** v1 is a single file, which is fine at 168 lines but not after the above. The repo's
-other skills (and the skill-creator guidance) keep `SKILL.md` as a router and push detail into
-`references/` and templates into `assets/`.
+other skills keep `SKILL.md` as a router with detail in `references/` and templates in `assets/`.
+Trevor's direction: scripts are welcome wherever they cut tool calls or tokens during planning
+and slicing — reading a 600-line status file to find a checkbox, hand-rendering a diff into HTML,
+or re-reading four gate docs on resume are all things a script does in one call.
 
-**What.** Layout in §5. Plus one **zero-dependency Python script**, `scripts/plan.py`, with three
-subcommands: `init <slug> [--lite]` copies the templates into `docs/plans/<slug>/` with the slug
-and date filled in; `status <slug>` prints the first unapproved gate or first unchecked slice
-(the resume rule made mechanical, so a fresh session does not misread a 600-line file);
-`check <slug>` lints the folder — Gate 1 doc contains none of the banned tech words, every slice
-has a Proof line, every status line is well-formed, log entries reference existing slices.
-Python because it is on practically every machine the skill will meet and this repo already
-uses it for slide-forge; stdlib only, so it runs anywhere `python3` does.
+**What.** One **zero-dependency Python script**, `scripts/plan.py`, stdlib only (Python is on
+practically every machine the skill will meet; this repo already uses it):
+
+| Subcommand | Does | Saves |
+| --- | --- | --- |
+| `init <slug> [--lite]` | copies templates into `docs/plans/<slug>/`, fills slug/date, creates the branch (unless overridden) | a dozen Write calls and the branch bookkeeping |
+| `status <slug>` | prints the first unapproved gate or first unchecked slice, plus the version-control override | reading the whole status file on resume |
+| `digest <slug>` | a compact digest of every gate doc: headings, decisions, slice list, user decisions, amendments | re-reading four docs in full on resume |
+| `check <slug>` | lints the folder: Gate 1 free of banned tech words, every slice has Proof and needs-user-present, status lines well-formed, pointers resolve | a self-review pass done by reading |
+| `walkthrough <slug> --slice N` | renders `walkthrough/slice-N.html` from the slice commit's diff + the slice entry + a code-tour paragraph passed in; regenerates `index.html` | hand-writing HTML and pasting diffs |
+| `commit <slug> --slice N` | builds the structured slice commit message from the slice entry and proof, commits on the plan branch (respecting overrides and repo rules) | composing the message by hand each slice |
+
+`check` also accepts extra rule files so an overlay (§6) can add lint rules. Each subcommand has
+a `--json` flag so the agent can read the result without parsing prose.
 
 ### Upgrade 10 — Description tuned for triggering
 
-v1's description is accurate but relies on the user saying "feature". v2 should also fire on
-"plan this", "spec", "PRD", "design doc", "break this into slices", "what's the first slice",
-"resume the plan in docs/plans/…", and on the agent's own judgement that a task will touch
-several files. Keep the explicit negatives (renames, copy, one-line config). The skill-creator's
-description optimizer (20 should/should-not-trigger prompts, run against the live model) is the
-tool for this, run last.
+v1's description relies on the user saying "feature". v2 should also fire on "plan this",
+"spec", "PRD", "design doc", "break this into slices", "what's the first slice", "resume the plan
+in docs/plans/…", and on the agent's own judgement that a task will touch several files. Keep the
+explicit negatives (renames, copy, one-line config). The skill-creator's description optimizer is
+the tool for this, run last.
 
 ### Explicitly not proposed
 
 - No change to the four gates, their order, or the approval question.
-- No automatic gate approval, no "agent approves its own gate" path, no skipping Gate 3.
+- No automatic gate approval, no "agent approves its own gate" path, no skipping Gate 3. Slices
+  are autonomous; gates are not.
 - No framework- or language-specific content; overlays (§6) are where that lives.
 - No bundled mockup framework; plain HTML throwaway mockups stay as they are.
+- No pushing, PR creation or merging by the agent unless asked.
 
 ## 5. Proposed layout of v2
 
 ```
 software-factory/
-├── SKILL.md                 router (~200 lines): when to run, tiers, the protocol, standing
-│                            rules, index into references/ — keeps every v1 rule
+├── SKILL.md                 router (~200 lines): when to run, tiers, the protocol, autonomous
+│                            slice loop, standing rules, index into references/ — keeps every v1 rule
 ├── references/
 │   ├── gates.md             gate-by-gate guidance with the reasoning, banned words, examples
-│   ├── proof.md             proof kinds, UNVERIFIED rule, code-tour format
-│   ├── research.md          what deep-enough research looks like; spikes; subagent use
+│   ├── proof.md             proof kinds, UNVERIFIED rule, code-tour paragraph format
+│   ├── research.md          what deep-enough research looks like; spikes; subagent use; the
+│   │                        "user-supplied exclusive context" exception
 │   └── overlay-contract.md  how other skills extend the gates (see §6)
-├── assets/templates/        copied verbatim by plan.py init, hand-copyable without it
-│   ├── 00-status.md  00-research.md  01-product.md  02-architecture.md
-│   ├── 03-program-design.md  04-slices.md  05-log.md  plan.md (Lite)  adr.md
+├── assets/
+│   ├── templates/           copied by plan.py init, hand-copyable without it
+│   │   ├── 00-status.md  00-research.md  01-product.md  02-architecture.md
+│   │   ├── 03-program-design.md  04-slices.md  plan.md (Lite)  adr.md
+│   └── walkthrough/         HTML shell + CSS the walkthrough renderer fills (no network, no JS deps)
 ├── scripts/
-│   └── plan.py              init | status | check — stdlib only
+│   ├── plan.py              init | status | digest | check | walkthrough | commit — stdlib only
+│   └── selftest.py          exercises every subcommand on a temp repo
 ├── evals/                   test cases (§7), skill-creator case-folder format
-└── DESIGN.md                this proposal, renamed once accepted; then the decision record
+└── DESIGN.md                this proposal, renamed once implementation starts; then the decision record
 ```
 
 `SKILL.md` stays readable top to bottom without opening anything else; the references hold the
@@ -281,7 +332,8 @@ software-factory/
 
 **Existing plan folders.** `docs/plans/slide-forge-composer/` and `slide-forge-motion/` must
 still resume under v2 without edits. They will: the status line format is unchanged, the new
-status sections are optional, and a missing `05-log.md` simply means the log starts now.
+status sections are optional, and the absence of a plan branch or walkthroughs simply means
+they start from the next slice.
 
 **The VS Code skill overlay.** `building-vscode-extensions/workflows/feature.md` loads
 software-factory and adds VS Code sections to each gate doc, appends a review verdict before the
@@ -294,8 +346,11 @@ v2 makes that contract explicit in `references/overlay-contract.md`:
 - the approval question is stable and overlays may prefix a one-line verdict to it (as the VS
   Code skill already does);
 - `00-status.md` has named sections an overlay may append to, and a `## Overlay` block it owns;
+- an overlay may add a **per-slice gate** that runs before the slice commit (the VS Code skill's
+  slice review gate is exactly this) and may flag slices *needs user present*;
 - new in v2 and available to overlays: the research artifact, the proof standard, the Lite tier
-  (an overlay may require Full), and the `plan.py check` hook for extra lint rules.
+  (an overlay may require Full), extra `plan.py check` rules, and extra sections in the slice
+  walkthrough.
 
 The VS Code skill's "condensed protocol (only if software-factory is unavailable)" needs no
 change for v2, since every v1 rule it restates survives.
@@ -304,43 +359,54 @@ change for v2, since every v1 rule it restates survives.
 
 Done with the skill-creator loop, on this branch:
 
-1. **Snapshot the baseline.** The v1 `SKILL.md` already committed here is the baseline skill
-   for every eval run (`old_skill/` configuration).
-2. **Write v2** per §4–§5. SKILL.md first, then references, templates, `plan.py` with its own
-   small test (init → check passes; a Gate 1 doc with "endpoint" in it → check fails).
-3. **Test cases** (evals/, one folder each, prompts only at first):
+1. **Baseline.** The v1 `SKILL.md` committed here is the `old_skill` configuration for every
+   eval run.
+2. **Write v2** per §4–§5: `SKILL.md`, references, templates, the walkthrough shell, `plan.py`
+   with `selftest.py` (init → check passes; a Gate 1 doc containing "endpoint" → check fails;
+   walkthrough renders from a synthetic commit; commit respects an override).
+3. **Test cases** (`evals/`, one folder each, prompts first, assertions while runs are in flight):
    - `feature-on-small-repo` — a feature request against a tiny fixture repo. Expected: research
-     summary, `00-status.md` + `01-product.md` written, no code, the approval question asked,
-     tier offered.
+     summary, plan folder and branch created, `01-product.md` without tech talk, no code, tier
+     offered, the approval question asked verbatim.
+   - `exclusive-context-skips-research` — the user hands over a spec and says to use only it.
+     Expected: no codebase research, `00-research.md` points at the spec, Gate 1 proceeds.
    - `resume-mid-plan` — fixture `docs/plans/<slug>/` with Gates 1–2 approved and Gate 3 absent.
-     Expected: Gate 1 and 2 not redone, Gate 3 doc produced, status updated.
+     Expected: Gates 1–2 not redone, Gate 3 doc produced, status updated.
    - `trivial-tweak-skips` — a rename. Expected: no plan folder, the task just done.
-   - `lite-tier-medium-task` — a medium task where the user asks for the light version.
-     Expected: single `plan.md`, one approval, slices follow.
+   - `lite-tier-medium-task` — the user asks for the light version. Expected: single `plan.md`
+     with all four sections, one approval, slices follow.
+   - `autonomous-slices-with-walkthrough` — fixture with Gate 4 approved and two small slices.
+     Expected: both slices implemented without a stop between them, one commit each on the plan
+     branch, `walkthrough/slice-1.html`, `slice-2.html` and `index.html` present, boxes ticked.
    - `slice-proof-unverifiable` — a slice whose proof tool is unavailable in the fixture.
-     Expected: UNVERIFIED reported, slice not checked off, log entry.
-4. **Run with-skill (v2) and old-skill (v1) in parallel**, grade with assertions on the files
-   produced (these are objectively checkable: files exist, banned words absent from Gate 1,
-   approval question asked verbatim, no `src/` changes before Gate 4), aggregate, open the
-   viewer for Trevor's review, iterate.
+     Expected: UNVERIFIED reported, slice not checked off, run paused with the reason.
+4. **Run with-skill (v2) and old-skill (v1) in parallel**, grade with assertions on the files and
+   git state produced (all objectively checkable), aggregate, open the viewer for Trevor's review,
+   iterate.
 5. **Description optimization** last, with the trigger eval set reviewed by Trevor.
 6. **Update `README.md` and `CLAUDE.md`** to list the skill; open the PR to `master`.
 
 Package as `software-factory.skill` (gitignored, like the others). Name stays `software-factory`;
 `metadata.version` becomes `2.0.0`.
 
-## 8. Open decisions for Trevor
+## 8. Decisions taken (2026-11-09)
 
-1. **Lite tier (upgrade 1):** include it, or keep v1's binary full-or-skip? It is the only
-   proposal that touches the spirit of "never merge gates", even though the user opts in.
-2. **Research as its own phase (upgrade 2):** always for brownfield, or only when the agent
-   judges the code non-trivial?
-3. **Comprehension checkpoints (upgrade 5):** ask the user to open a file every third slice, or
-   only provide the code tour and leave the nudge to judgement?
-4. **`plan.py` (upgrade 9):** worth having, or keep the skill script-free and template-only?
-5. **Commit rhythm (upgrade 8):** state it in the skill, or leave version control entirely to
-   the host repo's rules?
-6. Anything from the two real runs you remember wanting that §2 missed.
+Trevor's answers to the open questions, recorded here so no later session re-litigates them:
+
+1. **Lite tier: in.** It follows the basics of every gate in a less stringent manner (upgrade 1).
+2. **Research phase: in**, except when the user provides the context the implementation should
+   consider exclusively; then it is skipped and the research doc points at that context
+   (upgrade 2).
+3. **Slices run autonomously** once the slice plan is approved. The slice commit is the
+   historical note of what changed. Every slice produces an **HTML review walkthrough** of that
+   slice's changes alone, and a **plan walkthrough** is maintained alongside (upgrades 3 and 5).
+   The per-slice "continue or re-steer?" stop is gone; pauses are reserved for needs-user-present
+   slices, UNVERIFIED proof, backtracks and honest test failures.
+4. **Scripts: encouraged** wherever they reduce tool calls or token consumption during planning
+   and slicing (upgrade 9).
+5. **Version control default:** commits on a **new branch based on the repo's default branch**;
+   the user can override this for their own setup, and the override is recorded in the status
+   file (upgrade 8).
 
 ## 9. Sources
 
