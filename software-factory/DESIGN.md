@@ -1,6 +1,6 @@
 # software-factory v2 — design and decision record
 
-Status: **v2 built 2026-11-09 (`metadata.version` 2.0.0); first eval round run on 3 of 12 cases** — branch
+Status: **v2 built 2026-11-09 (`metadata.version` 2.0.0); two eval rounds run, covering 5 of 12 cases** — branch
 `claude/software-factory-v2`. The first commit on this branch imports the installed v1 `SKILL.md`
 verbatim, so v2 is reviewable as a diff against what ran before.
 
@@ -755,19 +755,27 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 
 **Not verified.**
 
-- **Most model behaviour.** One eval round has been run: three cases (a new feature on an
-  existing repo, building approved slices, a slice that cannot be proven), each once with v2 and
-  once with v1, graded by the skill's author. v2 met 22 of 22 assertions and v1 11 of 22; v1
-  passed all nine assertions that both versions were designed to meet, so the gap mostly
-  measures features v1 does not have. Nine cases have never been run, including the tier offer,
-  work items, close-out and the review flow from the plan home page, which was added after that
-  round. v1 as first committed on this branch is the baseline.
-- **The three behaviours seen in that round have been addressed but not re-run.** A stop to
-  ask before close-out: decision 10. HTML mockups for a command-line tool: Gate 1 now asks for a
+- **Most model behaviour.** Two eval rounds have been run, each case once with v2 and once
+  with v1, graded by the skill's author. Round 1 covered three cases (a new feature on an
+  existing repo, building approved slices, a slice that cannot be proven): v2 met 22 of 22
+  assertions and v1 11 of 22. Round 2 re-ran those three after the changes below and added the
+  review import and close-out: v2 met 41 of 41 and v1 24 of 41. In both rounds nearly all of
+  v1's misses were things only v2 is designed to do, so the gap mostly measures features v1
+  does not have, and a perfect score for v2 mostly shows it does what its author checks for.
+  One run per configuration cannot separate an effect from chance: which version produced HTML
+  mockups for a command-line tool flipped between the rounds. Seven cases have never been run:
+  exclusive context, resuming a v1 plan, the trivial tweak, the Lite tier, work items, a fresh
+  project, and an existing project with its own conventions. v1 as first committed on this
+  branch is the baseline.
+- **The three behaviours seen in round 1 were addressed and held in round 2.** A stop to ask
+  before close-out: decision 10. HTML mockups for a command-line tool: Gate 1 now asks for a
   text sample of what the user types and sees when the interface is text. An UNVERIFIED reason
   written into the status file as a paragraph: the guidance asks for one sentence, and the
   script enforces it by keeping only the first sentence in the status file and the whole reason
-  in the commit. Each has an assertion in its eval case.
+  in the commit. Each has an assertion in its eval case, and each passed once.
+- **Seen in round 2 and not addressed**: in the review case v2 recorded each comment under both
+  "Decisions taken by the user" and "Amendments at approval"; and the review case itself barely
+  separates the two versions (v1 met 6 of 7), so it tests the fixture more than the skill.
 - **Tracker imports.** The Azure DevOps and Jira CSV shapes follow the vendors' documented
   hierarchy columns (`Title 1..N`; `Issue ID` / `Parent`). Field names for points and estimates
   were not tried against a live board, and company-managed Jira projects may want an epic-link

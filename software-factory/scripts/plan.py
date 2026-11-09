@@ -2404,7 +2404,7 @@ def cmd_harvest(args):
             num = re.match(r"^(\d+)", Path(d["file"]).name).group(1)
             body = fill(read(TPL / "adr.md"), {
                 "number": num, "title": d["title"][:1].upper() + d["title"][1:], "supersedes": "none", "slug": args.slug,
-                "decision": d["title"] + ((". " + d["reason"][:1].upper() + d["reason"][1:]) if d["reason"] else "") + ".",
+                "decision": d["title"] + (((", " if d["reason"].lower().startswith("because") else ": ") + d["reason"]) if d["reason"] else "") + ".",
                 "alternatives": ("- " + re.sub(r"^instead of\s+", "", d["alternative"], flags=re.I)) if d["alternative"] else "<what else was considered, and why not>"})
             body += "\n<!-- software-factory: plan=%s source=%s -->\n" % (args.slug, d["hash"])
             write(ctx.root / d["file"], body)
