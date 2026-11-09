@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: exclusive-context-skips-research
+expected_outcome: |
+  Skips codebase research because the user supplied exclusive context. The research document points at specs/reminders-spec.md as the context source and lists the constraints the spec states. The Gate 1 product document reflects the spec's rules and out-of-scope list without inventing extra features. No implementation code. Ends by asking "Approve Gate 1, or what should change?"
+context:
+  scaffold_script: place-files.sh

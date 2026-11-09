@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: feature-on-small-repo
+expected_outcome: |
+  Treats the repository as an existing project and says so. Researches the code and writes a research document with file references. Creates the plan in the plan store (not on the code branch) and cuts a feature branch from main. Writes the Gate 1 product document with problem, success metric, announcement, scope and a rough size, free of technical talk. Writes no implementation code. Ends by asking exactly "Approve Gate 1, or what should change?"
+context:
+  scaffold_script: place-files.sh

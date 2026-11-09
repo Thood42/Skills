@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: resume-mid-plan
+expected_outcome: |
+  Finds the existing plan at docs/plans/due-dates/ (the v1 layout), reads its status and gate documents, and continues from Gate 3 without redoing Gates 1 and 2. Writes the program design document with files, signatures without bodies and a numbered test plan, honouring the notes in the status file. Does not move the plan folder without asking. No implementation code. Ends by asking "Approve Gate 3, or what should change?"
+context:
+  scaffold_script: place-files.sh

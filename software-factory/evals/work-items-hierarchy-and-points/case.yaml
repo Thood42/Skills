@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: work-items-hierarchy-and-points
+expected_outcome: |
+  Writes 04-slices.md with a tracer-bullet first slice and, for every slice, what it delivers, the proof, whether the user must be present, and a story-point estimate with basis and confidence (1 point = one 8-hour block of human effort). Records Azure DevOps and Feature 4321 as an existing linked item, generates the work-item hierarchy (Feature, User Story per slice, Tasks) and an Azure DevOps import CSV. States the total and asks "Approve Gate 4, or what should change?" Calls no tracker API. Writes no implementation code.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: lite-tier-medium-task
+expected_outcome: |
+  Uses the Lite tier because the user asked for a light process: one plan.md with Product, Architecture, Program design and Slices sections, each slice with a named proof and an estimate. One approval question for the whole plan. No implementation code.
+context:
+  scaffold_script: place-files.sh

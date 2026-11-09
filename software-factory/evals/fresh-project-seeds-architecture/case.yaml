@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: fresh-project-seeds-architecture
+expected_outcome: |
+  Records Gate 2 as approved. Because this is a fresh project, seeds the architecture document and the first ADR from the approved gate, filled in and written in the present tense. Then writes the Gate 3 program design document and asks "Approve Gate 3, or what should change?" No implementation code yet.
+context:
+  scaffold_script: place-files.sh
