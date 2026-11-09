@@ -736,7 +736,7 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
 
 **Verified.**
 
-- `scripts/selftest.py`: 86 checks across an existing project, a fresh project on the Lite tier,
+- `scripts/selftest.py`: 87 checks across an existing project, a fresh project on the Lite tier,
   a v1 in-tree folder (read in place, then migrated), in-tree mode with retire, a non-git folder,
   an external store, a linked worktree and an overlay rule file. All pass on Windows with
   Git 2.44 and Python 3.11.
@@ -762,9 +762,12 @@ Trevor's answers to the open questions, recorded here so no later session re-lit
   measures features v1 does not have. Nine cases have never been run, including the tier offer,
   work items, close-out and the review flow from the plan home page, which was added after that
   round. v1 as first committed on this branch is the baseline.
-- **Two behaviours seen in that round are not yet addressed**: HTML mockups produced for a
-  command-line tool, and an UNVERIFIED reason written into the status file as a paragraph. The
-  third, a stop to ask before close-out, is resolved by decision 10 but has not been re-run.
+- **The three behaviours seen in that round have been addressed but not re-run.** A stop to
+  ask before close-out: decision 10. HTML mockups for a command-line tool: Gate 1 now asks for a
+  text sample of what the user types and sees when the interface is text. An UNVERIFIED reason
+  written into the status file as a paragraph: the guidance asks for one sentence, and the
+  script enforces it by keeping only the first sentence in the status file and the whole reason
+  in the commit. Each has an assertion in its eval case.
 - **Tracker imports.** The Azure DevOps and Jira CSV shapes follow the vendors' documented
   hierarchy columns (`Title 1..N`; `Issue ID` / `Parent`). Field names for points and estimates
   were not tried against a live board, and company-managed Jira projects may want an epic-link

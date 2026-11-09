@@ -107,6 +107,15 @@ def fill(text, mapping):
     return re.sub(r"\{\{(\w+)\}\}", lambda m: str(mapping.get(m.group(1), m.group(0))), text)
 
 
+def first_sentence(text, limit=160):
+    """The first sentence of a reason, on one line and short enough for a status line."""
+    flat = " ".join((text or "").split())
+    first = re.split(r"(?<=[.!?])\s", flat, 1)[0]
+    if len(first) > limit:
+        first = first[:limit - 3].rsplit(" ", 1)[0] + "…"
+    return first
+
+
 def fmt_pts(x):
     if x is None:
         return ""
@@ -1331,11 +1340,10 @@ def human_status(st, sl):
         return out("building", "Building slice %d of %d" % (nxt["slice"], total), t[:1].upper() + t[1:] + ".")
     if k == "paused":
         why = next((s["unverified"] for s in st["slices"] if s["n"] == nxt["slice"]), "")
-        first = re.split(r"(?<=[.!?])\s", why.strip(), 1)[0]
-        if len(first) > 160:
-            first = first[:157].rsplit(" ", 1)[0] + "…"
+        first = first_sentence(why)
         return out("paused", "Paused on slice %d" % nxt["slice"],
-                   "It is built but could not be proven. %s The full reason is under Needs your attention." % first)
+                   "It is built but could not be proven. %s%s The full reason is on the slice's review page."
+                   % (first, "" if first.endswith((".", "!", "?", "…")) else "."))
     if k == "needs-user":
         return out("waiting", "Slice %d needs you present" % nxt["slice"], "It will not start until you say so.")
     if k == "closeout":
@@ -1503,7 +1511,9 @@ def render_home(ctx, slug):
             body += "<p class=\"muted small\">How it will be proven: %s</p>" % inline_md(d["proof"])
         if s.get("unverified"):
             body += "<p><strong>Not proven:</strong> %s</p>" % esc(s["unverified"])
-            attention.append("<li>Slice %d is built but <strong>not proven</strong>: %s</li>" % (n, esc(s["unverified"])))
+            attention.append("<li>Slice %d is built but <strong>not proven</strong>: %s%s</li>"
+                             % (n, esc(s["unverified"]), " <a href=\"slice-%d.html\">Read the full reason</a>" % n
+                                if (out_dir / ("slice-%d.html" % n)).exists() else ""))
         elif d.get("needs_user") and not s.get("done"):
             attention.append("<li>Slice %d needs you present before it starts.</li>" % n)
         if (out_dir / ("slice-%d.html" % n)).exists():
@@ -2056,7 +2066,7 @@ def cmd_commit(args):
     else:
         body.append("Proof (%s): %s" % (args.proof_kind, args.proof.strip()))
     done = not unv or bool(accepted)
-    flag = None if done else unv
+    flag = None if done else first_sentence(unv)  # the status file stays short; the commit has it all
     if d["tests"]:
         body.append("Tests: %s" % d["tests"])
     if args.notes:

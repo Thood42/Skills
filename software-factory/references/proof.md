@@ -62,7 +62,13 @@ reachable, a test runner that will not start. Then:
    ```
 
    The code is committed so the work is not lost. The slice is **not** ticked, the run pauses,
-   and the walkthrough shows it in red.
+   and the plan home page shows it as needing attention.
+
+   Keep the reason to one sentence: what could not be run, and why. That sentence goes on the
+   slice's line in the status file, which has to stay short. Everything else — what you did
+   run instead, what it does and does not show — belongs in `--notes`, where the commit message
+   and the slice's review page carry it in full. If you write more, the script keeps the whole
+   text in the commit and puts only the first sentence in the status file.
 3. Tell the user plainly: what was built, what could not be checked, what they can run to check
    it.
 4. It becomes done in one of two ways. Either it is proven later

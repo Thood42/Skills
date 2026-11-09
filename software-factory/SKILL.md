@@ -86,7 +86,7 @@ the detail.
   00-status.md          state file: tier, gate approvals, slice checklist, user decisions,
                         amendments, version control, work items, pointers
   00-research.md        what is true today, constraints, spikes
-  01-product.md         Gate 1      mockups/   one plain HTML file per screen
+  01-product.md         Gate 1      mockups/   one plain HTML file per screen (graphical UIs only)
   02-architecture.md    Gate 2
   03-program-design.md  Gate 3
   04-slices.md          Gate 4: slices with proof, estimate and tasks
@@ -180,8 +180,10 @@ Lite equivalents. The rules that matter most:
 metric and how it is measured, the announcement written before the feature, scope (in / out /
 deferred), the riskiest assumption, and a rough size in story points. Databases, schemas,
 endpoints, architecture and file names are banned here; if tech appears, it belongs in Gate 2.
-For anything with a UI, make one plain HTML file per screen in `mockups/` — no framework,
-throwaway by design — and iterate until the user says "yes, that."
+For anything with a graphical UI, make one plain HTML file per screen in `mockups/` — no
+framework, throwaway by design — and iterate until the user says "yes, that." For a
+command-line tool, or anything whose interface is text, do not make mockups: put a sample of
+what the user types and sees in the doc as a text block.
 
 **Gate 2 — Architecture.** Read the real code before writing; never design against an imagined
 codebase. Fit, endpoints, data, flow, external dependencies (env var names, never values). Also:
@@ -236,8 +238,8 @@ For each slice:
 **Pause only when:**
 
 - the next slice is marked "Needs user present: yes";
-- a slice could not be proven — record it with `--unverified "<reason>"`, never as done. Report
-  it plainly. It is ticked only once it is proven (`--proof-only`) or the user accepts it in
+- a slice could not be proven — record it with `--unverified "<one sentence: what could not be
+  run, and why>"`, never as done. Report it plainly. It is ticked only once it is proven (`--proof-only`) or the user accepts it in
   words (`--accepted-by-user`);
 - a slice shows an approved gate was wrong — backtrack through the approval protocol;
 - a test cannot be made to pass honestly.

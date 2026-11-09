@@ -21,4 +21,4 @@
 <a story-point range, 1 point = one 8-hour block of human effort — e.g. "5–8 points">
 
 ## Screens
-<one line per mockup file in ./mockups/ — or "no UI">
+<graphical UI: one line per mockup file in ./mockups/. Text interface (command line, API): a sample of what the user types and sees, as a text block. Neither: "no UI">

@@ -103,9 +103,15 @@ never gets asked. If a technical thought comes up, write it down for Gate 2 and 
 - **Riskiest assumption** — the belief that, if false, makes this the wrong thing to build.
 - **Rough size** — a story-point range. The user decides whether to build at all at this gate,
   and that decision should have a cost beside it. See `work-items.md` for the scale.
-- **Screens** — for anything with a UI, one plain HTML file per screen in `mockups/`. No
-  framework, no build step, throwaway by design. Iterate with the user until they say "yes,
-  that." Open each mockup and look at it before showing it. For no UI, write "no UI".
+- **Screens** — match the form to the interface:
+  - *A graphical UI*: one plain HTML file per screen in `mockups/`. No framework, no build
+    step, throwaway by design. Iterate with the user until they say "yes, that." Open each
+    mockup and look at it before showing it; a mockup nobody has looked at is not a mockup.
+  - *A command-line tool, an API, a chat reply, or anything else whose interface is text*: no
+    mockups. Put a sample session in the doc as a text block — what the user types and what
+    comes back, including one thing going wrong. An HTML picture of a terminal adds a file to
+    open and shows nothing the text does not.
+  - *No interface at all*: write "no UI".
 
 ## Gate 2 — Architecture
 

@@ -496,9 +496,15 @@ def scenario_fresh_lite(root):
     rc, out, s = plan(d, "status", "greeting", "--json")
     check("lite: next action is slice 1", s and s["next"]["kind"] == "slice", out)
     write(d / "greet.py", "def greet(name):\n    return 'hello'\n")
-    rc, out, c = plan(d, "commit", "greeting", "--slice", "1", "--all", "--unverified", "no test runner yet",
+    long_reason = ("No test runner yet. The sandbox has no network, so nothing can be installed, and the planned check\n"
+                   "needs the packaged command, which does not exist until slice 2 builds it.")
+    rc, out, c = plan(d, "commit", "greeting", "--slice", "1", "--all", "--unverified", long_reason,
                       "--tour", "greet() in greet.py", "--json")
     check("lite: an unverified slice is recorded but not done", c and not c["done"] and c["pause"], out)
+    line = next((l for l in read(pdir / "00-status.md").split("\n") if l.startswith("- [ ] Slice 1")), "")
+    check("unverified: the status file keeps one short sentence and the commit keeps the whole reason",
+          "UNVERIFIED: No test runner yet." in line and "sandbox" not in line and len(line) < 140
+          and "does not exist until slice 2 builds it" in " ".join(sh(["git", "log", "-1", "--format=%B"], d).split()), line)
     rc, out, c = plan(d, "commit", "greeting", "--slice", "1", "--proof-only", "--unverified", "no test runner yet",
                       "--accepted-by-user", "fine, I will run it myself", "--json")
     msg = sh(["git", "log", "-1", "--format=%B"], d)
