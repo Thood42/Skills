@@ -5,7 +5,9 @@ self-contained HTML presentations (a single `.html` file, opens offline, no inst
 step), and **research-partner**, which bootstraps Obsidian-based research vaults backed by a
 queryable knowledge graph. They are independent — different languages, different deliverables,
 no shared code. Most of this file documents slide-forge, which is the actively developed one;
-see the `research-partner/` section near the end for that skill.
+see the `research-partner/` section near the end for that skill. Two more skills live here and
+are documented in their own folders: **building-vscode-extensions** (its `DESIGN.md`) and
+**software-factory** (section at the end of this file, and its `DESIGN.md`).
 
 ## Layout
 
@@ -16,6 +18,8 @@ slide-forge-design-critique.md  2026-07-06 design review that led to the v3 engi
 slide-forge-media-plan.md  images/diagrams/links/sandboxed embeds — READ before touching media (§11 ADR)
 slide-forge-editor-ux-plan.md  2026-07-31 design handoff behind the v4 editor UX — READ before editor-UI work
 research-partner/       Obsidian research-vault bootstrapper + SQLite knowledge graph (separate skill)
+building-vscode-extensions/  VS Code extension builder; overlays the software-factory gates
+software-factory/       four-gate plan-before-code workflow + plan.py helper (separate skill)
 README.md               short index (the skill + plan docs); this file is the source of truth
 *.skill                 gitignored build artifacts (zips); rebuilt separately, not tracked
 ```
@@ -269,3 +273,29 @@ the source of truth for it, not this file.
   not apply to it.
 - Not yet exercised in this workspace (no vault has been bootstrapped from here yet); verify
   against `SKILL.md`'s own phases before relying on it end-to-end.
+
+## `software-factory/` (2026-11-09 — v2 built, evals not yet run)
+
+Dex Horthy's four-gate workflow (Product → Architecture → Program Design → Vertical Slices),
+upgraded from the single-file v1 that is still what the Claude skills plugin has installed.
+`software-factory/DESIGN.md` is the decision record: the proposal, Trevor's eight decisions, and
+a section on what the build verified and what it did not. Read it before changing the skill.
+
+- **What v2 adds:** a Lite tier, a research phase, autonomous slices (the slice commit is the
+  record; each slice gets an HTML review page), a proof standard with an UNVERIFIED state, an
+  Agile work-item hierarchy with story points (1 point = one 8-hour block of human effort), a
+  **plan store** (plans live on an orphan `plans` branch mounted at `.plans/`, not on code
+  branches) and a close-out harvest into a present-state architecture doc and ADRs in force.
+- **`scripts/plan.py`** (Python, stdlib only) does the bookkeeping. `scripts/selftest.py` drives
+  every subcommand through throwaway repos — run it after any change to the script:
+  `python software-factory/scripts/selftest.py` (88 checks; it never touches this repo).
+- **Careful with git here:** this repo is itself a candidate for `plan.py`, which creates a
+  `plans` branch and a `.plans/` worktree in whatever repository it is run from. Run it only from
+  a fixture or a real project, never from this repo's root, unless the intent is to plan work on
+  this repo.
+- **Evals:** `software-factory/evals/<case>/` in the skill-creator case format; fixtures are
+  built by `evals/files/build_fixture.py <case> <dir>` (each case's `place-files.sh` calls it).
+  No eval has been run yet; v1 (the first commit on the branch) is the baseline to compare with.
+- `building-vscode-extensions` overlays these gates and still names `docs/plans/<slug>/`; v2
+  reads a plan at that path in place. The two finished plans under `docs/plans/` on `master` are
+  v1 runs and have not been migrated.

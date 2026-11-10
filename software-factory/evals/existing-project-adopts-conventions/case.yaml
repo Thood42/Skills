@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: existing-project-adopts-conventions
+expected_outcome: |
+  Treats the repository as an existing project and follows what is already there: the feature branch uses the `feat/` prefix and is cut from `trunk`, the existing CLAUDE.md and doc/adr/ are used as they are, and ADR 0007 is taken as a constraint. Writes research and the Gate 1 product document. No implementation code. Ends by asking "Approve Gate 1, or what should change?"
+context:
+  scaffold_script: place-files.sh

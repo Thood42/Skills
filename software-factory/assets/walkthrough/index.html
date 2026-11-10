@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{plan_title}} — plan</title>
+<script>try{var t=localStorage.getItem("sf-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}</script>
+<style>
+{{css}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="bar-title" href="#top">{{plan_title}}</a>
+  <span class="bar-where">plan home</span>
+  <div class="bar-tools">
+    <label class="live" title="Reload this page every 15 seconds so the status stays current">
+      <input type="checkbox" id="live" aria-label="Live updates"><span class="live-track" aria-hidden="true"></span><span>Live updates</span>
+    </label>
+    <button type="button" class="tool" id="theme"><svg viewBox="0 0 16 16" aria-hidden="true"><path id="theme-icon" fill="currentColor" d=""/></svg><span id="theme-label">Dark</span></button>
+    <button type="button" class="tool" id="print" aria-label="Print or save as PDF"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 1h8v3H4zM2 5h12a1 1 0 0 1 1 1v6h-3v3H4v-3H1V6a1 1 0 0 1 1-1zm4 6v3h4v-3z"/></svg><span>Print</span></button>
+  </div>
+</header>
+
+<div class="wrap" id="top">
+<section class="hero hero--{{now_class}}" aria-live="polite">
+  <p class="hero-plan">{{plan_title}} <code>{{slug}}</code></p>
+  <h1 class="hero-status">{{headline}}</h1>
+  <p class="hero-sub">{{now_text}}</p>
+  {{hero_actions}}
+  <ol class="route" style="--stations: {{stations}}; --reach: {{reach}};" aria-label="Where the plan is on its route">
+    <li class="route-fill" aria-hidden="true"></li>
+    {{route}}
+  </ol>
+  <p class="freshness">Updated <time id="updated" datetime="{{generated_iso}}">{{generated}}</time>. Reload for the latest, or turn on live updates.</p>
+</section>
+
+<div class="figures">
+  {{figures}}
+</div>
+<dl class="facts">
+  {{facts}}
+</dl>
+
+<div class="layout">
+<nav class="rail" aria-label="On this page">
+  <div class="rail-inner">
+    <span class="rail-title">On this page</span>
+    {{rail}}
+  </div>
+</nav>
+
+<div class="content">
+<div id="stale" class="card warnbox notice" hidden>
+  <span><strong>The plan has changed since you started this review.</strong> Your comments are kept. Check that they still apply.</span>
+  <button type="button" id="stale-ok" class="btn small">Got it</button>
+</div>
+
+{{attention_section}}
+
+<section id="signoff">
+  <h2>{{signoff_title}}</h2>
+  <div class="card signoff {{signoff_class}}">
+    <p class="lede">{{signoff_help}}</p>
+    <fieldset id="decision" class="decision" {{decision_hidden}}>
+      <legend class="visually-hidden">Your decision</legend>
+      <label class="choice"><input type="radio" name="decision" value="approve"><span><strong>Approve</strong>Go ahead as written.</span></label>
+      <label class="choice"><input type="radio" name="decision" value="approve-with-changes"><span><strong>Approve, with the changes in my comments</strong>Make the changes I have noted, then carry on without asking again.</span></label>
+      <label class="choice"><input type="radio" name="decision" value="changes"><span><strong>Changes needed before I approve</strong>Revise it and show me again.</span></label>
+    </fieldset>
+    <label class="field-label" for="overall">Overall comment (optional)</label>
+    <textarea id="overall" rows="3" placeholder="Anything that applies to the whole plan"></textarea>
+  </div>
+</section>
+
+<section id="plan">
+  <h2>The plan</h2>
+  <p class="lede">Each part has a Comment button. What you write is saved in this browser as you type and sent only when you choose.</p>
+  <div class="doc-tools">
+    <button type="button" class="btn small quiet" id="open-all">Open all</button>
+    <button type="button" class="btn small quiet" id="close-all">Close all</button>
+  </div>
+  {{docs}}
+</section>
+
+<section id="slices">
+  <h2>Slices</h2>
+  <p class="lede">The feature is built in thin end-to-end slices. Each one ends working, proven and committed, with its own review page.</p>
+  {{slices}}
+</section>
+
+{{effort_section}}
+
+{{work_items_section}}
+
+<section id="decisions">
+  <h2>Decisions on record</h2>
+  <h3>Where you chose differently from the recommendation</h3>
+  <div class="card">{{decisions}}</div>
+  <h3>Changes you attached to an approval</h3>
+  <div class="card">{{amendments}}</div>
+</section>
+
+<footer class="end">
+  <p>Generated from the plan folder and git by software-factory. The page is rebuilt whenever the plan changes. Your comments stay in this browser until you send them.</p>
+</footer>
+</div>
+</div>
+</div>
+
+<div class="dock" role="region" aria-label="Send your review">
+  <span id="count" class="dock-count">No comments yet</span>
+  <button type="button" id="clear" class="btn small quiet">Clear</button>
+  <button type="button" id="download" class="btn small">Download file</button>
+  <button type="button" id="copy" class="btn primary">Copy review for chat</button>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="tip" class="tip" hidden></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title">Your review</h2>
+    <p id="modal-status" class="lede"></p>
+    <textarea id="modal-text" rows="14" readonly></textarea>
+    <div class="modal-actions">
+      <button type="button" id="modal-copy" class="btn">Copy again</button>
+      <button type="button" id="modal-close" class="btn primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var PLAN = {{plan_json}};
+  var KEY = "sf-review:" + PLAN.slug + ":" + PLAN.gate;
+  var mem = { decision: "", overall: "", comments: {}, version: PLAN.version };
+  var root = document.documentElement;
+  function byId(id) { return document.getElementById(id); }
+  function all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function store(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* storage unavailable */ } }
+  function recall(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+
+  /* ---- theme ---- */
+  var SUN = "M8 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM8 0l1 2.5H7zM8 16l-1-2.5h2zM0 8l2.5-1v2zM16 8l-2.5 1V7zM2.3 2.3l2.5 1-1.5 1.5zM13.7 13.7l-2.5-1 1.5-1.5zM2.3 13.7l1-2.5 1.5 1.5zM13.7 2.3l-1 2.5-1.5-1.5z";
+  var MOON = "M6 1a7 7 0 1 0 9 9A6 6 0 0 1 6 1z";
+  function isDark() {
+    var set = root.getAttribute("data-theme");
+    if (set) { return set === "dark"; }
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function paintTheme() {
+    var dark = isDark();
+    byId("theme-label").textContent = dark ? "Light" : "Dark";
+    byId("theme-icon").setAttribute("d", dark ? SUN : MOON);
+    byId("theme").setAttribute("aria-label", "Switch to the " + (dark ? "light" : "dark") + " theme");
+  }
+  byId("theme").addEventListener("click", function () {
+    var next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    store("sf-theme", next);
+    paintTheme();
+  });
+  paintTheme();
+  if (window.matchMedia) {
+    var scheme = window.matchMedia("(prefers-color-scheme: dark)");
+    if (scheme.addEventListener) { scheme.addEventListener("change", paintTheme); }
+  }
+
+  /* ---- freshness and live updates ---- */
+  function ago() {
+    var el = byId("updated");
+    var then = new Date(el.getAttribute("datetime"));
+    var mins = Math.round((Date.now() - then.getTime()) / 60000);
+    if (isNaN(mins)) { return; }
+    el.textContent = mins < 1 ? "just now" : mins === 1 ? "1 minute ago" : mins < 60 ? mins + " minutes ago"
+      : mins < 120 ? "1 hour ago" : mins < 1440 ? Math.round(mins / 60) + " hours ago"
+      : "on " + then.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " at " + then.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+  ago();
+  window.setInterval(ago, 30000);
+  var live = byId("live");
+  live.checked = recall("sf-live") === "on";
+  live.addEventListener("change", function () { store("sf-live", live.checked ? "on" : "off"); });
+  window.setInterval(function () {
+    var typing = document.activeElement && document.activeElement.tagName === "TEXTAREA";
+    if (live.checked && !typing && byId("modal").hidden && !document.hidden) { window.location.reload(); }
+  }, 15000);
+
+  /* ---- comments and the review ---- */
+  function load() {
+    var raw = recall(KEY);
+    if (!raw) { return; }
+    try { var saved = JSON.parse(raw); if (saved && typeof saved.comments === "object") { mem = saved; } } catch (e) { /* ignore */ }
+  }
+  function save() { store(KEY, JSON.stringify(mem)); refresh(); }
+  function keyOf(sec) { return sec.getAttribute("data-target") + "::" + sec.getAttribute("data-section"); }
+  var sections = all("[data-target]");
+
+  function commentList() {
+    var out = [];
+    sections.forEach(function (sec) {
+      var text = (mem.comments[keyOf(sec)] || "").trim();
+      if (text) { out.push({ target: sec.getAttribute("data-target"), section: sec.getAttribute("data-section"), text: text }); }
+    });
+    return out;
+  }
+  var DECISIONS = { "approve": "Approve", "approve-with-changes": "Approve, with the changes in my comments",
+                    "changes": "Changes needed before I approve" };
+  function reviewText() {
+    var list = commentList();
+    var lines = ["Plan review: " + PLAN.title + " (" + PLAN.slug + "), " + PLAN.gateLabel];
+    if (PLAN.awaiting) { lines.push("Decision: " + (DECISIONS[mem.decision] || "none given yet")); }
+    if ((mem.overall || "").trim()) { lines.push("Overall: " + mem.overall.trim()); }
+    if (list.length) {
+      lines.push("Comments (" + list.length + "):");
+      list.forEach(function (c, i) {
+        var where = c.target.indexOf("slice-") === 0 ? c.section : c.target + " › " + c.section;
+        lines.push((i + 1) + ". [" + where + "] " + c.text.replace(/\s*\n\s*/g, " "));
+      });
+    } else {
+      lines.push("Comments: none");
+    }
+    return lines.join("\n");
+  }
+  function reviewData() {
+    return { kind: "software-factory-review", schema: 1, slug: PLAN.slug, title: PLAN.title, gate: PLAN.gate,
+             gateLabel: PLAN.gateLabel, awaiting: PLAN.awaiting, version: PLAN.version, exported: new Date().toISOString(),
+             decision: PLAN.awaiting ? (mem.decision || "none") : "feedback", overall: (mem.overall || "").trim(),
+             comments: commentList() };
+  }
+  function refresh() {
+    var list = commentList();
+    var n = list.length;
+    var head = n === 0 ? "No comments yet" : "<strong>" + n + (n === 1 ? " comment" : " comments") + "</strong>";
+    var SHORT = { "approve": "approve", "approve-with-changes": "approve with changes", "changes": "changes needed" };
+    if (PLAN.awaiting) { head += mem.decision ? ", decision: " + SHORT[mem.decision] : ", no decision yet"; }
+    byId("count").innerHTML = head;
+    var per = {};
+    list.forEach(function (c) {
+      var group = c.target.indexOf("slice-") === 0 ? "slices" : c.target;
+      per[group] = (per[group] || 0) + 1;
+    });
+    all("[data-count-for]").forEach(function (b) {
+      var k = per[b.getAttribute("data-count-for")] || 0;
+      b.textContent = k;
+      b.hidden = k === 0;
+    });
+    sections.forEach(function (sec) {
+      var has = !!(mem.comments[keyOf(sec)] || "").trim();
+      sec.classList.toggle("has-comment", has);
+      var btn = sec.querySelector(".cbtn");
+      if (btn) { btn.textContent = has ? "Edit comment" : "Comment"; }
+    });
+  }
+  sections.forEach(function (sec) {
+    var btn = sec.querySelector(".cbtn");
+    var box = sec.querySelector(".cbox");
+    if (!btn || !box) { return; }
+    var area = box.querySelector("textarea");
+    btn.addEventListener("click", function () {
+      if (box.hidden) { box.hidden = false; area.focus(); } else if (!area.value.trim()) { box.hidden = true; }
+    });
+    area.addEventListener("input", function () {
+      var k = keyOf(sec);
+      if (area.value.trim()) { mem.comments[k] = area.value; } else { delete mem.comments[k]; }
+      save();
+    });
+  });
+  function restore() {
+    sections.forEach(function (sec) {
+      var text = mem.comments[keyOf(sec)];
+      var box = sec.querySelector(".cbox");
+      if (text && box) {
+        box.querySelector("textarea").value = text;
+        box.hidden = false;
+        var holder = sec.closest("details");
+        if (holder) { holder.open = true; }
+      }
+    });
+    byId("overall").value = mem.overall || "";
+    all("input[name=decision]").forEach(function (r) { r.checked = r.value === mem.decision; });
+    if (mem.version && mem.version !== PLAN.version && (commentList().length || mem.overall)) { byId("stale").hidden = false; }
+  }
+  byId("overall").addEventListener("input", function () { mem.overall = this.value; save(); });
+  all("input[name=decision]").forEach(function (r) {
+    r.addEventListener("change", function () { if (r.checked) { mem.decision = r.value; save(); } });
+  });
+  byId("stale-ok").addEventListener("click", function () { mem.version = PLAN.version; byId("stale").hidden = true; save(); });
+
+  var toastTimer = null;
+  function toast(text) {
+    var el = byId("toast");
+    el.textContent = text;
+    el.hidden = false;
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(function () { el.hidden = true; }, 3200);
+  }
+  function fallbackCopy() {
+    var area = byId("modal-text");
+    area.focus();
+    area.select();
+    try { return document.execCommand("copy"); } catch (e) { return false; }
+  }
+  function copyText(text, done) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy()); });
+    } else {
+      done(fallbackCopy());
+    }
+  }
+  function showReview() {
+    var text = reviewText();
+    byId("modal-text").value = text;
+    byId("modal").hidden = false;
+    copyText(text, function (ok) {
+      byId("modal-status").textContent = ok
+        ? "Copied. Paste it into the chat to send it."
+        : "Could not copy automatically. Select the text below, copy it, and paste it into the chat.";
+      if (ok) { toast("Review copied"); }
+    });
+  }
+  byId("copy").addEventListener("click", showReview);
+  byId("modal-copy").addEventListener("click", showReview);
+  byId("modal-close").addEventListener("click", function () { byId("modal").hidden = true; });
+  byId("modal").addEventListener("click", function (ev) { if (ev.target === this) { this.hidden = true; } });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") { byId("modal").hidden = true; } });
+
+  byId("download").addEventListener("click", function () {
+    var data = reviewData();
+    var stamp = data.exported.replace(/[-:]/g, "").slice(0, 13).replace("T", "-");
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "plan-review-" + PLAN.slug + "-" + PLAN.gate + "-" + stamp + ".json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+    toast("Review file saved. Tell the assistant you have sent your review.");
+  });
+  byId("clear").addEventListener("click", function () {
+    if (!window.confirm("Remove your decision and all comments on this page?")) { return; }
+    mem = { decision: "", overall: "", comments: {}, version: PLAN.version };
+    sections.forEach(function (sec) {
+      var box = sec.querySelector(".cbox");
+      if (box) { box.querySelector("textarea").value = ""; box.hidden = true; }
+    });
+    save();
+    restore();
+    toast("Comments cleared");
+  });
+
+  /* ---- reading aids ---- */
+  var docs = all("details.doc");
+  byId("open-all").addEventListener("click", function () { docs.forEach(function (d) { d.open = true; }); });
+  byId("close-all").addEventListener("click", function () { docs.forEach(function (d) { d.open = false; }); });
+  var reopened = [];
+  window.addEventListener("beforeprint", function () {
+    reopened = all("details:not([open])");
+    reopened.forEach(function (d) { d.open = true; });
+  });
+  window.addEventListener("afterprint", function () { reopened.forEach(function (d) { d.open = false; }); reopened = []; });
+  byId("print").addEventListener("click", function () { window.print(); });
+
+  var links = all(".rail a[href^='#']");
+  function target(link) { return document.getElementById(link.getAttribute("href").slice(1)); }
+  links.forEach(function (link) {
+    link.addEventListener("click", function () {
+      var el = target(link);
+      if (el && el.tagName === "DETAILS") { el.open = true; }
+    });
+  });
+  function spy() {
+    var here = null;
+    links.forEach(function (link) {
+      var el = target(link);
+      if (el && el.getBoundingClientRect().top <= 120) { here = link; }
+    });
+    links.forEach(function (link) { link.classList.toggle("is-here", link === here); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+
+  var tip = byId("tip");
+  all("[data-tip]").forEach(function (row) {
+    function show() {
+      var r = row.getBoundingClientRect();
+      tip.textContent = row.getAttribute("data-tip");
+      tip.hidden = false;
+      var w = tip.offsetWidth;
+      tip.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+      tip.style.top = Math.max(8, r.top - tip.offsetHeight - 6) + "px";
+    }
+    function hide() { tip.hidden = true; }
+    row.addEventListener("mouseenter", show);
+    row.addEventListener("focus", show);
+    row.addEventListener("mouseleave", hide);
+    row.addEventListener("blur", hide);
+  });
+
+  load();
+  restore();
+  refresh();
+})();
+</script>
+</body>
+</html>

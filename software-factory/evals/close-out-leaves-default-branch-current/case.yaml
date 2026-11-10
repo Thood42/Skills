@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: close-out-leaves-default-branch-current
+expected_outcome: |
+  Harvests the plan: docs/architecture.md is edited in place to describe the export module as part of the system as it is now; a new ADR records the CSV decision and supersedes ADR 0003, which leaves the code branch for the plan store's archive; another ADR records the user's decision to quote every field; the test trap from the slice notes goes into the agent file. These edits are the last commit on the feature branch, the harvest is recorded, and the close-out check passes. No planning file is tracked on the feature branch. Nothing is pushed.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: review-comments-folded-in
+expected_outcome: |
+  Reads the review the user exported from the plan home page (approve, with three changes). Folds every comment into the Gate 2 document: the field is named `repeats`, a decision is added that the next due date is worked out from the task's due date and not the completion date, and changes to the saved file are listed as needing the user present. Records Gate 2 as approved with the amendments. Replies comment by comment saying what changed. Then writes the Gate 3 program design, consistent with the amended Gate 2, and asks "Approve Gate 3, or what should change?" No implementation code.
+context:
+  scaffold_script: place-files.sh

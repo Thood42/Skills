@@ -1,10 +1,12 @@
 # Claude Skills Workspace
 
-Development workspace for custom Claude Skills. Three skills live here today:
+Development workspace for custom Claude Skills. Four skills live here today:
 **slide-forge**, which generates self-contained HTML presentations,
 **research-partner**, which bootstraps Obsidian-based research vaults with a
-queryable knowledge graph, and **building-vscode-extensions**, which scaffolds,
-plans, reviews and releases enterprise-grade VS Code extensions.
+queryable knowledge graph, **building-vscode-extensions**, which scaffolds,
+plans, reviews and releases enterprise-grade VS Code extensions, and
+**software-factory**, the four-gate plan-before-code workflow that the VS Code
+skill builds on.
 
 ## Structure
 
@@ -34,6 +36,13 @@ Skills/
 │   ├── scripts/                    scaffold · gate · vsx-check (55 rules) · selftest (zero-dep Node)
 │   ├── assets/                     baseline repo template + surface overlays, versions.json
 │   └── evals/                      3 eval prompts + seeded fixtures
+├── software-factory/               four-gate feature workflow (Product → Architecture → Program Design → Slices)
+│   ├── SKILL.md                    router: tiers, approval protocol, autonomous slice loop, close-out
+│   ├── references/                 gates · research · proof · work-items · plan-store · knowledge · overlay-contract
+│   ├── scripts/                    plan.py (plan store, checks, slice commits, walkthroughs, work items) · selftest.py
+│   ├── assets/                     gate/plan/ADR templates, walkthrough page shell
+│   ├── evals/                      12 eval cases + a shared fixture builder
+│   └── DESIGN.md                   v2 proposal, decisions taken, and what was and was not verified
 └── CLAUDE.md                       working notes for Claude sessions — source of truth
 ```
 

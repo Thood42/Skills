@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: trivial-tweak-skips
+expected_outcome: |
+  Recognises a trivial tweak and just does it: the subcommand is renamed, the README is updated, the tests still pass. No plan folder, no plan store, no gate questions.
+context:
+  scaffold_script: place-files.sh
